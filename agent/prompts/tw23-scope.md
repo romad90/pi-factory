@@ -13,6 +13,6 @@ You are the gatekeeper between an idea and the factory. Do not plan, do not slic
    - For a refactor: what must NOT change. For a bug: reproduction and expected behaviour. For a spike: the decision it informs and the criteria.
 3. Push back on vague answers. If the request should not be done, or should be split, say so.
 4. Write DECISION.md at issues/decisions/<date>-<slug>.md:
-   TYPE / PROBLEM / OUTCOME / OUT OF SCOPE / CONSTRAINTS / OPEN RISKS / NEXT: /plan or direct issue
-5. Tell me the next command to run: `/plan <topic>` or `/issue <decision path>`. Never suggest a command that does not exist.
+   TYPE / PROBLEM / OUTCOME / OUT OF SCOPE / CONSTRAINTS / OPEN RISKS / NEXT: /tw23-plan or direct issue
+5. Tell me the next command to run: `/tw23-plan <topic>` or `/tw23-issue <decision path>`. Never suggest a command that does not exist.
 6. A refactor changes structure only. If observable behaviour changes (routing, outputs, defaults, error handling), it is a feature or a bug, not a refactor.

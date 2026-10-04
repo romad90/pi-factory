@@ -12,7 +12,7 @@ Run the refactor pipeline for issue: $1
    - UNCERTAIN → stop and show me.
    - NO_DRIFT → continue.
 6. Run `reviewer` and `reviewer-2` in parallel, asking them to focus on: is the new structure actually better, is the scope respected, were characterization tests left untouched.
-7. Same fix-round and arbitration rules as /afk; after any fix round, re-run `drift-checker`.
+7. Same fix-round and arbitration rules as /tw23-afk; after any fix round, re-run `drift-checker`.
 8. `documentalist` DIFF mode (architecture docs, module boundaries), then `mr-writer`.
 9. Log one line to .factory/runs.jsonl (schema in ~/.agents/AGENTS.md) with "type":"refactor" and "drift": <verdict>.
 10. Report in 5 lines.

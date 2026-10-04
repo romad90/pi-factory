@@ -8,7 +8,7 @@ Run the bug pipeline for issue: $1
 3. Run `debugger` with the issue path and worktree path.
 4. CANNOT_REPRODUCE or BLOCKED → stop and show me what was tried.
 5. FIXED → run `reviewer` and `reviewer-2` in parallel. Ask them to also check that the reproduction test fails on the base branch and that the stated root cause matches the fix.
-6. Same fix-round and arbitration rules as /afk (max 1 round, then me).
+6. Same fix-round and arbitration rules as /tw23-afk (max 1 round, then me).
 7. If the fix changes documented behaviour → `documentalist` DIFF mode. Then `mr-writer`.
 8. Log one line to .factory/runs.jsonl (schema in ~/.agents/AGENTS.md) with "type":"bug" and "same_pattern_elsewhere": <count>.
 9. Report in 5 lines. List SAME PATTERN ELSEWHERE as candidate new issues.

@@ -1,25 +1,25 @@
 # Pi factory — cheat sheet
 
-**Cycle:** `/scope` → `/plan` → `/drain` → you open MRs → `/wrap`
+**Cycle:** `/tw23-scope` → `/tw23-plan` → `/tw23-drain` → you open MRs → `/tw23-wrap`
 
 ## Start
 | Command | When | What happens | You |
 |---|---|---|---|
-| `/scope <need>` | Always first | Classifies (feature/bug/refactor/docs/spike), interviews you, writes `issues/decisions/…md`, tells you the next command | Answer, push back |
-| `/plan <topic>` | Big or fuzzy work | scout (+architect) → grill → PRD → typed issues (AFK/HITL, Status: todo, parallel-safe table) | **Validate the slicing** |
+| `/tw23-scope <need>` | Always first | Classifies (feature/bug/refactor/docs/spike), interviews you, writes `issues/decisions/…md`, tells you the next command | Answer, push back |
+| `/tw23-plan <topic>` | Big or fuzzy work | scout (+architect) → grill → PRD → typed issues (AFK/HITL, Status: todo, parallel-safe table) | **Validate the slicing** |
 
-Small, clear work: skip `/plan`, run `/issue <decision path>` to write one issue.
+Small, clear work: skip `/tw23-plan`, run `/tw23-issue <decision path>` to write one issue.
 
 ## Run
 | Command | What happens |
 |---|---|
-| `/drain` | **Default.** Empties the AFK queue in batches of 3, routed by Type. Stops: queue empty, 2 BLOCKED in a row, or 9 issues. |
-| `/parallel a b c` | Same, issues you pick (max 3, must be parallel-safe) |
-| `/afk <issue>` | feature: builder → reviewer ∥ reviewer-2 → documentalist → MR text |
-| `/bug <issue>` | debugger: failing repro test → root cause → fix → reviewers → MR text (+ same pattern elsewhere) |
-| `/refactor <issue>` | refactorer: characterization tests → small steps → **drift-checker** → reviewers → docs → MR text |
-| `/docs <branch or module>` | documentalist (diff or legacy) → reviewer fact-check |
-| `/spike <issue>` | scout → researcher → reviewer-2 challenges → ADR draft |
+| `/tw23-drain` | **Default.** Empties the AFK queue in batches of 3, routed by Type. Stops: queue empty, 2 BLOCKED in a row, or 9 issues. |
+| `/tw23-parallel a b c` | Same, issues you pick (max 3, must be parallel-safe) |
+| `/tw23-afk <issue>` | feature: builder → reviewer ∥ reviewer-2 → documentalist → MR text |
+| `/tw23-bug <issue>` | debugger: failing repro test → root cause → fix → reviewers → MR text (+ same pattern elsewhere) |
+| `/tw23-refactor <issue>` | refactorer: characterization tests → small steps → **drift-checker** → reviewers → docs → MR text |
+| `/tw23-docs <branch or module>` | documentalist (diff or legacy) → reviewer fact-check |
+| `/tw23-spike <issue>` | scout → researcher → reviewer-2 challenges → ADR draft |
 
 Max 1 automatic fix round per issue, then it comes to you.
 
@@ -31,7 +31,7 @@ Max 1 automatic fix round per issue, then it comes to you.
 - Every MR — text ready in `.factory/mr/`, **you** open it
 
 ## End
-`/wrap` → handoff note, worktrees to clean, day's metrics from `.factory/runs.jsonl`
+`/tw23-wrap` → handoff note, worktrees to clean, day's metrics from `.factory/runs.jsonl`
 
 ## Models
 | Role | Model |

@@ -4,16 +4,16 @@ Run AFK issues of any type in parallel, with you on scoping, slicing and arbitra
 
 ## Lifecycle
 ```
-/scope   HITL  triage + interview → issues/decisions/*.md → next command
-/plan    HITL  scout (+architect) → grill → PRD → typed issues, Status: todo
-/drain   AFK   queue → batches of 3 parallel-safe issues → routed by Type:
-                 feature  /afk       builder → reviewer ∥ reviewer-2 → documentalist → mr-writer
-                 bug      /bug       debugger → reviewers → (documentalist) → mr-writer
-                 refactor /refactor  refactorer → drift-checker → reviewers → documentalist → mr-writer
-                 docs     /docs      documentalist → reviewer fact-check → mr-writer
-                 spike    /spike     scout → researcher → reviewer-2 challenge → ADR draft
+/tw23-scope   HITL  triage + interview → issues/decisions/*.md → next command
+/tw23-plan    HITL  scout (+architect) → grill → PRD → typed issues, Status: todo
+/tw23-drain   AFK   queue → batches of 3 parallel-safe issues → routed by Type:
+                 feature  /tw23-afk       builder → reviewer ∥ reviewer-2 → documentalist → mr-writer
+                 bug      /tw23-bug       debugger → reviewers → (documentalist) → mr-writer
+                 refactor /tw23-refactor  refactorer → drift-checker → reviewers → documentalist → mr-writer
+                 docs     /tw23-docs      documentalist → reviewer fact-check → mr-writer
+                 spike    /tw23-spike     scout → researcher → reviewer-2 challenge → ADR draft
          you   open MRs from .factory/mr/, arbitrate what's waiting
-/wrap          handoff, worktree cleanup list, metrics
+/tw23-wrap          handoff, worktree cleanup list, metrics
 ```
 Out of scope for step 2: CI/CD, deployment, prod ops, dependency upgrades.
 
@@ -68,12 +68,12 @@ install.sh                optional; copy by hand works the same
 1. Model ids exact (`curl …/v1/models`): `mistral-medium-3-5-0` and the Qwen id were typed from chat/photo. Fix with `grep -rn "model:" ~/.pi/agent/agents`.
 2. `/model` (reloads models.json) and `/reload`; check every agent in `/agents`.
 3. Context test on a subagent: quote global hard rules, name its skill, give the repo test command.
-4. Dry run `/afk` on a trivial issue: worktree, DONE, two independent reviews, log line, nothing pushed.
+4. Dry run `/tw23-afk` on a trivial issue: worktree, DONE, two independent reviews, log line, nothing pushed.
 
 ## Rollout
-Week 1 `/scope` `/plan` `/afk` · Week 2 `/bug` `/docs` · Week 3 `/refactor` after the drift-checker catches a planted change · Week 4 `/drain` on 3–6 issues, then `/spike` as needed.
+Week 1 `/tw23-scope` `/tw23-plan` `/tw23-afk` · Week 2 `/tw23-bug` `/tw23-docs` · Week 3 `/tw23-refactor` after the drift-checker catches a planted change · Week 4 `/tw23-drain` on 3–6 issues, then `/tw23-spike` as needed.
 
 ## Step 2 exit criteria
 3 mixed-type issues in parallel without conflicts · most AFK issues DONE with no fix round · drift-checker zero misses on planted changes · your time goes to scoping, slicing and arbitration.
 
-Next milestone (step 3): `/drain` triggered by GitLab events on a server, cost caps, eval set, auto-merge for docs when both reviewers agree.
+Next milestone (step 3): `/tw23-drain` triggered by GitLab events on a server, cost caps, eval set, auto-merge for docs when both reviewers agree.

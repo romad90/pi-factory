@@ -3,7 +3,7 @@ description: Run one AFK feature issue end to end — worktree, build, double re
 ---
 Run the feature pipeline for issue: $1
 
-1. Read the issue. Stop if it is not AFK, has no acceptance criteria or verification command, or its Type is not feature (point me to /bug, /refactor, /docs or /spike instead).
+1. Read the issue. Stop if it is not AFK, has no acceptance criteria or verification command, or its Type is not feature (point me to /tw23-bug, /tw23-refactor, /tw23-docs or /tw23-spike instead).
 2. Create the worktree: git worktree add ../wt-<slug> -b agent/<slug>
 3. Run `builder` with the issue path and worktree path.
 4. BLOCKED → stop, show me the blocker.

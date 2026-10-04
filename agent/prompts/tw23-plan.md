@@ -18,4 +18,4 @@ Slicing rules (these make parallel work possible):
 - Pipeline and deployment definitions (.gitlab-ci.yml, CI includes, Dockerfiles, anything that triggers a deploy) are always HITL. Config such as Helm values may be AFK only if a local, offline verification exists (e.g. helm lint / helm template per environment) and nothing is deployed.
 - End with a table: issue — type — AFK/HITL — depends on — parallel-safe with.
 5. Before finishing, re-check every issue against these rules and fix the files themselves (Mode, Parallel-safe with), not just the table.
-6. Finish by telling me the run command: `/drain`, `/parallel <issues>`, or the pipeline matching each AFK issue's Type. Never suggest `/issue` (issues already exist) or a command that does not exist.
+6. Finish by telling me the run command: `/tw23-drain`, `/tw23-parallel <issues>`, or the pipeline matching each AFK issue's Type. Never suggest `/tw23-issue` (issues already exist) or a command that does not exist.
