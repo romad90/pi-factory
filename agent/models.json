@@ -1,0 +1,18 @@
+{
+  "providers": {
+    "llmaas": {
+      "baseUrl": "https://YOUR-LLMAAS-ENDPOINT/v1",
+      "api": "openai-completions",
+      "apiKey": "LLMAAS_API_KEY",
+      "models": [
+        { "id": "nemotron-3-ultra-550",  "name": "Judge / Planner (Ultra)",  "reasoning": true,  "contextWindow": 1000000, "maxTokens": 16384 },
+        { "id": "gpt-oss-120b",          "name": "Reviewer B",               "reasoning": true,  "contextWindow": 128000,  "maxTokens": 16384 },
+        { "id": "qwen3-6-27b-fp8",       "name": "Doer (build/debug/refactor)", "reasoning": true, "contextWindow": 256000, "maxTokens": 16384 },
+        { "id": "mistral-medium-3-5-0",  "name": "Documentalist",            "reasoning": true,  "contextWindow": 128000,  "maxTokens": 16384 },
+        { "id": "mistral-small-2603",    "name": "Mechanical",               "reasoning": true,  "contextWindow": 128000,  "maxTokens": 8192 },
+        { "id": "nemotron-3-super-120b", "name": "Fallback for Ultra",       "reasoning": true,  "contextWindow": 1000000, "maxTokens": 16384 },
+        { "id": "gemma-4-31b-it",        "name": "Fallback for Mistral",     "reasoning": true,  "contextWindow": 256000,  "maxTokens": 16384 }
+      ]
+    }
+  }
+}

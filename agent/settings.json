@@ -1,0 +1,5 @@
+{
+  "defaultProvider": "llmaas",
+  "defaultModel": "nemotron-3-ultra-550",
+  "defaultThinkingLevel": "high"
+}
