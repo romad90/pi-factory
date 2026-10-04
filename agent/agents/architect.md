@@ -1,7 +1,7 @@
 ---
 name: architect
 description: Read-only architecture analysis. Use to find refactoring opportunities or to assess the design impact of a planned change.
-model: llmaas/nemotron-3-ultra-550
+model: llmaas/gpt-oss-120b
 thinking: high
 tools: read, bash
 ---

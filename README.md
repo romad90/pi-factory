@@ -28,18 +28,20 @@ More specific layers win on project facts; nothing overrides global hard rules. 
 ## Roles and models
 | Agent | Model | Thinking | Writes |
 |---|---|---|---|
-| foreground (scope, plan, arbitrate) | nemotron-3-ultra-550 | high | issues, decisions |
-| scout | Ultra | low | nothing |
-| architect | Ultra | high | nothing |
-| researcher | Ultra | high | ADR draft |
-| drift-checker | Ultra | high | nothing |
-| reviewer (A) | Ultra | high | nothing |
-| reviewer-2 (B) | gpt-oss-120b | high | nothing |
+| foreground (scope, plan, issue, arbitrate) | gpt-oss-120b | high | issues, decisions |
+| scout | nemotron-3-super-120b | low | nothing |
+| architect | gpt-oss-120b | high | nothing |
+| researcher | gpt-oss-120b | high | ADR draft |
+| drift-checker | gpt-oss-120b | high | nothing |
+| reviewer (A) | gpt-oss-120b | high | nothing |
+| reviewer-2 (B) | mistral-medium-3-5-0 | high | nothing |
 | builder / debugger / refactorer | Qwen 27B | medium / high / medium | code, own worktree |
 | documentalist | mistral-medium-3-5-0 | medium | docs |
 | mr-writer, handoff | mistral-small-2603 | off | MR text, notes |
 
-Declared but unassigned: nemotron-3-super-120b (fallback for Ultra), gemma-4-31b-it (fallback for Mistral).
+Declared but unassigned: gemma-4-31b-it (fallback for Mistral). Nemotron 3 Ultra is not usable in this setup.
+
+Bias warning: the foreground and reviewer A are both gpt-oss. When reviewers disagree, the human arbitrates, not the foreground model.
 
 Design rules: strong tier judges, mid tier executes · structure and behaviour never mix · proof before fix · surgical diff-driven docs · reviewers share one prompt, differ only by model family · max 1 automatic fix round.
 
@@ -47,7 +49,7 @@ Design rules: strong tier judges, mid tier executes · structure and behaviour n
 ```
 global/AGENTS.md          → ~/.agents/AGENTS.md (+ symlink in ~/.pi/agent/)
 agent/models.json         → ~/.pi/agent/
-agent/settings.json       → ~/.pi/agent/   default = Ultra
+agent/settings.json       → ~/.pi/agent/   default = gpt-oss-120b
 agent/agents/*.md         → ~/.pi/agent/agents/   (12 agents, managed via /agents)
 agent/prompts/*.md        → ~/.pi/agent/prompts/  scope plan drain parallel afk bug refactor docs spike wrap
 repo-template/            → each project: AGENTS.md (facts only), issues/TEMPLATE.md, gitignore-additions
@@ -63,7 +65,7 @@ install.sh                optional; copy by hand works the same
 - Fallback: no automatic fallback for now. Switch by hand in `/agents`. Keep the two reviewers in different families.
 
 ## Verify before use
-1. Model ids exact (`curl …/v1/models`): `nemotron-3-ultra-550`, `mistral-medium-3-5-0` and the Qwen id were typed from chat/photo. Fix with `grep -rn "model:" ~/.pi/agent/agents`.
+1. Model ids exact (`curl …/v1/models`): `mistral-medium-3-5-0` and the Qwen id were typed from chat/photo. Fix with `grep -rn "model:" ~/.pi/agent/agents`.
 2. `/model` (reloads models.json) and `/reload`; check every agent in `/agents`.
 3. Context test on a subagent: quote global hard rules, name its skill, give the repo test command.
 4. Dry run `/afk` on a trivial issue: worktree, DONE, two independent reviews, log line, nothing pushed.

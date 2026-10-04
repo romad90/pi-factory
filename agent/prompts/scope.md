@@ -14,4 +14,5 @@ You are the gatekeeper between an idea and the factory. Do not plan, do not slic
 3. Push back on vague answers. If the request should not be done, or should be split, say so.
 4. Write DECISION.md at issues/decisions/<date>-<slug>.md:
    TYPE / PROBLEM / OUTCOME / OUT OF SCOPE / CONSTRAINTS / OPEN RISKS / NEXT: /plan or direct issue
-5. Tell me the next command to run.
+5. Tell me the next command to run: `/plan <topic>` or `/issue <decision path>`. Never suggest a command that does not exist.
+6. A refactor changes structure only. If observable behaviour changes (routing, outputs, defaults, error handling), it is a feature or a bug, not a refactor.

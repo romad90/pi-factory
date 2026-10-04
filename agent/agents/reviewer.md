@@ -1,7 +1,7 @@
 ---
 name: reviewer
-description: Independent code review of one branch against its issue (reviewer A, Nemotron family). Read-only.
-model: llmaas/nemotron-3-ultra-550
+description: Independent code review of one branch against its issue (reviewer A, gpt-oss family). Read-only.
+model: llmaas/gpt-oss-120b
 thinking: high
 tools: read, bash
 ---

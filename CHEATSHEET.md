@@ -8,7 +8,7 @@
 | `/scope <need>` | Always first | Classifies (feature/bug/refactor/docs/spike), interviews you, writes `issues/decisions/…md`, tells you the next command | Answer, push back |
 | `/plan <topic>` | Big or fuzzy work | scout (+architect) → grill → PRD → typed issues (AFK/HITL, Status: todo, parallel-safe table) | **Validate the slicing** |
 
-Small, clear work: skip `/plan`, write one issue from `issues/TEMPLATE.md`.
+Small, clear work: skip `/plan`, run `/issue <decision path>` to write one issue.
 
 ## Run
 | Command | What happens |
@@ -36,12 +36,13 @@ Max 1 automatic fix round per issue, then it comes to you.
 ## Models
 | Role | Model |
 |---|---|
-| Foreground, scout, architect, researcher, drift-checker, reviewer A | Nemotron 3 Ultra |
-| Reviewer B | gpt-oss-120b (never Nemotron) |
+| Foreground, architect, researcher, drift-checker, reviewer A | gpt-oss-120b |
+| scout | nemotron-3-super-120b |
+| Reviewer B | mistral-medium (never gpt-oss) |
 | builder, debugger, refactorer | Qwen 27B |
 | documentalist | mistral-medium |
 | mr-writer, handoff, subagent default | mistral-small |
-| Manual fallbacks | Ultra → Super · Mistral → Gemma · doers: rerun by hand |
+| Manual fallbacks | gpt-oss → Super (not for reviewer B) · Mistral → Gemma · doers: rerun by hand |
 
 ## Where things live
 - Global rules: `~/.agents/AGENTS.md` (symlinked to `~/.pi/agent/AGENTS.md`)

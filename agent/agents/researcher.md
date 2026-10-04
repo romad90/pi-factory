@@ -1,7 +1,7 @@
 ---
 name: researcher
 description: Time-boxed technical spike. Answers one question with evidence (code reading, small throwaway experiments) and drafts an ADR. No production code.
-model: llmaas/nemotron-3-ultra-550
+model: llmaas/gpt-oss-120b
 thinking: high
 tools: read, write, bash
 ---

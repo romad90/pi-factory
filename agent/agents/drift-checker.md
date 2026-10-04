@@ -1,7 +1,7 @@
 ---
 name: drift-checker
 description: Strong-tier, read-only check that a branch did not change behaviour or public contracts versus its base. Mandatory after refactors.
-model: llmaas/nemotron-3-ultra-550
+model: llmaas/gpt-oss-120b
 thinking: high
 tools: read, bash
 ---

@@ -1,7 +1,7 @@
 ---
 name: scout
 description: Read-only codebase exploration. Use before planning or building to map the files, entry points and conventions relevant to a task.
-model: llmaas/nemotron-3-ultra-550
+model: llmaas/nemotron-3-super-120b
 thinking: low
 tools: read, bash
 ---

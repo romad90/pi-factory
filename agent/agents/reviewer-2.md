@@ -1,7 +1,7 @@
 ---
 name: reviewer-2
-description: Independent code review of one branch against its issue (reviewer B, gpt-oss family — never Nemotron). Read-only.
-model: llmaas/gpt-oss-120b
+description: Independent code review of one branch against its issue (reviewer B, Mistral family — never gpt-oss). Read-only.
+model: llmaas/mistral-medium-3-5-0
 thinking: high
 tools: read, bash
 ---

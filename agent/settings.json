@@ -1,5 +1,5 @@
 {
   "defaultProvider": "llmaas",
-  "defaultModel": "nemotron-3-ultra-550",
+  "defaultModel": "gpt-oss-120b",
   "defaultThinkingLevel": "high"
 }
