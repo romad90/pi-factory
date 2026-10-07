@@ -1,0 +1,177 @@
+#!/usr/bin/env bash
+# Factory gates G1–G4. Run by GitLab CI on every merge request, so the gates
+# hold however tired or rushed anyone is. See ADR-001 §5 (D9–D11, D23).
+#
+# Usage:
+#   scripts/factory/gate.sh mission <feature>   check one mission (local)
+#   scripts/factory/gate.sh mr <base-ref>       check what an MR touches (CI)
+#
+# Exit: 0 = gates pass, 1 = a gate fails, 2 = usage / missing inputs
+set -euo pipefail
+here="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=lib.sh
+. "$here/lib.sh"
+
+fail=0
+ok()  { printf '  ✓ %s\n' "$*"; }
+bad() { printf '  ✗ %s\n' "$*"; fail=1; }
+
+check_verdict() {                       # <file> <label>
+  local f="$1" label="$2" r n
+  if [ ! -f "$f" ]; then bad "$label: verdict missing ($f)"; return; fi
+  r="$(verdict_field "$f" Result)"
+  n="$(verdict_round "$f")"
+  if [ "$r" = "PASS" ]; then
+    ok "$label: PASS (round ${n:-?})"
+  elif [ -n "$n" ] && [ "$n" -ge "$FACTORY_ROUND_LIMIT" ]; then
+    bad "$label: FAIL at round $n, limit reached. Escalate: amend the contract or the spec."
+  else
+    bad "$label: ${r:-no result} (round ${n:-?})"
+  fi
+}
+
+check_fresh() {                         # <file> <label>
+  local f="$1" label="$2" sha
+  [ -f "$f" ] || return 0
+  sha="$(verdict_field "$f" Commit)"
+  if verdict_is_fresh "$sha"; then
+    ok "$label: verdict matches current code (${sha:0:8})"
+  else
+    bad "$label: verdict is stale or has no valid **Commit:** line; code changed after it was produced"
+  fi
+}
+
+# D32: a PASS verdict must carry the id of a factory-generated brief for that
+# role, scope, ticket and commit. Proves the reviewer was dispatched with a
+# file-paths-only brief rather than a hand-written one.
+check_brief() {                         # <file> <label> <role> <scope> <ticket>
+  local f="$1" label="$2" got commit want
+  [ -f "$f" ] && [ "$(verdict_field "$f" Result)" = "PASS" ] || return 0
+  got="$(verdict_field "$f" Brief)"; commit="$(verdict_field "$f" Commit)"
+  want="$(brief_id "$3" "$4" "$5" "$commit")"
+  if [ "$got" = "$want" ]; then ok "$label: dispatched with a generated brief"
+  else bad "$label: brief id '${got:-none}' doesn't match the generated brief ($want); re-dispatch via workflow.sh"; fi
+}
+
+check_mission() {                       # <feature>
+  local feature="$1" dir spec t name cov
+  dir="$(mission_dir "$feature")"; spec="$dir/spec.md"
+  echo "Mission: $feature"
+
+  if [ ! -f "$spec" ]; then bad "spec.md missing"; return; fi
+  if ! has_contract "$spec"; then bad "G1: no validation contract"; return; fi
+
+  if [ -f "$dir/contract-critique.md" ]; then ok "G1: contract critique present"
+  else bad "G1: contract critique missing (run /contract-critic)"; fi
+
+  if contract_approved "$spec"; then ok "G1: contract approved"
+  else bad "G1: contract not approved (or amended and awaiting re-approval)"; fi
+
+  cov="$(mktemp)"
+  if bash "$here/coverage.sh" "$feature" >"$cov" 2>&1; then ok "G2: coverage"
+  else bad "G2: coverage"; sed 's/^/      /' "$cov"; fi
+  rm -f "$cov"
+
+  shopt -s nullglob
+  for t in "$dir"/issues/*.md; do
+    name="$(ticket_name "$t")"
+    v="$dir/verdicts/${name}-code.md"
+    check_verdict "$v" "G3 $name"
+    check_brief   "$v" "G3 $name" reviewer "$feature" "$name"
+    marker="$(ticket_marker "$feature" "$name")"
+    if [ -n "$marker" ] && [ -f "$v" ] && [ "$(verdict_field "$v" Commit)" != "$marker" ]; then
+      bad "G3 $name: verdict doesn't cover the latest integration (${marker:0:8})"
+    fi
+  done
+
+  check_verdict "$dir/verdicts/behavior.md" "G4 behavior"
+  check_brief   "$dir/verdicts/behavior.md" "G4 behavior" validator "$feature" -
+  check_fresh   "$dir/verdicts/behavior.md" "G4 behavior"
+}
+
+mode="${1:-}"
+case "$mode" in
+  mission)
+    check_mission "${2:?usage: gate.sh mission <feature>}"
+    ;;
+
+  mr)
+    base="${2:?usage: gate.sh mr <base-ref>}"
+
+    if [[ ",${CI_MERGE_REQUEST_LABELS:-}," == *",factory:bypass,"* ]]; then
+      echo "WARNING: factory:bypass label set. Gates skipped; this is visible in the MR and counted."
+      exit 0
+    fi
+
+    changed="$(git diff --name-only "$base"...HEAD)"
+
+    # D23: the instrument can grow freely; changing or deleting a case
+    # needs a contract amendment in the same MR.
+    shrunk="$(git diff --name-status "$base"...HEAD -- "$FACTORY_INSTRUMENT_DIR/scenarios" \
+      | awk '$1 !~ /^A/' || true)"
+    if [ -n "$shrunk" ]; then
+      echo "Instrument cases changed or removed:"
+      printf '%s\n' "$shrunk" | sed 's/^/    /'
+      if git diff "$base"...HEAD -- "$FACTORY_DIR" \
+           | grep -qE '^\+.*\*\*(Amended|Withdrawn):\*\*'; then
+        ok "instrument change backed by a contract amendment"
+      else
+        bad "instrument weakened without a contract amendment (/contract amend)"
+      fi
+    fi
+
+    code_changed="$(printf '%s\n' "$changed" \
+      | grep -vE "^(${FACTORY_DIR}|${FACTORY_INSTRUMENT_DIR})/" \
+      | grep -vE "$FACTORY_DOCS_RE" | grep -v '^$' || true)"
+
+    if [ -z "$code_changed" ]; then
+      echo "Planning, docs or instrument-only change: no lane gate applies."
+      [ "$fail" -ne 0 ] && { echo; echo "FACTORY GATE: FAIL"; exit 1; }
+      echo; echo "FACTORY GATE: PASS"
+      exit 0
+    fi
+
+    behavior_changed=""
+    if [ -f "$FACTORY_BEHAVIOR_PATHS_FILE" ]; then
+      patterns="$(grep -vE '^[[:space:]]*(#|$)' "$FACTORY_BEHAVIOR_PATHS_FILE" || true)"
+      if [ -n "$patterns" ]; then
+        behavior_changed="$(printf '%s\n' "$code_changed" | grep -E -f <(printf '%s\n' "$patterns") || true)"
+      fi
+    fi
+
+    missions="$(printf '%s\n' "$changed" \
+      | awk -F/ -v d="$FACTORY_DIR" '$1 == d && $2 != "light" && NF > 2 { print $2 }' | sort -u)"
+
+    if [ -n "$behavior_changed" ]; then
+      echo "Lane: FULL (behavior paths changed)"
+      printf '%s\n' "$behavior_changed" | sed 's/^/    /'
+      if [ -z "$missions" ]; then
+        bad "behavior changed but no mission is part of this MR (.${FACTORY_DIR#.}/<feature>/)"
+      fi
+    elif [ -n "$missions" ]; then
+      echo "Lane: FULL (mission included in MR)"
+    else
+      echo "Lane: LIGHT"
+      lights="$(printf '%s\n' "$changed" | grep -E "^${FACTORY_DIR}/light/[^/]+/verdicts/code\.md$" || true)"
+      if [ -z "$lights" ]; then
+        bad "light lane needs a fresh code review verdict: ${FACTORY_DIR}/light/<slug>/verdicts/code.md"
+      fi
+      for f in $lights; do
+        slug="$(printf '%s' "$f" | awk -F/ '{print $3}')"
+        check_verdict "$f" "light review"
+        check_brief   "$f" "light review" light-reviewer "$slug" -
+        check_fresh   "$f" "light review"
+      done
+    fi
+
+    for m in $missions; do check_mission "$m"; done
+    ;;
+
+  *)
+    die "usage: gate.sh mission <feature> | gate.sh mr <base-ref>"
+    ;;
+esac
+
+echo
+if [ "$fail" -ne 0 ]; then echo "FACTORY GATE: FAIL"; exit 1; fi
+echo "FACTORY GATE: PASS"

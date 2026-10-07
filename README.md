@@ -1,79 +1,88 @@
-# Pi factory — Step 2, full SDLC
+# Agentic factory
 
-Run AFK issues of any type in parallel, with you on scoping, slicing and arbitration. Quick reference: `CHEATSHEET.md`.
+A contract-first agentic SDLC on Pi, orchestrated with pi-subagents, on mattpocock/skills v1.3.1, with gates enforced by GitLab CI. Target: **Step 2 (Parallel) on Boris Cherny's ladder, from a laptop.**
 
-## Lifecycle
+**Why it's built this way:** `docs/adr/ADR-001-agentic-factory.md`. Every rule traces to a numbered decision (D1–D37). The path to Step 2 is §11.
+
+## How a mission runs
+
 ```
-/tw23-scope   HITL  triage + interview → issues/decisions/*.md → next command
-/tw23-plan    HITL  scout (+architect) → grill → PRD → typed issues, Status: todo
-/tw23-drain   AFK   queue → batches of 3 parallel-safe issues → routed by Type:
-                 feature  /tw23-afk       builder → reviewer ∥ reviewer-2 → documentalist → mr-writer
-                 bug      /tw23-bug       debugger → reviewers → (documentalist) → mr-writer
-                 refactor /tw23-refactor  refactorer → drift-checker → reviewers → documentalist → mr-writer
-                 docs     /tw23-docs      documentalist → reviewer fact-check → mr-writer
-                 spike    /tw23-spike     scout → researcher → reviewer-2 challenge → ADR draft
-         you   open MRs from .factory/mr/, arbitrate what's waiting
-/tw23-wrap          handoff, worktree cleanup list, metrics
-```
-Out of scope for step 2: CI/CD, deployment, prod ops, dependency upgrades.
-
-## Rule layers
-```
-~/.agents/AGENTS.md          global: hard rules, factory conventions, run-log schema
-  └ kit AGENTS.md            bot now (api, front later): conventions, verification, risks
-      └ project AGENTS.md    commands, architecture, doc locations
-```
-More specific layers win on project facts; nothing overrides global hard rules. Nothing is duplicated across layers. Every agent prompt also points to the global file explicitly, in case subagents don't inherit it.
-
-## Roles and models
-| Agent | Model | Thinking | Writes |
-|---|---|---|---|
-| foreground (scope, plan, issue, arbitrate) | gpt-oss-120b | high | issues, decisions |
-| scout | nemotron-3-super-120b | low | nothing |
-| architect | gpt-oss-120b | high | nothing |
-| researcher | gpt-oss-120b | high | ADR draft |
-| drift-checker | gpt-oss-120b | high | nothing |
-| reviewer (A) | gpt-oss-120b | high | nothing |
-| reviewer-2 (B) | mistral-medium-3-5-0 | high | nothing |
-| builder / debugger / refactorer | Qwen 27B | medium / high / medium | code, own worktree |
-| documentalist | mistral-medium-3-5-0 | medium | docs |
-| mr-writer, handoff | mistral-small-2603 | off | MR text, notes |
-
-Declared but unassigned: gemma-4-31b-it (fallback for Mistral). Nemotron 3 Ultra is not usable in this setup.
-
-Bias warning: the foreground and reviewer A are both gpt-oss. When reviewers disagree, the human arbitrates, not the foreground model.
-
-Design rules: strong tier judges, mid tier executes · structure and behaviour never mix · proof before fix · surgical diff-driven docs · reviewers share one prompt, differ only by model family · max 1 automatic fix round.
-
-## Files
-```
-global/AGENTS.md          → ~/.agents/AGENTS.md (+ symlink in ~/.pi/agent/)
-agent/models.json         → ~/.pi/agent/
-agent/settings.json       → ~/.pi/agent/   default = gpt-oss-120b
-agent/agents/*.md         → ~/.pi/agent/agents/   (12 agents, managed via /agents)
-agent/prompts/*.md        → ~/.pi/agent/prompts/  scope plan drain parallel afk bug refactor docs spike wrap
-repo-template/            → each project: AGENTS.md (facts only), issues/TEMPLATE.md, gitignore-additions
-kits/                     → layering guide + bot additions (merge into your bot AGENTS.md)
-install.sh                optional; copy by hand works the same
+you, main session   /grill-with-docs → /to-spec
+/factory <feature>  contract → (you approve) → (you write tickets) →
+                    parallel workers → integrate (lint+tests) → fresh reviewers →
+                    validator → metrics → (you: /pr, /retro)
 ```
 
-## Setup notes (tintinweb pi-subagents)
-- Agents: `/agents` (no `/subagents-models` in this extension). Project `.pi/agents/` overrides global.
-- In `/agents → Settings`: max subagent depth **1** (only the foreground orchestrates), default subagent model **mistral-small**, model scope on only if every model is in `enabledModels`.
-- Frontmatter: check `model`, `thinking`, `tools` key names against the tintinweb README; unknown keys are silently ignored. Its skill preloading can replace the "Read …/SKILL.md" lines once verified.
-- Worktrees: prompts create them with `git worktree add`. If you switch to tintinweb's built-in worktree isolation, remove those steps — never both.
-- Fallback: no automatic fallback for now. Switch by hand in `/agents`. Keep the two reviewers in different families.
+`/factory` is a loop: `next.sh` says where the mission is, `workflow.sh` generates the exact subagent workflow for the next wave, and the lead passes it verbatim. Subagents get **generated briefs** (file paths, a commit, an id), never the lead's words. Every role runs **fresh**, on **its own model**; judges on **another model family** than what they judge.
 
-## Verify before use
-1. Model ids exact (`curl …/v1/models`): `mistral-medium-3-5-0` and the Qwen id were typed from chat/photo. Fix with `grep -rn "model:" ~/.pi/agent/agents`.
-2. `/model` (reloads models.json) and `/reload`; check every agent in `/agents`.
-3. Context test on a subagent: quote global hard rules, name its skill, give the repo test command.
-4. Dry run `/tw23-afk` on a trivial issue: worktree, DONE, two independent reviews, log line, nothing pushed.
+## Layout
 
-## Rollout
-Week 1 `/tw23-scope` `/tw23-plan` `/tw23-afk` · Week 2 `/tw23-bug` `/tw23-docs` · Week 3 `/tw23-refactor` after the drift-checker catches a planted change · Week 4 `/tw23-drain` on 3–6 issues, then `/tw23-spike` as needed.
+```
+.pi/
+  agents/factory/          role agents: contract-author, contract-critic, worker,
+                           worker-heavy, reviewer, review-axis, validator
+  prompts/                 /factory, /factory-light (lead playbooks)
+  settings.json            models per role + fallbacks, model scope, builtins off
+  skills/                  mattpocock/skills v1.3.1 (pinned) + contract,
+                           contract-critic, verify-behavior
+.factory/
+  briefs/                  brief templates per role
+  skills-pin/              UPSTREAM.md, upstream.txt, skills.sha256, LICENSE
+  model-families.json      model id → family, judge/judged rules
+  commands.env             lint and test commands for integration
+  behavior-paths           paths that force the full lane
+instrument/scenarios/      behavior cases: validator only, hidden from workers
+scripts/factory/
+  next.sh                  mission state + STEP code
+  workflow.sh              generates each wave's workflowScript
+  brief.sh                 generates a role's brief
+  integrate.sh             applies a worker patch, lint + tests, commits
+  checkpoint.sh            commits mission state before a wave
+  coverage.sh  gate.sh     G2; G1–G4, lanes, briefs, instrument rule
+  metrics.sh               per-mission evidence for the MR
+  skills-pin.sh            verify / check-global / update the v1.3.1 pin
+  models-lint.mjs          one model per role; families separated, fallbacks included
+  readiness.sh  doctor.sh  repo readiness; laptop health
+  worktree-hook.mjs        hides instrument/ in worker worktrees, sets a port
+  install-pi-config.sh     one-time: wires pi-subagents' user config to the hook
+docs/adr/  docs/agents/    ADR-001; contract, verdict, checklist, harness formats
+.gitlab-ci.yml             factory-config, factory-gate, readiness, behavior replay
+AGENTS.factory.md          section to paste into the general AGENTS.md
+```
 
-## Step 2 exit criteria
-3 mixed-type issues in parallel without conflicts · most AFK issues DONE with no fix round · drift-checker zero misses on planted changes · your time goes to scoping, slicing and arbitration.
+## Setup (S0)
 
-Next milestone (step 3): `/tw23-drain` triggered by GitLab events on a server, cost caps, eval set, auto-merge for docs when both reviewers agree.
+1. `pi install npm:pi-subagents@0.76.1` and remove `@tintinweb/pi-subagents` (one orchestrator only).
+2. `scripts/factory/install-pi-config.sh` (once per machine).
+3. Fill `.pi/settings.json` (`agentOverrides` models + fallbacks, `modelScope.allow`) and `.factory/commands.env`. Add your models to `.factory/model-families.json` if missing.
+4. Paste `AGENTS.factory.md` into AGENTS.md; run `/setup-matt-pocock-skills` (local markdown tracker in `.scratch/`).
+5. Merge the factory jobs into `.gitlab-ci.yml`; enable **Settings → Merge requests → "Pipelines must succeed"**.
+6. `scripts/factory/doctor.sh` until green; then in Pi: `/subagents-doctor`, `/subagents-models`, and ask to list subagents (only `factory-*`).
+7. Dry-run `/factory` on a toy mission with one ticket (ADR §11 lists what to check).
+
+## Day to day
+
+```bash
+/factory <feature>                        # in Pi: runs the mission until a human step
+scripts/factory/next.sh <feature>         # where is it?
+scripts/factory/gate.sh mission <feature> # before pushing
+/factory-light <slug> <base>              # code change outside a mission
+```
+
+## Lanes
+
+| MR touches | Lane | Needs |
+|---|---|---|
+| Docs, `.scratch/`, new instrument cases | none | nothing (changed/removed cases need an amendment) |
+| Code, no behavior path | light | fresh verdict in `.scratch/light/<slug>/` with a generated brief id |
+| A behavior path | full | a mission, G1–G4 |
+
+## On the laptop
+
+- herdr for visibility: one workspace per mission; FleetView or `/subagents-fleet` for the children.
+- Keep the machine awake during a mission: `caffeinate -dimsu` (macOS) or `systemd-inhibit --what=idle:sleep bash` (Linux).
+- 4 children at a time by default (`parallel.concurrency`, `FACTORY_MAX_PARALLEL`).
+
+## Requirements
+
+Pi with pi-subagents 0.76.1, `bash` 4+, `git` with sparse-checkout (tested with 2.43), `node` (bundled with Pi), `awk`, `grep`, `sed`. Scripts are shellcheck-clean.

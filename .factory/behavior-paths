@@ -1,0 +1,8 @@
+# Paths whose changes alter what the bot does. Any MR touching them must
+# carry a mission (full lane). Extended regex, one per line, matched
+# against repo-relative paths. Adjust to your bot's layout. (D11)
+^src/prompts/
+^src/tools/
+^src/routing/
+^src/agents/
+^config/bot/

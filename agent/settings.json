@@ -1,5 +1,0 @@
-{
-  "defaultProvider": "llmaas",
-  "defaultModel": "gpt-oss-120b",
-  "defaultThinkingLevel": "high"
-}

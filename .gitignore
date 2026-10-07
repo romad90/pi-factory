@@ -1,0 +1,4 @@
+# Agentic factory
+instrument/results/
+.env.factory
+.pi-subagents/
