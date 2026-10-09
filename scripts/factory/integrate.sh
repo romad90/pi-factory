@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Deterministic gate between a worker and its reviewer (D34):
-# apply the worker's patch, run lint and tests, commit only if green.
-# Reviewers therefore only ever review committed, green code.
+# apply the worker's patch, run lint, tests and the extra check, commit only
+# if green. Reviewers therefore only ever review committed, green code.
 #
 # Usage: scripts/factory/integrate.sh <feature> <ticket> <patch-file>
-#   The patch path comes from the worker's result (artifactPaths / handoff
-#   manifest of its pi-subagents worktree run).
-# Commands come from .factory/commands.env (FACTORY_LINT_CMD, FACTORY_TEST_CMD).
+#   The patch path comes from the build wave's result ("patch" field), or
+#   from scripts/factory/locate-patch.sh when the wave couldn't return it.
+# Commands come from .factory/commands.env. Without FACTORY_TEST_CMD this
+# refuses to run (D44): an integration without tests proves nothing.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib.sh
@@ -17,23 +18,28 @@ ticket="${2:?usage: integrate.sh <feature> <ticket> <patch-file>}"
 patch="${3:?usage: integrate.sh <feature> <ticket> <patch-file>}"
 dir="$(mission_dir "$feature")"
 [ -f "$dir/issues/$ticket.md" ] || die "unknown ticket $ticket in $dir/issues"
-[ -s "$patch" ] || die "patch $patch is missing or empty (did the worker change anything?)"
+[ -s "$patch" ] || die "patch $patch is missing or empty: record it with scripts/factory/record-no-patch.sh $feature $ticket"
 
-# shellcheck source=/dev/null
-[ -f .factory/commands.env ] && . .factory/commands.env
-FACTORY_LINT_CMD="${FACTORY_LINT_CMD:-}"; FACTORY_TEST_CMD="${FACTORY_TEST_CMD:-}"
+load_commands
+[ -n "$FACTORY_TEST_CMD" ] || [ "${FACTORY_ALLOW_NO_TESTS:-0}" = "1" ] \
+  || die "FACTORY_TEST_CMD is empty in .factory/commands.env: refusing to integrate without tests (D44)"
 
 dirty="$(git status --porcelain --untracked-files=no -- . ":(exclude)${FACTORY_DIR}")"
 [ -z "$dirty" ] || die "working tree has changes outside ${FACTORY_DIR}/; commit or stash them first"
-
-if git apply --check --index "$patch" 2>/dev/null; then :; else
-  git apply --check --3way --index "$patch" || die "patch does not apply on $(git rev-parse --short HEAD); rebuild the ticket"
-fi
 
 if grep -qE "^diff --git a/${FACTORY_INSTRUMENT_DIR}/" "$patch"; then
   die "patch touches ${FACTORY_INSTRUMENT_DIR}/: workers must not see or change the instrument (D21)"
 fi
 
+if ! git apply --check --index "$patch" 2>/dev/null; then
+  if ! git apply --check --3way --index "$patch" 2>/dev/null; then
+    write_fail_verdict "$feature" "$ticket" integrate \
+      "The worker's patch does not apply on $(git rev-parse --short HEAD). Rebuild from the current code."
+    bash "$here/checkpoint.sh" "$feature" >/dev/null
+    echo "  ✗ patch does not apply; recorded as a failed round in $dir/verdicts/$ticket-code.md"
+    exit 1
+  fi
+fi
 git apply --3way --index "$patch"
 
 mkdir -p "$dir/logs" "$dir/state"
@@ -46,27 +52,20 @@ run_check() {                # <label> <command>
 }
 
 echo "Integrating $ticket on $(git rev-parse --short HEAD)"
-if run_check lint "$FACTORY_LINT_CMD" && run_check tests "$FACTORY_TEST_CMD"; then
-  git commit -q -m "factory($feature): integrate $ticket"
+if run_check lint "$FACTORY_LINT_CMD" && run_check tests "$FACTORY_TEST_CMD" \
+   && run_check extra "$FACTORY_EXTRA_CMD"; then
+  type="feat"; [[ "$ticket" == *-fix-* ]] && type="fix"
+  git commit -q -m "${FACTORY_COMMIT_TYPE:-$type}($feature): $ticket" \
+    -m "Integrated by the factory after lint and tests passed." -- . ":(exclude)${FACTORY_DIR}"
   git rev-parse HEAD > "$dir/state/$ticket.integrated"
-  echo "  ✓ committed $(git rev-parse --short HEAD); ready for review"
+  bash "$here/checkpoint.sh" "$feature" >/dev/null
+  echo "  ✓ committed $(git rev-parse --short "$(cat "$dir/state/$ticket.integrated")"); ready for review"
 else
   git apply -R --index "$patch"
-  # Record the failure as a verdict so the worker's fix round sees it and the
-  # round counts toward escalation. Commit = current marker (or HEAD when the
-  # ticket was never integrated), so the ticket returns to "build", not "review".
-  v="$dir/verdicts/$ticket-code.md"; mkdir -p "$dir/verdicts"
-  prev="$(verdict_round "$v")"; marker="$(ticket_marker "$feature" "$ticket")"
-  cat > "$v" <<VERDICT
-# Verdict: $ticket — round $(( ${prev:-0} + 1 ))
-**Result:** FAIL
-**Commit:** ${marker:-$(git rev-parse HEAD)}
-**Model:** none (integrate.sh)
-**Brief:** integrate
-
-## Issues
-- [blocking] Lint or tests failed when integrating the worker's patch. Log: $log
-VERDICT
-  echo "  ✗ checks failed; patch reverted. Failure recorded in $v (log: $log)"
+  # The failure is a round like any review FAIL, so escalation is automatic (D38).
+  write_fail_verdict "$feature" "$ticket" integrate \
+    "Lint, tests or the extra check failed when integrating the worker's patch. Log: $log"
+  bash "$here/checkpoint.sh" "$feature" >/dev/null
+  echo "  ✗ checks failed; patch reverted. Recorded in $dir/verdicts/$ticket-code.md (log: $log)"
   exit 1
 fi

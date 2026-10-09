@@ -9,16 +9,15 @@ Written by `/code-review` (per ticket), `/verify-behavior` (per mission) and lig
 | Light lane | `.scratch/light/<slug>/verdicts/code.md` |
 
 ```markdown
-# Verdict: <ticket stem | behavior | slug> — round <n>
+# Verdict: <ticket stem | behavior | slug>
 **Result:** PASS | FAIL
 **Commit:** <full SHA reviewed or run against>
-**Model:** <model used>
 **Brief:** <the brief-id line from your task>
-**Tokens:** <total for this role's session, if Pi reports it>
 
 ## Assertions
-- VAL-ROUTE-001: PASS — <evidence reference>
+- VAL-ROUTE-001: PASS — <evidence: test name, log line, result file>
 - VAL-ROUTE-002: FAIL — observed <x>, expected <y>
+- VAL-ROUTE-003: UNVERIFIED — <why it could not be checked>
 
 ## Issues
 - [blocking] <issue>
@@ -30,10 +29,12 @@ Written by `/code-review` (per ticket), `/verify-behavior` (per mission) and lig
 Rules:
 
 - `PASS` means no `[blocking]` issue and every assertion in scope passes.
+- **Evidence or label (D40).** Every assertion line is `PASS — <evidence>`, `FAIL — <what>`, or `UNVERIFIED — <why>`. A PASS without evidence counts as unverified. For behavior, unverified assertions block G4 until proven or accepted by a human (`/factory-accept-unverified`), and the MR lists them as Known limits.
+- **Round and model are written by the factory (D38, D39).** `scripts/factory/collect.sh` numbers the round from the verdict history (`<stem>.r<N>.md`) and writes the model configured for the role. Whatever the agent wrote there is replaced. The gate rejects a verdict that wasn't recorded or was edited afterwards.
 - `**Brief:**` copies the `brief-id:` line of the task. The gate recomputes it for the role, ticket and commit: a PASS without a matching id means the reviewer wasn't dispatched with a generated, file-paths-only brief (D32).
 - Code verdicts review one integration commit (`.scratch/<feature>/state/<ticket>.integrated`); `**Commit:**` must equal it.
 - `**Commit:**` is the commit the verdict was produced on. The gate rejects it if code changed afterwards (outside `.scratch/`).
-- The round increases by one at each re-review of the same ticket. At round 3 still failing, escalate.
+- Every recorded FAIL is a round: review FAILs, failed integrations (`**Brief:** integrate`) and worker runs without a patch (`**Brief:** worker-no-patch`). At round 3 still failing, the ticket escalates. From round 2 the heavy worker builds it.
 - Validators report. Each `[amendment]` goes to `/contract amend`.
 
 ## Behavior verdicts: clustered findings (D25)

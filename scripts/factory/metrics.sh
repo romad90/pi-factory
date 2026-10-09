@@ -19,7 +19,7 @@ assertions="$(contract_ids "$spec" | grep -c . || true)"
 amendments="$(grep -cE '^\s*- \*\*(Amended|Withdrawn):\*\*' "$spec" || true)"
 
 shopt -s nullglob
-tickets=0; fixes=0; first_pass=0; rounds=0; reviewed=0; tokens=0
+tickets=0; fixes=0; first_pass=0; rounds=0; reviewed=0; tokens=0; det_fail=0
 for t in "$dir"/issues/*.md; do
   tickets=$((tickets + 1))
   name="$(ticket_name "$t")"
@@ -29,15 +29,28 @@ for t in "$dir"/issues/*.md; do
   reviewed=$((reviewed + 1))
   n="$(verdict_round "$v")"; n="${n:-1}"
   rounds=$((rounds + n))
-  [ "$n" = "1" ] && [ "$(verdict_field "$v" Result)" = "PASS" ] && first_pass=$((first_pass + 1))
+  # D38: first pass = the first recorded round passed (history, not the agent's word).
+  r1="${v%.md}.r1.md"; [ -f "$r1" ] || r1="$v"
+  [ "$(verdict_field "$r1" Result)" = "PASS" ] && first_pass=$((first_pass + 1))
+  for h in "${v%.md}".r*.md; do
+    case "$(verdict_field "$h" Brief)" in integrate|worker-no-patch) det_fail=$((det_fail + 1)) ;; esac
+  done
 done
 
-models=(); behavior_rounds="-"
+models=(); behavior_rounds="-"; evidence="-"
 for v in "$dir"/verdicts/*.md; do
-  m="$(verdict_field "$v" Model)"; [ -n "$m" ] && models+=("$m")
+  [[ "$v" =~ \.r[0-9]+\.md$ ]] && continue
+  m="$(verdict_field "$v" Model)"; [ -n "$m" ] && [ "$m" != none ] && models+=("$m")
   k="$(verdict_field "$v" Tokens)"; [[ "$k" =~ ^[0-9]+$ ]] && tokens=$((tokens + k))
 done
-[ -f "$dir/verdicts/behavior.md" ] && behavior_rounds="$(verdict_round "$dir/verdicts/behavior.md")"
+b="$dir/verdicts/behavior.md"
+if [ -f "$b" ]; then
+  behavior_rounds="$(verdict_round "$b")"
+  read -r ep ef eu < <(verdict_evidence_counts "$b")
+  evidence="$ep proven, $ef failed, $eu unverified"
+fi
+decisions=0
+[ -f "$dir/decisions.tsv" ] && decisions=$(( $(wc -l < "$dir/decisions.tsv") - 1 ))
 models_list=""
 [ ${#models[@]} -gt 0 ] && models_list="$(printf '%s\n' "${models[@]}" | sort -u | paste -sd, - | sed 's/,/, /g')"
 
@@ -61,9 +74,11 @@ cat <<EOF
 | Contract amendments after drafting | $amendments |
 | Tickets (of which fix tickets) | $tickets ($fixes) |
 | First-pass review rate | $(pct "$first_pass" "$reviewed") ($first_pass/$reviewed) |
-| Review rounds, total | $rounds |
+| Rounds, total (of which deterministic fails: integration, no patch) | $rounds ($det_fail) |
 | Behavior validation rounds | ${behavior_rounds:--} |
+| Behavior assertions (evidence or label) | $evidence |
+| Human decisions logged | $decisions |
 | Cycle time (first → last mission commit) | $cycle |
 | Tokens reported in verdicts | $( [ "$tokens" -gt 0 ] && echo "$tokens" || echo "not reported" ) |
-| Models used | ${models_list:--} |
+| Models used (configured, from collect.sh) | ${models_list:--} |
 EOF
