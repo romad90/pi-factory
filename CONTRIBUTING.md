@@ -1,0 +1,39 @@
+# Contributing
+
+This repo is a template: improvements land here, then reach target repos with `scripts/factory/install-into.sh`.
+
+## Branches
+
+| Branch | Role |
+|---|---|
+| `develop` | default branch; every PR targets it; pushes publish prereleases (`x.y.z-rc.N`) |
+| `main` | releases only; updated by merging `develop` |
+| `feat/…`, `fix/…`, `docs/…`, `chore/…` | work branches |
+
+## Commits
+
+[Conventional Commits](https://www.conventionalcommits.org), checked on every PR:
+
+- `feat:` a new capability → minor; `fix:` → patch; `feat!:` or a `BREAKING CHANGE:` footer → major.
+- `docs:`, `test:`, `chore:`, `ci:`, `refactor:` → no release.
+- In the body, say the **issue** (with mission evidence when there is some) and the **fix**. Curated release notes in `docs/releases/` are built from those bodies.
+
+## Before a PR
+
+```bash
+shellcheck -S warning scripts/factory/*.sh scripts/dev/*.sh tests/*.sh
+bash scripts/factory/skills-pin.sh verify
+bash tests/factory.test.sh
+```
+
+A behavior change in a script needs a check in `tests/factory.test.sh`. A new decision needs an entry in the ADR (`docs/adr/ADR-001-agentic-factory.md`) with its *Why*.
+
+## Releases
+
+semantic-release runs on pushes to `develop` and `main` (`.github/workflows/release.yml`): it computes the version, tags `v<version>`, updates `CHANGELOG.md` and `.factory/VERSION`, and publishes a GitHub release. Write `docs/releases/<version>.md` for releases with user-facing changes.
+
+## After a mission
+
+1. `/retro` in the target repo; findings go to `docs/retros/mission-NN.md` here.
+2. Update `docs/LADDER.md` (evidence log and criteria).
+3. Open roadmap items as issues: `scripts/dev/open-roadmap-issues.sh`.
