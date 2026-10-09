@@ -61,8 +61,11 @@ const [srcFile, dstFile] = process.argv.slice(2);
 const tpl = JSON.parse(fs.readFileSync(srcFile, "utf8"));
 const cur = fs.existsSync(dstFile) ? JSON.parse(fs.readFileSync(dstFile, "utf8")) : {};
 const had = !!cur.subagents;
-cur.subagents = { ...tpl.subagents, ...(cur.subagents || {}),
-  agentOverrides: { ...tpl.subagents.agentOverrides, ...((cur.subagents || {}).agentOverrides || {}) } };
+const { agentOverrides: _ignored, ...tplSub } = tpl.subagents;          // models live in agent frontmatter (D31)
+cur.subagents = { ...tplSub, ...(cur.subagents || {}) };
+const ov = cur.subagents.agentOverrides || {};
+for (const k of Object.keys(ov)) if (k.startsWith("factory-")) delete ov[k];  // would crash pi-subagents
+if (cur.subagents.agentOverrides && !Object.keys(ov).length) delete cur.subagents.agentOverrides;
 fs.mkdirSync(require("path").dirname(dstFile), { recursive: true });
 fs.writeFileSync(dstFile, JSON.stringify(cur, null, 2) + "\n");
 console.log(`  .pi/settings.json: ${had ? "merged (your existing subagents values kept)" : "factory subagents block added"}`);

@@ -138,8 +138,8 @@ Each decision states its reason. If the reason stops being true, revisit the dec
 **D30. Factory roles are repo-defined agents** (`.pi/agents/factory/`). Builtins are disabled. Every factory agent: `defaultContext: fresh`, project instructions inherited (AGENTS.md rules reach every role), `inheritSkills: false` with explicit `skills` and `skillPath` to the pinned copy, no agent memory, strict tool lists.
 *Why:* the package's builtin `worker`/`oracle`/`advisor` default to forked context (the lead's conversation) and its builtin `reviewer` makes fixes, both against D2 and D12. Memory could carry instrument details past the wall.
 
-**D31. Models live in `.pi/settings.json` only.** Every factory role has its own model and fallbacks in `agentOverrides`; no model in agent frontmatter; `modelScope.enforce`; family separation (D13) checked across primary *and* fallback models by `models-lint.mjs`, in CI.
-*Why:* one source of truth, versioned and reviewable. Frontmatter would silently override settings. A fallback that lands a reviewer on the worker's family would silently undo D13, so fallbacks count. Supersedes `.factory/models.conf`.
+**D31. Each factory agent declares its own model in its frontmatter** (`model`, `fallbackModels`, `thinking`). `.pi/settings.json` keeps only package-level guards: builtins off, `modelScope.enforce`, root resolution. Family separation (D13) is checked across primary *and* fallback models by `models-lint.mjs`, in CI.
+*Why:* every subagent must run on its own model, and the frontmatter is the documented, authoritative place for it. Revised after S0: pi-subagents 0.76.1 only accepts **builtin** names in settings `agentOverrides`; project agents there crash agent discovery ("Builtin override 'factory-…'"). `migrate-models.mjs` moves existing overrides into frontmatter; the lint fails on any `factory-*` left in `agentOverrides`. A fallback that lands a reviewer on the worker's family would silently undo D13, so fallbacks count. Models are template-owned: set them once in the template repo, `install-into.sh` propagates them.
 
 **D32. Briefs are generated, never written by the lead.** `brief.sh` renders a per-role template with file paths, a commit, and a `brief-id`, closed by an END OF BRIEF line. Reviewers and validators copy the id into their verdict; the gate recomputes it.
 *Why:* a subagent only knows what its task says. A lead summarizing its own reasoning ("I did X because Y") carries its bias into an isolated context. Generated briefs carry paths, not narrative, and the id makes a hand-written dispatch visible at the gate.
@@ -202,7 +202,8 @@ CI             factory-config (skills pin, models), factory-gate      D9, D31, D
 | Verdicts | `.scratch/<f>/verdicts/<ticket>-code.md`, `behavior.md`; light: `.scratch/light/<slug>/verdicts/code.md` |
 | Instrument (validator only) | `instrument/scenarios/`; raw results `instrument/results/` (ignored) |
 | Factory agents | `.pi/agents/factory/*.md` |
-| Models, scope, builtins off | `.pi/settings.json` (`subagents`) |
+| Models per role | `.pi/agents/factory/*.md` frontmatter |
+| Scope, builtins off | `.pi/settings.json` (`subagents`) |
 | Model families + rules | `.factory/model-families.json` |
 | Brief templates | `.factory/briefs/<role>.md` |
 | Pinned skills | `.pi/skills/`; pin in `.factory/skills-pin/` |

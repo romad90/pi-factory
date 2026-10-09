@@ -22,7 +22,7 @@ you, main session   /grill-with-docs → /to-spec
   agents/factory/          role agents: contract-author, contract-critic, worker,
                            worker-heavy, reviewer, review-axis, validator
   prompts/                 /factory, /factory-light (lead playbooks)
-  settings.json            models per role + fallbacks, model scope, builtins off
+  settings.json            model scope, builtins off (models: agent frontmatter)
   skills/                  mattpocock/skills v1.3.1 (pinned) + contract,
                            contract-critic, verify-behavior
 .factory/
@@ -54,7 +54,7 @@ AGENTS.factory.md          section to paste into the general AGENTS.md
 
 1. `pi install npm:pi-subagents@0.76.1` and remove `@tintinweb/pi-subagents` (one orchestrator only).
 2. `scripts/factory/install-pi-config.sh` (once per machine).
-3. Fill `.pi/settings.json` (`agentOverrides` models + fallbacks, `modelScope.allow`) and `.factory/commands.env`. Add your models to `.factory/model-families.json` if missing.
+3. Set `model`/`fallbackModels` in each `.pi/agents/factory/*.md`, `modelScope.allow` in `.pi/settings.json`, and `.factory/commands.env`. Add your models to `.factory/model-families.json` if missing.
 4. Paste `AGENTS.factory.md` into AGENTS.md; run `/setup-matt-pocock-skills` (local markdown tracker in `.scratch/`).
 5. Merge the factory jobs into `.gitlab-ci.yml`; enable **Settings → Merge requests → "Pipelines must succeed"**.
 6. `scripts/factory/doctor.sh` until green; then in Pi: `/subagents-doctor`, `/subagents-models`, and ask to list subagents (only `factory-*`).

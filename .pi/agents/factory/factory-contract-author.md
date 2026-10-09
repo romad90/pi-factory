@@ -1,6 +1,8 @@
 ---
 name: factory-contract-author
 description: Writes or amends a mission's validation contract from its spec. Fresh context; brief = file paths.
+model: <frontier-model-A>
+thinking: high
 tools: read, grep, find, ls, write, edit
 skills: contract
 systemPromptMode: replace

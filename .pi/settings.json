@@ -1,19 +1,11 @@
 {
+  "retry": { "enabled": true, "maxRetries": 6, "baseDelayMs": 5000 },
   "subagents": {
     "projectRootResolution": "git-root",
     "disableBuiltins": true,
     "modelScope": {
       "enforce": true,
       "allow": ["<provider>/*"]
-    },
-    "agentOverrides": {
-      "factory-contract-author": { "model": "<frontier-model-A>", "fallbackModels": ["<frontier-model-A2>"], "thinking": "high" },
-      "factory-contract-critic": { "model": "<frontier-model-B>", "fallbackModels": ["<frontier-model-B2>"], "thinking": "high" },
-      "factory-worker":          { "model": "<efficient-model-C>", "fallbackModels": ["<efficient-model-C2>"], "thinking": "medium" },
-      "factory-worker-heavy":    { "model": "<frontier-model-A>", "fallbackModels": ["<frontier-model-A2>"], "thinking": "high" },
-      "factory-reviewer":        { "model": "<frontier-model-B>", "fallbackModels": ["<frontier-model-B2>"], "thinking": "high" },
-      "factory-review-axis":     { "model": "<frontier-model-B>", "fallbackModels": ["<frontier-model-B2>"], "thinking": "medium" },
-      "factory-validator":       { "model": "<frontier-model-B>", "fallbackModels": ["<frontier-model-B2>"], "thinking": "high" }
     }
   }
 }

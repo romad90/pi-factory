@@ -1,6 +1,8 @@
 ---
 name: factory-validator
 description: Black-box behavior validator. Holds the instrument, runs the bot, writes the behavior verdict with clustered findings. Main checkout only.
+model: <frontier-model-B>
+thinking: high
 tools: read, grep, find, ls, bash, write
 skills: verify-behavior
 systemPromptMode: replace
