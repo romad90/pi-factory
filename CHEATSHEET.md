@@ -64,14 +64,14 @@ Under a small shared quota (about 10 requests per window), set `parallel.concurr
 ## 4. Once per target repo
 
 ```bash
-scripts/factory/install-into.sh "/path/to/repo"     # from this template; quotes matter with spaces or &
+scripts/factory/install-into.sh "/path/to/repo" [--pack api|batch|bot]...   # quotes matter with spaces or &
 ```
 
 That puts the install on its own branch, `chore/install-pi-factory-<version>`, as one commit (with today's health baseline). Merge it through its own MR before any mission. Then in the target:
 
 1. `.factory/commands.env`: `FACTORY_TEST_CMD` (required), `FACTORY_LINT_CMD`, `FACTORY_EXTRA_CMD` (e.g. `helm lint --strict charts/x`), `FACTORY_HEALTH_CMD` (your complexity/duplication tool), `FACTORY_GATEWAY_URL` (pre-flight network check).
 2. `.factory/behavior-paths`: regexes of paths that change behavior.
-3. `docs/agents/quality-bar.md`: the bar G5 judges against. Sharpen it for this repo; keep the `QB-` IDs.
+3. `docs/agents/quality-bar.md`: the bar G5 judges against. Sharpen it for this repo; keep the `QB-` IDs. With a pack, also prune `docs/agents/contract-checklist-<pack>.md` and `quality-bar-<pack>.md` (blank page: keep them; existing code: drop what contradicts it). Company-wide taste goes in `AGENTS.md`.
 4. `.gitlab-ci.yml`: `include: [{ local: .factory/ci/factory.gitlab-ci.yml }]`, plus **Settings → Merge requests → Pipelines must succeed**.
 5. In Pi, **trust the project** once, so the command guard (`.pi/extensions/factory-guard.ts`) loads.
 6. `/setup-matt-pocock-skills`: choose the local markdown tracker in `.scratch/`.

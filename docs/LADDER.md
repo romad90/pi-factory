@@ -72,9 +72,10 @@ Step 3 means agents delegate to agents and you supervise outcomes and exceptions
 | Nested delegation (reviewer → axes) | ✅ depth 2 in use |
 | Durable missions, resumable from files | ✅ state in files, pause/pickup (v1.0) |
 | Escalation only on exceptions | ✅ STEP codes + notifications; ⚠️ the contract and tickets are still yours |
-| Supervision you can read at a glance | ❌ READY report (v1.2), dashboard (v1.3) |
-| Safe autonomy: sandbox, least privilege, kill switch, no default egress | ⚠️ guards in place (D51); OS sandbox, short-lived credentials and kill switch still to do (S5) |
+| Supervision you can read at a glance | ❌ READY report (v1.3), dashboard (v1.4) |
+| Safe autonomy: sandbox, least privilege, kill switch, no default egress | ⚠️ guards in place (D51); OS sandbox, short-lived credentials and kill switch still to do (S5); Pi Durable execution environments are the candidate (X13) |
+| Unattended missions that survive crashes, steerable from anywhere | ❌ candidate: a thin runner on Pi Durable (X13), after Step 2 |
 | Code that stays understandable without a human reading every line | ✅ G5 steward + ratchet; your MR review becomes a spot check |
 | Triggered work (issue → mission) | ❌ after Step 2 is declared |
 
-**Next:** run mission 2 on v1.1.0, do the retro, then contract quality and supervision (v1.2).
+**Next:** run mission 2 on v1.1.0, do the retro, then contract quality and supervision (v1.3).

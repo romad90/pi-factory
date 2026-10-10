@@ -27,7 +27,7 @@ Priority: **P1** blocks or wastes a lot · **P2** friction · **P3** nice to hav
 |---|---|---|---|---|---|
 | 6 | The critic ignores the output format | Emoji headings, no `[blocking]` tags, no traceability table | Strict template + `next.sh` lint | P1 | roadmap C7 |
 | 7 | Behavior written in **Given** | "4th and 5th not attempted" in a Given | Given = preconditions only | P2 | roadmap C6 |
-| 8 | Conversational-bot checklist used for a batch bot | Irrelevant "Not covered" lines | `contract-checklist-batch.md` | P2 | roadmap X4 |
+| 8 | Conversational-bot checklist used for a batch bot | Irrelevant "Not covered" lines | `contract-checklist-batch.md` | P2 | ✅ 1.2.0 (`batch` pack) |
 | 9 | Almost every assertion `Kind: behavior` with no harness | Contract | Default `Kind: code` until a harness exists | P2 | roadmap C6 |
 | 10 | 25 user stories → long contract and G1 | Spec | Split above about 12 stories | P3 | ✅ cheat sheet |
 | 23 | Contract self-contradiction passed every judge | One assertion counted succeeded = 3 instead of 4; the code was right | Mechanical consistency checks in the critic + regression fixture | P1 | roadmap C6 |

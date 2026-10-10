@@ -44,7 +44,14 @@ Effort: S < half a day · M ≈ 1–2 days · L > 2 days.
 | F11 | Size-aware routing (L → heavy worker) | M | ✅ 1.1.0 |
 | C14 | Re-validate a failing behavior verdict once fixes are built | N | ✅ 1.1.0 |
 
-## v1.2.0: contract quality and supervision
+## v1.2.0: practice packs ✅
+
+| # | Item | Src | Release |
+|---|---|---|---|
+| P1 | Practice packs: content for a kind of software (api, batch, bot), `install-into.sh --pack` | N, you | ✅ 1.2.0 |
+| X4 | Batch contract checklist (now the `batch` pack) | M, A | ✅ 1.2.0 |
+
+## v1.3.0: contract quality and supervision
 
 **Contract quality and fluidity**
 
@@ -69,14 +76,13 @@ Effort: S < half a day · M ≈ 1–2 days · L > 2 days.
 | S6 | Security review role | A | Features that delete production data | `factory-security-reviewer` per mission, triggered by `.factory/security-paths`, another family | M |
 | S7 | Install lifecycle | E | Multi-repo updates | `install-into.sh --dry-run`, `uninstall`; doctor warns on outdated `.factory/VERSION` | S |
 
-## v1.3.0: proof and scale
+## v1.4.0: proof and scale
 
 | # | Item | Src | Why | Fix | Effort |
 |---|---|---|---|---|---|
 | X1 | Bot harness / verification skill | M, P | G4 only by human acceptance | Generated verification skill that drives the bot like a user; replay in CI | L |
 | X2 | Skill evals with pass@k | A, E | Critic regressions found live | Fixtures per local skill, 3 runs, require 3/3 | M |
 | X3 | Anti-rationalization tables | A | "Tests pass so the assertion holds" | Excuse/rebuttal tables in contract, critic, verify-behavior, worker | S |
-| X4 | Batch-bot contract checklist | M, A | Conversational checklist produced noise | `contract-checklist-batch.md` | S |
 | X5 | Reviewer does both axes inline | A, M | 3 agents per review under a small quota | Axes inline; axis agents only for L tickets | S |
 | X6 | Interrogate panel for risky missions | P | Production deletes deserve more than one judge | Opt-in multi-family panel before `/pr` | M |
 | X7 | Definition of Done | A | No standing bar across missions | `docs/agents/definition-of-done.md`, checked by gate and `/pr` | S |
@@ -85,6 +91,12 @@ Effort: S < half a day · M ≈ 1–2 days · L > 2 days.
 | X10 | Request accounting + quota case | M | 429s under a shared quota | Requests per role from run metadata | S |
 | X11 | Model compatibility map + smoke | M | Thinking levels and reasoning replay found at run time | `.factory/model-compat.json` in models-lint; `/factory-smoke` | S |
 | X12 | Dashboard, perf-analyst | N | Supervision at a glance; ops | Static dashboard from `.scratch/`; perf-analyst read-only on captured artifacts | L |
+
+## After Step 2 is declared
+
+| # | Item | Src | Why | Fix | Effort |
+|---|---|---|---|---|---|
+| X13 | Durable mission runner on Pi Durable | N | Step 3 needs unattended missions that survive crashes mid-wave, steering from phone or Slack, and per-agent sandboxed environments (S5) | A thin runner that loops on `next.sh` with Pi Durable checkpoints, execution environments and multi-client steering; scripts and files stay the source of truth. Wait for the API to settle. | L |
 
 ## Explicitly not taking
 

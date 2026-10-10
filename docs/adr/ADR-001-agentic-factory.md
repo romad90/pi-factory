@@ -1,6 +1,6 @@
 # ADR-001 — Agentic factory on Pi
 
-**Revision:** v1.1.0. The codebase is guarded as the team's fuel: code health gate G5 (D49, D50), agents that can't do harm (D51), tickets drafted for you (D52). v1.0.0 (after mission 1): records the factory can't overstate (D38–D40), humans decide in one word (D43–D47), small changes stop costing a mission (D41, D42, D48).
+**Revision:** v1.2.0. Practice packs keep the factory agnostic (D54). v1.1.0: The codebase is guarded as the team's fuel: code health gate G5 (D49, D50), agents that can't do harm (D51), tickets drafted for you (D52). v1.0.0 (after mission 1): records the factory can't overstate (D38–D40), humans decide in one word (D43–D47), small changes stop costing a mission (D41, D42, D48).
 **Status:** Accepted
 **Date:** 2026-10-10 (v1.0.0 and v1.1.0; first revision 2026-10-07)
 **Scope:** The factory on Pi, from a laptop, bots projects first. The team can reuse skills, CI and conventions.
@@ -215,6 +215,13 @@ The codebase is what the team uses to bring value to customers. It must stay saf
 
 **D53. A failing behavior verdict is re-validated once fixes are built.** If code changed since a failing behavior verdict, the next step is `validate`, not new fix tickets.
 *Why:* without it, the mission asked for fix tickets for findings that the built fixes had already addressed.
+
+### v1.2.0: agnostic machinery, owned content
+
+**D54. Domain practices arrive as practice packs: content, never code.** A pack (`packs/<name>/`) is a contract checklist for the author and critic (G1) and `QB-<PACK>-NN` items for the steward (G5), installed with `install-into.sh --pack <name>` and repo-owned afterwards. Briefs read every `contract-checklist-*.md` and `quality-bar-*.md` present. Packs: `api` (Stripe-inspired; **Public** items only for third-party APIs), `batch`, `bot`.
+*Why:* the factory builds bots, APIs, front ends, in any language; baking one domain into scripts or roles would make it neither agnostic nor lean. Good practices still matter most on a blank page, where conventions cost nothing; on an existing code base, consistency with it beats any ideal, so packs are pruned before use, not enforced blindly. Company taste stays in `AGENTS.md`.
+
+**Not adopted (yet): Pi Durable.** Earendil's experimental framework for durable, multi-client agent applications (checkpointed tasks, execution environments per conversation, steering from several surfaces). The factory's durability already comes from files and git, and a TypeScript runner would be a second architecture on an unstable API. It is the candidate for the Step 3 runner (roadmap), with the scripts staying the brain.
 
 ---
 
