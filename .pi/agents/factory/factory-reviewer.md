@@ -1,6 +1,8 @@
 ---
 name: factory-reviewer
 description: Fresh-context reviewer for one integrated ticket or a light-lane change. Reports only; writes one verdict file. Other model family than the worker.
+model: <frontier-model-B>
+thinking: high
 tools: read, grep, find, ls, bash, write, subagent
 skills: code-review
 systemPromptMode: replace

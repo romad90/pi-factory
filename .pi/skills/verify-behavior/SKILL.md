@@ -14,7 +14,7 @@ Work from the main checkout. Read: the `## Validation contract` section of the m
 3. Start the bot with the harness and run the cases. Raw output goes to `instrument/results/<feature>/round-<n>/`.
 4. Judge each assertion on evidence only, using each case's runs and threshold. Partial passes are `FLAKY` and count as fails.
 5. Group failures by root cause. For each cluster, write a finding with the assertions it affects, its weight, and a directive in behavior terms. Leave case inputs and raw output out of the verdict.
-6. Write `verdicts/behavior.md` in the verdict format. The round is the previous behavior round plus one, or 1.
+6. Write `verdicts/behavior.md` in the verdict format. Each assertion is PASS with the evidence observed, FAIL, or UNVERIFIED with why; never PASS on "tests pass". The factory writes the round and the model.
 7. When an assertion itself looks wrong, add an `[amendment]` issue rather than a finding.
 8. When this round and the previous one show the same result with no new failures, expand the weakest area of the instrument before declaring PASS.
 

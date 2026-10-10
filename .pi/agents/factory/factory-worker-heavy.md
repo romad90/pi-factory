@@ -1,6 +1,8 @@
 ---
 name: factory-worker-heavy
 description: Escalated worker (frontier model) for a ticket that failed round 2. Implements one factory ticket with TDD in an isolated worktree. Fresh context; brief = file paths.
+model: <frontier-model-A>
+thinking: high
 tools: read, grep, find, ls, bash, write, edit
 skills: tdd, codebase-design
 systemPromptMode: replace

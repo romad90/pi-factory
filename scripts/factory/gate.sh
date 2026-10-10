@@ -30,11 +30,45 @@ check_verdict() {                       # <file> <label>
   fi
 }
 
-check_fresh() {                         # <file> <label>
-  local f="$1" label="$2" sha
+warn() { printf '  ! %s\n' "$*"; }
+
+# D38: a verdict counts only once collect.sh recorded it (round from history).
+check_recorded() {                      # <file> <label>
+  local f="$1" label="$2" latest n
   [ -f "$f" ] || return 0
+  n="$(verdict_history_count "$f")"; latest="${f%.md}.r$n.md"
+  if [ "$n" -eq 0 ]; then bad "$label: verdict not recorded (run scripts/factory/collect.sh); rounds come from history, never from the agent"
+  elif ! cmp -s "$f" "$latest"; then bad "$label: verdict changed after it was recorded (run collect.sh)"; fi
+}
+
+# D39: the model in a verdict is the configured one, written by collect.sh.
+check_model() {                         # <file> <label> <agent>
+  local f="$1" label="$2" want got
+  [ -f "$f" ] || return 0
+  want="$(agent_model "$3")"; got="$(verdict_field "$f" Model)"
+  [ "$got" = "none" ] && return 0
+  [ "$got" = "$want" ] || warn "$label: verdict model '${got:-none}' ≠ configured $3 model '$want' (model changed since?)"
+}
+
+# D40: evidence or label. Unverified assertions only ship on a human's word.
+check_evidence() {                      # <file> <label> <spec>
+  local f="$1" label="$2" spec="$3" accepted id missing="" p u
+  [ -f "$f" ] && [ "$(verdict_field "$f" Result)" = "PASS" ] || return 0
+  read -r p _ u < <(verdict_evidence_counts "$f")
+  accepted=" $(accepted_unverified "$spec" | tr '\n' ' ') "
+  for id in $(verdict_unverified_ids "$f"); do
+    [[ "$accepted" == *" ALL "* || "$accepted" == *" $id "* ]] || missing+=" $id"
+  done
+  if [ -n "$missing" ]; then bad "$label: unverified, not accepted:$missing (prove them or /factory-accept-unverified)"
+  else ok "$label: $p proven, $u accepted unverified"; fi
+}
+
+check_fresh() {                         # <file> <label> [behavior]
+  local f="$1" label="$2" sha fresh=verdict_is_fresh
+  [ -f "$f" ] || return 0
+  [ "${3:-}" = behavior ] && fresh=behavior_verdict_is_fresh
   sha="$(verdict_field "$f" Commit)"
-  if verdict_is_fresh "$sha"; then
+  if "$fresh" "$sha"; then
     ok "$label: verdict matches current code (${sha:0:8})"
   else
     bad "$label: verdict is stale or has no valid **Commit:** line; code changed after it was produced"
@@ -76,17 +110,32 @@ check_mission() {                       # <feature>
   for t in "$dir"/issues/*.md; do
     name="$(ticket_name "$t")"
     v="$dir/verdicts/${name}-code.md"
-    check_verdict "$v" "G3 $name"
-    check_brief   "$v" "G3 $name" reviewer "$feature" "$name"
+    check_verdict  "$v" "G3 $name"
+    check_recorded "$v" "G3 $name"
+    check_brief    "$v" "G3 $name" reviewer "$feature" "$name"
+    check_model    "$v" "G3 $name" factory-reviewer
     marker="$(ticket_marker "$feature" "$name")"
     if [ -n "$marker" ] && [ -f "$v" ] && [ "$(verdict_field "$v" Commit)" != "$marker" ]; then
       bad "G3 $name: verdict doesn't cover the latest integration (${marker:0:8})"
     fi
   done
 
-  check_verdict "$dir/verdicts/behavior.md" "G4 behavior"
-  check_brief   "$dir/verdicts/behavior.md" "G4 behavior" validator "$feature" -
-  check_fresh   "$dir/verdicts/behavior.md" "G4 behavior"
+  b="$dir/verdicts/behavior.md"
+  check_verdict  "$b" "G4 behavior"
+  check_recorded "$b" "G4 behavior"
+  check_brief    "$b" "G4 behavior" validator "$feature" -
+  check_model    "$b" "G4 behavior" factory-validator
+  check_evidence "$b" "G4 behavior" "$spec"
+  check_fresh    "$b" "G4 behavior" behavior
+}
+
+check_light() {                         # <verdict file>
+  local f="$1" slug
+  slug="$(printf '%s' "$f" | awk -F/ '{print $3}')"
+  check_verdict  "$f" "light $slug"
+  check_recorded "$f" "light $slug"
+  check_brief    "$f" "light $slug" light-reviewer "$slug" -
+  check_fresh    "$f" "light $slug"
 }
 
 mode="${1:-}"
@@ -142,6 +191,8 @@ case "$mode" in
     missions="$(printf '%s\n' "$changed" \
       | awk -F/ -v d="$FACTORY_DIR" '$1 == d && $2 != "light" && NF > 2 { print $2 }' | sort -u)"
 
+    lights="$(printf '%s\n' "$changed" | grep -E "^${FACTORY_DIR}/light/[^/]+/verdicts/code\.md$" || true)"
+
     if [ -n "$behavior_changed" ]; then
       echo "Lane: FULL (behavior paths changed)"
       printf '%s\n' "$behavior_changed" | sed 's/^/    /'
@@ -152,17 +203,12 @@ case "$mode" in
       echo "Lane: FULL (mission included in MR)"
     else
       echo "Lane: LIGHT"
-      lights="$(printf '%s\n' "$changed" | grep -E "^${FACTORY_DIR}/light/[^/]+/verdicts/code\.md$" || true)"
       if [ -z "$lights" ]; then
         bad "light lane needs a fresh code review verdict: ${FACTORY_DIR}/light/<slug>/verdicts/code.md"
       fi
-      for f in $lights; do
-        slug="$(printf '%s' "$f" | awk -F/ '{print $3}')"
-        check_verdict "$f" "light review"
-        check_brief   "$f" "light review" light-reviewer "$slug" -
-        check_fresh   "$f" "light review"
-      done
     fi
+    # Fix-lane reviews count in either lane (D41).
+    for f in $lights; do check_light "$f"; done
 
     for m in $missions; do check_mission "$m"; done
     ;;

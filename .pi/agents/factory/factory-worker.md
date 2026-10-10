@@ -1,6 +1,8 @@
 ---
 name: factory-worker
 description: Implements one factory ticket with TDD in an isolated worktree. Fresh context; brief = file paths.
+model: <efficient-model-C>
+thinking: medium
 tools: read, grep, find, ls, bash, write, edit
 skills: tdd, codebase-design
 systemPromptMode: replace

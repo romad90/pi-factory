@@ -1,0 +1,42 @@
+name: release
+
+# develop → prereleases (x.y.z-rc.N), main → releases. Versions, tags,
+# CHANGELOG.md and .factory/VERSION come from Conventional Commits.
+on:
+  push:
+    branches: [develop, main]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: tests first
+        run: bash tests/factory.test.sh
+      - name: semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          npx --yes
+          -p semantic-release@24
+          -p @semantic-release/changelog@6
+          -p @semantic-release/git@10
+          -p @semantic-release/exec@6
+          -p conventional-changelog-conventionalcommits@8
+          semantic-release

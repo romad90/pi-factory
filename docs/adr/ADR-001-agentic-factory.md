@@ -1,8 +1,8 @@
 # ADR-001 — Agentic factory on Pi
 
-**Revision:** next. pi-subagents orchestration, generated briefs, deterministic integration, mattpocock/skills v1.3.1 enforced.
-**Status:** Proposed
-**Date:** 2026-10-07
+**Revision:** v1.0.0, after mission 1. Records the factory can't overstate (D38–D40), humans decide in one word (D43–D47), small changes stop costing a mission (D41, D42, D48).
+**Status:** Accepted
+**Date:** 2026-10-10 (first revision 2026-10-07)
 **Scope:** The factory on Pi, from a laptop, bots projects first. The team can reuse skills, CI and conventions.
 **Target:** Step 2 (Parallel) on Boris Cherny's ladder, solidly and with as little friction as possible.
 
@@ -22,8 +22,9 @@ So the **mechanics of Step 2 are already in place**. What's missing is the **tru
 
 - **Factory "Missions"** and Factory's research: separate roles with fresh context, a standard of completion written before the work, validators that report, an instrument hidden from implementers ("the wall"), routing models by role.
 - **mattpocock/skills v1.3.1** (commit `24fe0ef`): `code-review` (two axes in parallel sub-agents), `to-spec`/`to-tickets`, `tdd` with seams, `retro`, `pr`, `grilling`, `GLOSSARY.md`.
-- **pi-subagents (nicobailon) 0.76.1**: per-role model overrides with fallbacks, model scope enforcement, workflow scripts with per-child worktrees and a setup hook, a supervisor channel, Herdr integration.
-- **Boris Cherny's Steps of AI Adoption** (July 2026), §10.
+- **pi-subagents (nicobailon) 0.76.1**: one model per agent in its frontmatter, model scope enforcement, workflow scripts with per-child worktrees and a setup hook, a supervisor channel, Herdr integration.
+- **Boris Cherny's Steps of AI Adoption** (July 2026), §10 and [`docs/LADDER.md`](../LADDER.md).
+- **Mission 1** (a batch bot feature, 9 tickets, MR merged with green CI): its retro is the evidence for D38–D48. See [`docs/case-studies/mission-01.md`](../case-studies/mission-01.md).
 
 ---
 
@@ -39,7 +40,7 @@ Each decision states its reason. If the reason stops being true, revisit the dec
 **D2. Each role runs in a fresh subagent and communicates only through files.**
 *Why:* a context that saw the work is biased judging it, and long contexts dilute attention. Files are also the audit trail. Mechanism: D30, D32.
 
-**D3. Missions live in `.scratch/<feature>/` and are committed.** `checkpoint.sh` commits mission state before each build wave.
+**D3. Missions live in `.scratch/<feature>/` and are committed.** The factory's scripts commit mission state themselves (D46).
 *Why:* upstream's local tracker layout, so `to-spec`/`to-tickets` work unchanged; committed so CI can check gates and so worker worktrees (which branch from HEAD) can read spec and tickets.
 
 ### Defining done
@@ -133,13 +134,13 @@ Each decision states its reason. If the reason stops being true, revisit the dec
 ### This revision: orchestration and enforcement
 
 **D29. One orchestration package: pi-subagents (nicobailon), pinned at 0.76.1. @tintinweb/pi-subagents is removed.**
-*Why:* running every subagent on its own model is a hard requirement. pi-subagents layers per-run, frontmatter, per-role settings and default models; gives each role cross-provider fallback models on quota or outage; enforces a model scope; and shows the live mapping (`/subagents-models`). It also brings worktree setup hooks (D35), a supervisor channel (D37) and Herdr integration. One package only: two orchestration tools confuse the lead. Pinned because it moves fast.
+*Why:* running every subagent on its own model is a hard requirement. pi-subagents layers per-run, frontmatter, per-role settings and default models; enforces a model scope; and shows the live mapping (`/subagents-models`). It also brings worktree setup hooks (D35), a supervisor channel (D37) and Herdr integration. One package only: two orchestration tools confuse the lead. Pinned because it moves fast.
 
 **D30. Factory roles are repo-defined agents** (`.pi/agents/factory/`). Builtins are disabled. Every factory agent: `defaultContext: fresh`, project instructions inherited (AGENTS.md rules reach every role), `inheritSkills: false` with explicit `skills` and `skillPath` to the pinned copy, no agent memory, strict tool lists.
 *Why:* the package's builtin `worker`/`oracle`/`advisor` default to forked context (the lead's conversation) and its builtin `reviewer` makes fixes, both against D2 and D12. Memory could carry instrument details past the wall.
 
-**D31. Models live in `.pi/settings.json` only.** Every factory role has its own model and fallbacks in `agentOverrides`; no model in agent frontmatter; `modelScope.enforce`; family separation (D13) checked across primary *and* fallback models by `models-lint.mjs`, in CI.
-*Why:* one source of truth, versioned and reviewable. Frontmatter would silently override settings. A fallback that lands a reviewer on the worker's family would silently undo D13, so fallbacks count. Supersedes `.factory/models.conf`.
+**D31. Each factory agent declares its own model in its frontmatter** (`model`, `thinking`). `.pi/settings.json` keeps only package-level guards: builtins off, `modelScope.enforce`, root resolution, and a retry block for shared quotas. Family separation (D13) is checked by `models-lint.mjs`, in CI.
+*Why:* every subagent must run on its own model, and the frontmatter is the documented, authoritative place for it. Revised after S0: pi-subagents 0.76.1 only accepts **builtin** names in settings `agentOverrides`; project agents there crash agent discovery ("Builtin override 'factory-…'"). `migrate-models.mjs` moves existing overrides into frontmatter; the lint fails on any `factory-*` left in `agentOverrides`. `fallbackModels` was later removed upstream and stops an agent from launching; the lint fails on it. Models are template-owned: set them once in the template repo, `install-into.sh` propagates them.
 
 **D32. Briefs are generated, never written by the lead.** `brief.sh` renders a per-role template with file paths, a commit, and a `brief-id`, closed by an END OF BRIEF line. Reviewers and validators copy the id into their verdict; the gate recomputes it.
 *Why:* a subagent only knows what its task says. A lead summarizing its own reasoning ("I did X because Y") carries its bias into an isolated context. Generated briefs carry paths, not narrative, and the id makes a hand-written dispatch visible at the gate.
@@ -159,6 +160,43 @@ Each decision states its reason. If the reason stops being true, revisit the dec
 **D37. Escalations travel through the supervisor channel.** A child that needs a decision asks the parent (`contact_supervisor`); the lead relays the question to the human verbatim.
 *Why:* a worker guessing a product decision is a defect waiting for review; asking is cheaper.
 
+### v1.0.0: records that can't overstate, humans in one word
+
+Mission 1 worked end to end, and showed where the factory could still lie or stall. Each decision below names the evidence.
+
+**D38. Rounds come from history, never from the agent.** `collect.sh` archives every verdict as `<stem>.r<N>.md` and writes the round itself. Deterministic failures (an integration that fails, a worker run without a patch) are rounds too. The gate rejects a verdict that wasn't recorded or changed afterwards.
+*Why:* a ticket showed "round 1" after two failed runs and an escalation, and metrics reported a 100% first-pass rate that wasn't true. A worker run without a patch didn't count, so escalation needed a hand-written verdict.
+
+**D39. The factory, not the agent, reports facts about the run.** The model in a verdict is the one configured for the role. The build wave returns each ticket's patch path; `locate-patch.sh` is the fallback.
+*Why:* verdicts claimed a model that wasn't in use (models guess who they are), and the lead searched temp folders for patches by hand.
+
+**D40. Evidence or label.** Every assertion in a verdict is `PASS — <evidence>`, `FAIL`, or `UNVERIFIED — <why>`; a PASS without evidence is unverified. G4 blocks unverified behavior until it is proven or a human accepts it (`/factory-accept-unverified`), and the MR lists it under Known limits.
+*Why:* the mission reported every behavior assertion as passed while no harness existed. "Tests pass" was standing in for behavior evidence.
+
+**D41. A fix lane for small changes.** `/factory-fix`: the smallest change, a blast-radius check (behavior paths and the instrument are blocked, a line limit), lint/tests/extra check, one fresh reviewer from another family. The gate checks fix-lane reviews in either lane.
+*Why:* a three-line chart fix needed either the full ticket ceremony or a commit outside any gate; in mission 1 it went outside.
+
+**D42. A behavior verdict goes stale only when behavior changes** (a path in `.factory/behavior-paths`, or the instrument). Without patterns, any code change counts.
+*Why:* a README or deployment tweak forced a full behavior revalidation, which costs scarce quota.
+
+**D43. Human gates are one command.** `/factory-approve`, `/factory-decide`, `/factory-amend`, `/factory-accept-unverified` write the line, log it in `.scratch/<feature>/decisions.tsv` and checkpoint. Workers, reviewers, validators and the contract author read the log. Rows stay `unreviewed` until a human promotes them to the spec or an ADR.
+*Why:* decisions lived only in chat, approvals were typed into `spec.md` by hand, and a stale supervisor request kept showing after it was answered.
+
+**D44. No integration without tests.** `next.sh` stops at `STEP: setup` and `integrate.sh` refuses while `FACTORY_TEST_CMD` is empty. `FACTORY_EXTRA_CMD` adds a third check, such as a chart lint the CI runs.
+*Why:* an empty `commands.env` would have let integration commit without any check, and a chart lint failure was only found in CI.
+
+**D45. The factory calls you; you don't watch it.** Every human `STEP` notifies (macOS, `notify-send`, or `FACTORY_NOTIFY_CMD`). `/factory-pause` writes where it stopped and the open question; `/factory` in a new session resumes. The lead pauses itself after a wave when its context is above about 70%.
+*Why:* long waves were watched by hand; a VPN cut and a lead stuck in a repetition loop each forced a restart from memory.
+
+**D46. Pre-flight, and checkpoints are automatic.** `/factory` starts with `doctor.sh --quick` (repo root, node, tests configured, clean tree, models, gateway reachable). Every script that changes mission state commits it.
+*Why:* a dropped VPN produced seven connection errors in a row instead of one message, and `checkpoint.sh` was run by hand about ten times.
+
+**D47. Irreversible choices never default.** Deletes, secrets, production behavior and the contract itself: a worker stops with `DECISION NEEDED`, the lead records the question (`STEP: decide`), a human answers. A timeout is not a yes. Reversible code choices proceed and are reported.
+*Why:* a worker timed out on a question and proceeded with the option the spec had ruled out.
+
+**D48. The factory is installed through its own MR.** `install-into.sh` commits on `chore/install-pi-factory-<version>`.
+*Why:* the first feature MR carried 193 files, mostly tooling, which hides the feature from its reviewer.
+
 ---
 
 ## 3. Flow
@@ -166,27 +204,35 @@ Each decision states its reason. If the reason stops being true, revisit the dec
 ```
 HUMAN, main session       /grill-with-docs → /to-spec → .scratch/<f>/spec.md
                                                                        D3, D4
-/factory <f>   (lead loop: next.sh → act → repeat)
+/factory <f>   pre-flight (doctor.sh --quick), then the lead loop:     D46
+               next.sh → act → repeat; scripts checkpoint themselves
   contract     workflow.sh contract → author, then critic             D5, D32
                (fresh; critic on another family)                      D13, D31
-  ── G1, HUMAN: approve the contract (or rerun to amend) ─────────────  D7
-HUMAN          /to-tickets (## Covers on each) → checkpoint.sh
-  ── G2: coverage.sh clean ─────────────────────────────────────────── D6
-  build        checkpoint.sh → workflow.sh build-wave                 D33
+  ── G1, HUMAN: /factory-approve  (or /factory-amend "<change>") ────── D7, D43
+HUMAN          /to-tickets (## Covers on each)
+  ── G2: coverage.sh clean;  FACTORY_TEST_CMD set ─────────────────── D6, D44
+  build        workflow.sh build-wave                                 D33
                ≤4 factory-workers in parallel, own worktrees,         D16, D27
                instrument hidden, own port; heavy model after round 2 D21, D24, D35
-               → integrate.sh per patch: lint + tests → commit        D8, D34
+               → patch path returned → integrate.sh per patch:        D39
+                 lint + tests + extra → commit, or a recorded round   D8, D34, D38
+               no patch → record-no-patch.sh (a round)                D38
+               DECISION NEEDED → human.sh ask → HUMAN /factory-decide D43, D47
   review       workflow.sh review-wave → fresh reviewers, other      D2, D13
                family; code-review axes dispatched to review-axis
-               → verdicts/<ticket>-code.md with brief id             D12, D32
+               → collect.sh: round from history, configured model     D38, D39
   ── G3: every ticket PASS on its latest integration ──────────────── D34
   validate     workflow.sh validate → validator in main checkout,     D14, D15
-               holds the instrument → verdicts/behavior.md           D22, D23, D25
-  ── G4: behavior PASS on current code ─────────────────────────────── D10
-  pr           checkpoint + metrics.sh → HUMAN: /pr, MR, /retro      D20, D26
+               holds the instrument → collect.sh                      D22, D23, D25
+  ── G4: behavior PASS, evidence or accepted label, behavior fresh ── D10, D40, D42
+  pr           metrics.sh → HUMAN: /pr, MR, /retro                    D20, D26
 CI             factory-config (skills pin, models), factory-gate      D9, D31, D36
-               (G1–G4, lanes, briefs, instrument rule), readiness     D11, D23, D28
+               (G1–G4, lanes, briefs, records, instrument rule)       D11, D23, D38
 ```
+
+Every human STEP notifies you (D45). `/factory-pause` and `/factory` resume across sessions.
+
+**Fix lane** (small, no behavior path): `/factory-fix <slug> start "<what>"`, make and commit the change, `/factory-fix <slug> check` → blast radius, checks, one fresh reviewer → `.scratch/light/<slug>/` (D41).
 
 **Light lane** (no behavior path touched, chosen by CI): `/factory-light <slug> <base>`, one fresh reviewer → `.scratch/light/<slug>/verdicts/code.md`.
 
@@ -199,15 +245,20 @@ CI             factory-config (skills pin, models), factory-gate      D9, D31, D
 | Spec + contract, critique | `.scratch/<f>/spec.md`, `contract-critique.md` |
 | Tickets | `.scratch/<f>/issues/NN-<slug>.md` |
 | Integration markers, logs | `.scratch/<f>/state/<ticket>.integrated`, `logs/` |
-| Verdicts | `.scratch/<f>/verdicts/<ticket>-code.md`, `behavior.md`; light: `.scratch/light/<slug>/verdicts/code.md` |
+| Verdicts and their history | `.scratch/<f>/verdicts/<ticket>-code.md` + `<ticket>-code.r<N>.md`, `behavior.md` + `behavior.r<N>.md`; light: `.scratch/light/<slug>/verdicts/code.md` |
+| Human decisions | `.scratch/<f>/decisions.tsv`; open question `state/open-question.md`; amendments `amendments/` |
+| Pause note | `.scratch/<f>/state/PAUSED.md` |
+| Fix lane | `.scratch/light/<slug>/request.md`, `blast-radius.md`, `verdicts/` |
 | Instrument (validator only) | `instrument/scenarios/`; raw results `instrument/results/` (ignored) |
 | Factory agents | `.pi/agents/factory/*.md` |
-| Models, scope, builtins off | `.pi/settings.json` (`subagents`) |
+| Models per role | `.pi/agents/factory/*.md` frontmatter |
+| Scope, builtins off | `.pi/settings.json` (`subagents`) |
 | Model families + rules | `.factory/model-families.json` |
 | Brief templates | `.factory/briefs/<role>.md` |
 | Pinned skills | `.pi/skills/`; pin in `.factory/skills-pin/` |
-| Lead playbooks | `.pi/prompts/factory.md`, `factory-light.md` |
-| Integration commands | `.factory/commands.env` |
+| Lead playbooks and one-word gates | `.pi/prompts/factory*.md` |
+| Integration commands, gateway URL | `.factory/commands.env` |
+| CI jobs (included) | `.factory/ci/factory.gitlab-ci.yml` |
 | Lane rule | `.factory/behavior-paths` |
 
 ---
@@ -216,11 +267,11 @@ CI             factory-config (skills pin, models), factory-gate      D9, D31, D
 
 | Gate | Condition | Where |
 |---|---|---|
-| G1 | Critique exists; human added the dated approval line | `gate.sh`, `next.sh` |
+| G1 | Critique exists; human approved (`/factory-approve`, dated line) | `gate.sh`, `next.sh` |
 | G2 | Every assertion covered; tickets justified; no unknown IDs | `coverage.sh` |
-| G3 | Each ticket PASS, on its latest integration commit, with a generated brief id | `gate.sh` |
-| G4 | Behavior PASS on current code, with a generated brief id | `gate.sh` |
-| Lane | Behavior paths → mission required; else fresh light verdict | `gate.sh mr` |
+| G3 | Each ticket PASS, on its latest integration commit, with a generated brief id, recorded by `collect.sh` | `gate.sh` |
+| G4 | Behavior PASS, recorded, with a generated brief id; every assertion proven or accepted unverified; no behavior change since | `gate.sh` |
+| Lane | Behavior paths → mission required; else fresh light verdict; fix-lane verdicts checked in either lane | `gate.sh mr` |
 | Instrument | Changed/removed cases need a contract amendment | `gate.sh mr` |
 | Config | Skills match v1.3.1 pin, no shadows; models per role, families separated | `factory-config` |
 
@@ -259,7 +310,8 @@ CI             factory-config (skills pin, models), factory-gate      D9, D31, D
 ### Positive
 
 - **Unbiased dispatch is structural:** fresh context by agent default, generated briefs, ids checked at the gate (D30, D32).
-- **Every subagent on its own model,** with fallbacks that can't break the family rule (D31).
+- **Every subagent on its own model,** families separated and linted in CI (D31).
+- **Records can't overstate:** rounds, models and evidence are written by scripts (D38–D40).
 - **Less friction:** one command per mission (`/factory`); humans only at G1, tickets, behavior adjudication, escalations and the MR (D33). No runner extension to build.
 - **Reviewers see only green, committed code** (D34).
 - **v1.3.1 is enforced, not hoped for** (D36).
@@ -284,12 +336,12 @@ CI             factory-config (skills pin, models), factory-gate      D9, D31, D
 | Risk | Mitigation |
 |---|---|
 | "Pipelines must succeed" off | S0 checklist |
-| pi-subagents result shape differs from what `workflow.sh` returns (e.g. where the patch path is) | Lead finds the patch in artifactPaths or the handoff manifest; adjust the `return` lines in `workflow.sh` once, at S0 |
+| pi-subagents result shape differs from what `workflow.sh` returns (e.g. where the patch path is) | The wave returns `patch` from `artifactPaths`/handoff; `locate-patch.sh` falls back; `record-no-patch.sh` makes a miss a recorded round (D39) |
 | Skills under `.agents/` registered as agents | They live in `.pi/skills/`; `skills-pin.sh verify` fails on markdown under `.agents/` |
 | code-review axes fail because builtins are disabled | Reviewer dispatches axes to `factory-review-axis` (repo agent, fresh) |
-| Model ids not available on LLM-as-a-service | `models-lint` + `/subagents-models` at S0; fallbacks per role |
+| Model ids not available on the gateway, or a model rejects a thinking level | `models-lint` + `/subagents-models` at S0; pre-flight before each run (D46); see the cheat sheet's model notes |
 | Node missing on a runner | CI installs it; locally Pi brings it |
-| Mission state not committed before a wave | `workflow.sh build-wave` refuses until `checkpoint.sh` |
+| Mission state not committed before a wave | Scripts checkpoint themselves (D46) |
 | Laptop sleeps mid-mission | `caffeinate`/`systemd-inhibit`; background runs survive only while the machine is up |
 
 ---
@@ -298,14 +350,14 @@ CI             factory-config (skills pin, models), factory-gate      D9, D31, D
 
 Steps: **1 Assisted** (one agent, you hold the context), **2 Parallel** (~10 agents, AI writes and humans verify), **3 Supervised autonomy** (agents delegate to agents, humans supervise outcomes and exceptions), **4 AI-native** (AI decides what to work on).
 
-**Today: Step 2 mechanics, without the trust layer.** Isolated subagents and parallel workers were already in use. This revision adds the trust layer and the orchestration: what remains is running it and collecting evidence.
+**Today (v1.0.0): Step 2 mechanics with the trust layer, 1 mission of 4 run.** Mission 1 went from grill to merged MR through the factory. v1.0.0 makes its records trustworthy. What remains is evidence: three more missions, with parallel waves. The running log is [`docs/LADDER.md`](../LADDER.md).
 
 | Step 2 ingredient | Status |
 |---|---|
 | Agents in isolated worktrees, in parallel | In use; now with the instrument hidden and ports (D35) |
 | Self-verification loop you trust | Built: contract, critic, integration gate, fresh reviewers, validator, CI (D4–D13, D32–D34) |
 | Automated review on another model | Built and enforced (D13, D31) |
-| No permission prompts stalling agents | Check pi-subagents `permissions` / `authorityPolicy` at S0 |
+| No permission prompts stalling agents | Not seen in mission 1; deny-list for destructive commands planned (v1.1) |
 | You review final diffs, not every step | Verdicts + metrics in every MR (D26) |
 
 **Step 2 is declared when**, over 4 missions: 3–4 tickets per wave as routine; MRs approved from verdicts and metrics with spot checks only; first-pass review rate and escaped bugs stable or improving; zero unexplained bypasses.
@@ -318,8 +370,8 @@ Steps: **1 Assisted** (one agent, you hold the context), **2 Parallel** (~10 age
 
 | Move | What | Exit |
 |---|---|---|
-| **S0: Set up and dry-run** | Install pi-subagents 0.76.1, remove tintinweb; `install-pi-config.sh`; fill `.pi/settings.json` models and `commands.env`; `/setup-matt-pocock-skills` (local markdown tracker); paste `AGENTS.factory.md`; `doctor.sh` green; in Pi: `/subagents-doctor`, `/subagents-models`, list agents (only `factory-*`). Dry-run `/factory` on a toy mission with one ticket. | One toy ticket goes build → integrate → review → PASS. Any mismatch in workflow fields or patch location fixed in `workflow.sh`/playbook |
-| **S1: First real mission** | `/factory` on a small bots feature; behavior in interim mode (no harness) | One MR merged with metrics |
+| **S0: Set up and dry-run** (done) | Install pi-subagents 0.76.1, remove tintinweb; `install-pi-config.sh`; fill `.pi/settings.json` models and `commands.env`; `/setup-matt-pocock-skills` (local markdown tracker); paste `AGENTS.factory.md`; `doctor.sh` green; in Pi: `/subagents-doctor`, `/subagents-models`, list agents (only `factory-*`). Dry-run `/factory` on a toy mission with one ticket. | One toy ticket goes build → integrate → review → PASS. Any mismatch in workflow fields or patch location fixed in `workflow.sh`/playbook |
+| **S1: First real mission** (done: mission 1) | `/factory` on a small bots feature; behavior in interim mode (no harness) | One MR merged with metrics |
 | **S2: Behavior** | Harness as a mission; instrument; `behavior-replay` in CI | G4 passed with the wall in place |
 | **S3: Evidence** | 4 missions, parallel waves | §10 criteria met → Step 2 declared |
 
@@ -337,7 +389,7 @@ Steps: **1 Assisted** (one agent, you hold the context), **2 Parallel** (~10 age
 
 ## 13. Open questions
 
-1. Which models and families does LLM-as-a-service offer, with which provider prefix for `modelScope.allow`?
+1. ~~Which models and families does the gateway offer?~~ Settled at S0: families in `.factory/model-families.json`.
 2. Does pi-subagents' `permissions` config need an allowlist so parallel workers never stall on prompts?
 3. Harness: local instance or preview environment? Which tools are mocked?
 4. Team rollout: OpenCode reads skills from its own locations. Mirror `.pi/skills/` for them, or move the team to Pi?

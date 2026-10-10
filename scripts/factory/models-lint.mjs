@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // Checks that every factory subagent runs on its own configured model, and
 // that judges never share a model family with what they judge (D31).
-// Primary AND fallback models count: a fallback that lands a reviewer on the
-// worker's family would silently undo the rule.
+// pi-subagents now takes exactly one model per agent: the `fallbackModels`
+// frontmatter field was removed upstream and makes the agent fail to launch.
 //
 // Usage: node scripts/factory/models-lint.mjs
-// Inputs: .pi/settings.json, .factory/model-families.json, .pi/agents/factory/*.md
+// Inputs: .pi/agents/factory/*.md (model, fallbackModels in frontmatter),
+//         .pi/settings.json (builtins off, model scope), .factory/model-families.json
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
@@ -56,20 +57,18 @@ const models = {};                                   // agent → [primary, ...f
 for (const { file, fm } of agents) {
   const name = fm.name;
   if (!name) { bad(`${file}: no name`); continue; }
-  if (fm.model) bad(`${name}: model set in frontmatter; keep models in ${SETTINGS} only (frontmatter would override it)`);
   if (fm.defaultContext !== "fresh") bad(`${name}: defaultContext must be fresh`);
   if (fm.inheritSkills !== "false") bad(`${name}: inheritSkills must be false (pinned skills only)`);
   if (!fm.skillPath) bad(`${name}: skillPath must point at the pinned skills`);
   if ("memory" in fm) bad(`${name}: agent memory is off for factory agents (could carry instrument details past the wall)`);
-  const o = overrides[name];
-  if (!o || !o.model) { bad(`${name}: no model in ${SETTINGS} agentOverrides`); continue; }
-  const list = [o.model, ...(Array.isArray(o.fallbackModels) ? o.fallbackModels : [])];
+  if (!fm.model) { bad(`${name}: no model in its frontmatter (run node scripts/factory/migrate-models.mjs)`); continue; }
+  if ("fallbackModels" in fm) bad(`${name}: fallbackModels was removed by pi-subagents and stops the agent from launching; delete that line`);
+  const list = [fm.model];
   if (list.some(isPlaceholder)) { bad(`${name}: placeholder model ids left (${list.join(", ")})`); continue; }
   models[name] = list;
-  if (!(o.fallbackModels ?? []).length) warn(`${name}: no fallbackModels; a quota error fails the run`);
 }
 for (const name of Object.keys(overrides)) {
-  if (name.startsWith("factory-") && !agents.some((a) => a.fm.name === name)) warn(`agentOverrides.${name} matches no agent file`);
+  if (name.startsWith("factory-")) bad(`agentOverrides.${name}: pi-subagents only accepts builtin names there and fails to load agents; run node scripts/factory/migrate-models.mjs`);
 }
 
 // Scope and families
@@ -86,7 +85,7 @@ for (const [left, right] of fam.rules) {
   const shared = [...L].filter((x) => R.has(x));
   if (!left.concat(right).every((a) => models[a])) continue;   // already reported above
   shared.length
-    ? bad(`${left.join("/")} share family ${shared.join(", ")} with ${right.join("/")} (fallbacks included)`)
+    ? bad(`${left.join("/")} share family ${shared.join(", ")} with ${right.join("/")} `)
     : ok(`${left.join("/")} [${[...L].join(", ")}] ≠ ${right.join("/")} [${[...R].join(", ")}]`);
 }
 

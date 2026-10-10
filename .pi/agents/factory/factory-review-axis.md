@@ -1,6 +1,8 @@
 ---
 name: factory-review-axis
 description: One axis (Standards or Spec) of a code-review, dispatched by factory-reviewer. Read-only. Other model family than the worker.
+model: <frontier-model-B>
+thinking: medium
 tools: read, grep, find, ls, bash
 systemPromptMode: replace
 inheritProjectContext: true

@@ -11,6 +11,8 @@ FACTORY_INSTRUMENT_DIR="${FACTORY_INSTRUMENT_DIR:-instrument}"  # hidden from wo
 FACTORY_MAX_PARALLEL="${FACTORY_MAX_PARALLEL:-4}"               # laptop-sized (D27)
 FACTORY_SKILLS_DIR="${FACTORY_SKILLS_DIR:-.pi/skills}"          # pinned skills (D36)
 FACTORY_BRIEFS_DIR="${FACTORY_BRIEFS_DIR:-.factory/briefs}"     # brief templates (D32)
+FACTORY_AGENTS_DIR="${FACTORY_AGENTS_DIR:-.pi/agents/factory}"  # models live here (D31)
+FACTORY_FIX_MAX_LINES="${FACTORY_FIX_MAX_LINES:-80}"            # fix-lane blast radius (D41)
 
 die() { printf 'factory: %s\n' "$*" >&2; exit 2; }
 
@@ -84,9 +86,118 @@ verdict_field() {
     | sed -E 's/^\*\*[^*]+:\*\* *//' | awk '{print $1}'
 }
 
+# Round of a verdict (D38): the number of archived copies <stem>.r<N>.md,
+# written by record_verdict. Never the number an agent typed. Falls back to
+# the header only for verdicts recorded before history existed.
 verdict_round() {
+  local n
+  n="$(verdict_history_count "$1")"
+  if [ "$n" -gt 0 ]; then echo "$n"; return 0; fi
   [ -f "$1" ] || return 0
   { grep -m1 -oE 'round [0-9]+' "$1" || true; } | awk '{print $2}'
+}
+
+verdict_history_count() {              # <verdict file> → count of <stem>.r<N>.md
+  local f="$1" n=0 h
+  for h in "${f%.md}".r*.md; do [ -f "$h" ] && n=$((n + 1)); done
+  echo "$n"
+}
+
+# The model a factory agent is configured with (frontmatter). Verdicts carry
+# this, never the model's own guess about itself (D39).
+agent_model() {                        # <agent name>
+  local f="$FACTORY_AGENTS_DIR/$1.md"
+  [ -f "$f" ] || { echo "unknown"; return 0; }
+  awk '/^---$/ { c++; next } c == 1 && /^model:/ { sub(/^model:[ \t]*/, ""); print; exit }' "$f"
+}
+
+# record_verdict <file> <agent>: makes <file> the next round of its history.
+#   - round = archived copies + 1, written into the header
+#   - **Model:** = the agent's configured model
+#   - archived as <stem>.r<N>.md
+# Idempotent: a file identical to its latest archive is not recorded again.
+record_verdict() {                     # <file> <agent> [model line override]
+  local f="$1" agent="$2" n latest model tmp
+  [ -f "$f" ] || return 0
+  n="$(verdict_history_count "$f")"
+  latest="${f%.md}.r$n.md"
+  if [ "$n" -gt 0 ] && cmp -s "$f" "$latest"; then return 0; fi
+  n=$((n + 1)); tmp="$(mktemp)"
+  model="${3:-$(agent_model "$agent") (configured for $agent)}"
+  awk -v n="$n" -v model="$model" '
+    NR == 1 && /^# Verdict/ {
+      sub(/[ ]*(—|-)[ ]*round.*$/, ""); print $0 " — round " n; next }
+    /^\*\*Model:\*\*/ { print "**Model:** " model; seen = 1; next }
+    /^\*\*Commit:\*\*/ && !seen { print; print "**Model:** " model; seen = 1; next }
+    { print }' "$f" > "$tmp"
+  mv "$tmp" "$f"
+  cp "$f" "${f%.md}.r$n.md"
+}
+
+# write_fail_verdict <feature> <ticket> <brief-label> <issue text>
+# A deterministic failure (integration, worker without patch) counts as a
+# round like any review FAIL, so escalation happens on its own (D38).
+write_fail_verdict() {
+  local feature="$1" ticket="$2" label="$3" text="$4" dir v marker
+  dir="$(mission_dir "$feature")"; v="$dir/verdicts/$ticket-code.md"; mkdir -p "$dir/verdicts"
+  marker="$(ticket_marker "$feature" "$ticket")"
+  cat > "$v" <<VERDICT
+# Verdict: $ticket — round ?
+**Result:** FAIL
+**Commit:** ${marker:-$(git rev-parse HEAD)}
+**Model:** none
+**Brief:** $label
+
+## Issues
+- [blocking] $text
+VERDICT
+  record_verdict "$v" factory-scripts "none (deterministic check: $label)"
+}
+
+# Evidence or label (D40). Counts the assertion lines of a verdict:
+#   "- VAL-X-001: PASS — <evidence>"   pass (evidence required)
+#   "- VAL-X-001: FAIL — <what>"       fail
+#   "- VAL-X-001: UNVERIFIED — <why>"  unverified
+# A PASS without evidence counts as unverified. Prints: pass fail unverified
+verdict_evidence_counts() {
+  [ -f "$1" ] || { echo "0 0 0"; return 0; }
+  awk '
+    /^## Assertions/ { in_a = 1; next }
+    in_a && /^## /   { in_a = 0 }
+    in_a && /^- *VAL-[A-Z0-9]+-[0-9][0-9][0-9]/ {
+      line = $0; sub(/^- *VAL-[A-Z0-9]+-[0-9][0-9][0-9][^:]*: */, "", line)
+      split(line, w, /[ \t]/); status = toupper(w[1])
+      ev = line; sub(/^[A-Za-z]+[ \t]*/, "", ev); sub(/^(—|–|-|:)+[ \t]*/, "", ev)
+      if (status == "PASS" && ev != "") p++
+      else if (status == "FAIL" || status == "FLAKY") f++
+      else u++
+    }
+    END { printf "%d %d %d\n", p, f, u }' "$1"
+}
+
+# IDs of the assertions a verdict leaves unverified (UNVERIFIED, unlabeled,
+# or PASS without evidence).
+verdict_unverified_ids() {
+  [ -f "$1" ] || return 0
+  awk '
+    /^## Assertions/ { in_a = 1; next }
+    in_a && /^## /   { in_a = 0 }
+    in_a && match($0, /VAL-[A-Z0-9]+-[0-9][0-9][0-9]/) {
+      id = substr($0, RSTART, RLENGTH)
+      line = $0; sub(/^- *VAL-[A-Z0-9]+-[0-9][0-9][0-9][^:]*: */, "", line)
+      split(line, w, /[ \t]/); status = toupper(w[1])
+      ev = line; sub(/^[A-Za-z]+[ \t]*/, "", ev); sub(/^(—|–|-|:)+[ \t]*/, "", ev)
+      if (status == "PASS" && ev != "") next
+      if (status == "FAIL" || status == "FLAKY") next
+      print id
+    }' "$1"
+}
+
+# Human acceptance of unverified assertions, written by
+# `human.sh accept-unverified`:  **Accepted unverified:** <date> VAL-…, VAL-… — <why>
+accepted_unverified() {                # <spec> → accepted IDs ("ALL" for all)
+  { grep -E '^\*\*Accepted unverified:\*\*' "$1" || true; } \
+    | sed -E 's/ (—|-) .*$//' | grep -oE 'VAL-[A-Z0-9]+-[0-9]{3}|\bALL\b' || true
 }
 
 # A verdict is fresh when no file outside the missions dir changed
@@ -96,6 +207,64 @@ verdict_is_fresh() {
   [ -n "$sha" ] || return 1
   git cat-file -e "${sha}^{commit}" 2>/dev/null || return 1
   [ -z "$(git diff --name-only "$sha" HEAD -- . ":(exclude)${FACTORY_DIR}")" ]
+}
+
+# Behavior verdicts go stale only when behavior changed (D42): a path in
+# .factory/behavior-paths or the instrument. Without patterns, any code
+# change counts (the strict rule above).
+behavior_patterns() {
+  [ -f "$FACTORY_BEHAVIOR_PATHS_FILE" ] || return 0
+  grep -vE '^[[:space:]]*(#|$)' "$FACTORY_BEHAVIOR_PATHS_FILE" || true
+}
+
+behavior_verdict_is_fresh() {
+  local sha="$1" patterns changed
+  [ -n "$sha" ] || return 1
+  git cat-file -e "${sha}^{commit}" 2>/dev/null || return 1
+  patterns="$(behavior_patterns)"
+  [ -n "$patterns" ] || { verdict_is_fresh "$sha"; return; }
+  changed="$(git diff --name-only "$sha" HEAD -- . ":(exclude)${FACTORY_DIR}")"
+  [ -z "$changed" ] && return 0
+  ! printf '%s\n' "$changed" | grep -qE -f <(printf '%s\n' "$patterns"; printf '^%s/\n' "$FACTORY_INSTRUMENT_DIR")
+}
+
+# --- commands.env (D8, D34) ---------------------------------------------------
+
+load_commands() {
+  FACTORY_LINT_CMD=""; FACTORY_TEST_CMD=""; FACTORY_EXTRA_CMD=""; FACTORY_GATEWAY_URL=""
+  # shellcheck source=/dev/null
+  if [ -f .factory/commands.env ]; then . .factory/commands.env; fi
+  FACTORY_LINT_CMD="${FACTORY_LINT_CMD:-}"; FACTORY_TEST_CMD="${FACTORY_TEST_CMD:-}"
+  FACTORY_EXTRA_CMD="${FACTORY_EXTRA_CMD:-}"; FACTORY_GATEWAY_URL="${FACTORY_GATEWAY_URL:-}"
+}
+
+# --- humans: decisions, notifications (D43, D45) --------------------------------
+
+# decision_log <feature> <ticket|-> <kind> <question> <answer> [scope]
+# One row per human decision in .scratch/<feature>/decisions.tsv. Status
+# starts "unreviewed": only a human promotes a row into the spec or an ADR.
+decision_log() {
+  local f t who
+  f="$(mission_dir "$1")/decisions.tsv"; mkdir -p "$(dirname "$f")"
+  [ -f "$f" ] || printf 'date\tticket\tkind\tquestion\tanswer\tscope\twho\tstatus\n' > "$f"
+  who="$(git config user.name 2>/dev/null || echo human)"
+  t() { printf '%s' "$1" | tr '\t\n' '  '; }
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\tunreviewed\n' "$(date +%F)" "$(t "$2")" "$(t "$3")" \
+    "$(t "$4")" "$(t "$5")" "$(t "${6:-ticket}")" "$(t "$who")" >> "$f"
+}
+
+notify() {                             # <title> <message>
+  [ "${FACTORY_NOTIFY:-1}" = "0" ] && return 0
+  if [ -n "${FACTORY_NOTIFY_CMD:-}" ]; then
+    FACTORY_TITLE="$1" FACTORY_MESSAGE="$2" bash -c "$FACTORY_NOTIFY_CMD" >/dev/null 2>&1 || true
+  elif command -v osascript >/dev/null 2>&1; then
+    local t m; t="$(printf '%s' "$1" | tr -d '"\\')"; m="$(printf '%s' "$2" | tr -d '"\\')"
+    osascript -e "display notification \"$m\" with title \"$t\"" >/dev/null 2>&1 || true
+  elif command -v notify-send >/dev/null 2>&1; then
+    notify-send "$1" "$2" >/dev/null 2>&1 || true
+  else
+    printf '\a' >&2
+  fi
 }
 
 

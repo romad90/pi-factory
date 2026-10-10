@@ -46,7 +46,8 @@ check "lead playbook present" "copy .pi/prompts/factory.md" test -f .pi/prompts/
 check "issue tracker configured for skills" "run /setup-matt-pocock-skills (local markdown tracker, .scratch/)" test -f docs/agents/issue-tracker.md
 
 section "Validation"
-check "factory-gate job in CI" "merge the factory-gate job" has_line '^factory-gate:' "$ci"
+check "factory gate in CI" "add 'include: - local: .factory/ci/factory.gitlab-ci.yml' to $ci, then enable 'Pipelines must succeed'" \
+  bash -c "grep -qE '^factory-gate:|factory\.gitlab-ci\.yml' '$ci' 2>/dev/null"
 check "lint step in CI" "add a lint job before the factory stage" has_line 'lint' "$ci"
 check "test step in CI" "add a test job before the factory stage" has_line '(npm|pnpm|yarn) (run )?test|pytest|go test|mvn .*test|gradle.* test' "$ci"
 check "integration checks configured" "set FACTORY_LINT_CMD and FACTORY_TEST_CMD in .factory/commands.env" has_line '^FACTORY_TEST_CMD="[^"]+"' .factory/commands.env

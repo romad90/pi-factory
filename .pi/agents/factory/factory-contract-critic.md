@@ -1,6 +1,8 @@
 ---
 name: factory-contract-critic
 description: Attacks a validation contract before human approval. Reports only. Must run on another model family than the author.
+model: <frontier-model-B>
+thinking: high
 tools: read, grep, find, ls, write
 skills: contract-critic
 systemPromptMode: replace

@@ -1,0 +1,64 @@
+# pi-factory: merge request gates for GitLab. Installed by install-into.sh at
+# .factory/ci/factory.gitlab-ci.yml. Add to your project's .gitlab-ci.yml:
+#
+#   include:
+#     - local: .factory/ci/factory.gitlab-ci.yml
+#
+# REQUIRED project setting, or the gate is only advisory (D9):
+#   Settings → Merge requests → "Pipelines must succeed"
+#
+# Jobs run in the built-in .post stage, so they need no change to your
+# stages and only run once your own lint/test/security jobs passed (D8).
+
+variables:
+  GIT_DEPTH: "0"                    # verdict freshness needs full history
+  FACTORY_IMAGE: "alpine:3.20"      # override with your registry's image
+
+# G1–G4, lanes, instrument rule, fix-lane reviews (D9–D11, D23, D41).
+factory-gate:
+  stage: .post
+  image: $FACTORY_IMAGE
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  before_script:
+    - command -v bash >/dev/null && command -v git >/dev/null || apk add --no-cache bash git
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+  script:
+    - git fetch --no-tags origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+    - bash scripts/factory/gate.sh mr "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+
+# Pinned skills untouched and unshadowed; every subagent on its own model,
+# judges on other families (D31, D36).
+factory-config:
+  stage: .post
+  image: $FACTORY_IMAGE
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  before_script:
+    - command -v bash >/dev/null && command -v node >/dev/null || apk add --no-cache bash nodejs
+  script:
+    - bash scripts/factory/skills-pin.sh verify
+    - node scripts/factory/models-lint.mjs
+
+# Reruns the instrument so a behavior verdict isn't trusted on the agent's
+# word alone (D14, D21). Manual and non-blocking until a harness exists.
+behavior-replay:
+  stage: .post
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+      allow_failure: true
+  script:
+    - echo "TODO(harness): ./harness run instrument/scenarios"
+
+# Advisory: what the repo still lacks for Step 2 (D28).
+factory-readiness:
+  stage: .post
+  image: $FACTORY_IMAGE
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  allow_failure: true
+  before_script:
+    - command -v bash >/dev/null || apk add --no-cache bash
+  script:
+    - bash scripts/factory/readiness.sh --strict
