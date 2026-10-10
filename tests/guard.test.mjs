@@ -56,3 +56,17 @@ test("protects factory, CI and secrets on read/write/edit", () => {
   assert.equal(check({ tool: "write", input: { path: "src/app.ts" }, cwd: main }), null);
   assert.equal(check({ tool: "read", input: { path: ".scratch/f/spec.md" }, cwd: main }), null);
 });
+
+test("keeps the wall and protected paths in a monorepo project (D56)", () => {
+  const mono = mkdtempSync(join(tmpdir(), "guard-mono-"));
+  const wtProject = join(mono, "wt", "projects", "bot");
+  mkdirSync(join(mono, "wt", ".git"), { recursive: true }); mkdirSync(join(wtProject, ".factory"), { recursive: true });
+  const mainProject = join(mono, "main", "projects", "bot");
+  mkdirSync(join(mono, "main", ".git"), { recursive: true }); mkdirSync(join(mainProject, ".factory"), { recursive: true });
+  mkdirSync(join(mainProject, "instrument"));
+  assert.ok(bash("cat instrument/scenarios/a.yaml", wtProject), "worker in a monorepo worktree can't reach the instrument");
+  assert.ok(check({ tool: "read", input: { path: "../instrument/a.yaml" }, cwd: join(wtProject, "src") }));
+  assert.equal(bash("cat instrument/scenarios/a.yaml", mainProject), null);
+  assert.ok(check({ tool: "edit", input: { path: "../scripts/factory/gate.sh" }, cwd: join(mainProject, "src") }), "factory paths are relative to the project");
+  assert.equal(check({ tool: "edit", input: { path: "scripts/factory/x.js" }, cwd: join(mainProject, "src") }), null, "src/scripts/factory is ordinary code");
+});

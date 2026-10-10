@@ -16,10 +16,13 @@ const input = JSON.parse(await new Promise((res) => {
   let d = ""; process.stdin.on("data", (c) => (d += c)); process.stdin.on("end", () => res(d));
 }));
 const wt = input.worktreePath;
+// In a monorepo the project is a folder of the worktree (D56); the shim passes it.
+const prefix = (process.env.FACTORY_PROJECT_PREFIX || "").replace(/\/+$/, "");
+const inProject = (p) => (prefix ? `${prefix}/${p}` : p);
 const instrument = process.env.FACTORY_INSTRUMENT_DIR || "instrument";
 const base = Number(process.env.FACTORY_PORT_BASE || 8100);
 
-execFileSync("git", ["-C", wt, "sparse-checkout", "set", "--no-cone", "/*", `!/${instrument}/`], { stdio: "ignore" });
-writeFileSync(join(wt, ".env.factory"), `BOT_PORT=${base + Number(input.index ?? 0)}\n`);
+execFileSync("git", ["-C", wt, "sparse-checkout", "set", "--no-cone", "/*", `!/${inProject(instrument)}/`], { stdio: "ignore" });
+writeFileSync(join(wt, prefix, ".env.factory"), `BOT_PORT=${base + Number(input.index ?? 0)}\n`);
 
-process.stdout.write(JSON.stringify({ syntheticPaths: [".env.factory"] }));
+process.stdout.write(JSON.stringify({ syntheticPaths: [inProject(".env.factory")] }));

@@ -18,8 +18,9 @@ if [ "${1:-}" = "--quick" ]; then
   # shellcheck source=lib.sh
   . "$here/lib.sh"
   echo "Pre-flight"
-  git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ "$(git rev-parse --show-toplevel)" = "$PWD" ] \
-    && ok "at the repo root" || bad "run from the repo root"
+  prefix="$(git rev-parse --show-prefix 2>/dev/null)"; prefix="${prefix%/}"
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ -d .factory ] \
+    && ok "at the project root${prefix:+ (monorepo: $prefix)}" || bad "run from the project root (the folder with .factory/)"
   command -v node >/dev/null && ok "node" || bad "node not on PATH"
   load_commands
   [ -n "$FACTORY_TEST_CMD" ] && ok "tests configured" || bad "FACTORY_TEST_CMD empty in .factory/commands.env"

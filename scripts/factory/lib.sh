@@ -211,7 +211,7 @@ verdict_is_fresh() {
   local sha="$1"
   [ -n "$sha" ] || return 1
   git cat-file -e "${sha}^{commit}" 2>/dev/null || return 1
-  [ -z "$(git diff --name-only "$sha" HEAD -- . ":(exclude)${FACTORY_DIR}")" ]
+  [ -z "$(git diff --relative --name-only "$sha" HEAD -- . ":(exclude)${FACTORY_DIR}")" ]
 }
 
 # Behavior verdicts go stale only when behavior changed (D42): a path in
@@ -228,7 +228,7 @@ behavior_verdict_is_fresh() {
   git cat-file -e "${sha}^{commit}" 2>/dev/null || return 1
   patterns="$(behavior_patterns)"
   [ -n "$patterns" ] || { verdict_is_fresh "$sha"; return; }
-  changed="$(git diff --name-only "$sha" HEAD -- . ":(exclude)${FACTORY_DIR}")"
+  changed="$(git diff --relative --name-only "$sha" HEAD -- . ":(exclude)${FACTORY_DIR}")"
   [ -z "$changed" ] && return 0
   ! grep -qE -f <(printf '%s\n' "$patterns"; printf '^%s/\n' "$FACTORY_INSTRUMENT_DIR") <<<"$changed"
 }
@@ -241,8 +241,48 @@ code_verdict_is_fresh() {
   git cat-file -e "${sha}^{commit}" 2>/dev/null || return 1
   while IFS= read -r f; do
     [ -n "$f" ] && is_code_file "$f" && return 1
-  done < <(git diff --name-only "$sha" HEAD -- . ":(exclude)${FACTORY_DIR}")
+  done < <(git diff --relative --name-only "$sha" HEAD -- . ":(exclude)${FACTORY_DIR}")
   return 0
+}
+
+# --- monorepo projects (D56) ---------------------------------------------------
+# A project can be a folder inside a bigger repo. Factory paths stay relative
+# to the project; git commands that work from the root get the prefix.
+
+project_prefix() { local p; p="$(git rev-parse --show-prefix 2>/dev/null)"; printf '%s' "${p%/}"; }
+
+# Rewrites a patch to paths relative to the project. Worker patches may come
+# root-relative from a monorepo worktree. Exit 3 when the patch touches files
+# outside the project (git apply would silently drop them).
+project_patch() {                      # <in> <out>
+  local prefix; prefix="$(project_prefix)"
+  if [ -z "$prefix" ]; then cp "$1" "$2"; return 0; fi
+  node - "$1" "$2" "$prefix" <<'NODE'
+const fs = require("fs");
+const [inp, out, prefix] = process.argv.slice(2);
+const pre = prefix + "/";
+let files = 0, rooted = 0;
+const lines = fs.readFileSync(inp, "utf8").split("\n").map((l) => {
+  if (l.startsWith("diff --git ")) {
+    files++;
+    if (l.includes(" a/" + pre) || l.includes(" b/" + pre)) rooted++;
+    return l.split(" a/" + pre).join(" a/").split(" b/" + pre).join(" b/");
+  }
+  if (/^(--- a\/|\+\+\+ b\/)/.test(l) && l.slice(6).startsWith(pre)) return l.slice(0, 6) + l.slice(6 + pre.length);
+  const m = l.match(/^(rename from |rename to |copy from |copy to )(.*)$/);
+  if (m && m[2].startsWith(pre)) return m[1] + m[2].slice(pre.length);
+  return l;
+});
+fs.writeFileSync(out, lines.join("\n"));
+process.exit(rooted > 0 && rooted < files ? 3 : 0);
+NODE
+}
+
+# git apply for a project-relative patch, from the repo root in a monorepo.
+project_apply() {                      # <git apply args...> <patch>
+  local prefix; prefix="$(project_prefix)"
+  if [ -n "$prefix" ]; then git -C "$(git rev-parse --show-toplevel)" apply --directory="$prefix" "$@"
+  else git apply "$@"; fi
 }
 
 # --- commands.env (D8, D34) ---------------------------------------------------
@@ -316,7 +356,7 @@ changed_code_files() {                 # <base> <commit>
   while IFS= read -r f; do
     [ -n "$f" ] || continue
     is_code_file "$f" && ! is_test_file "$f" && echo "$f"
-  done < <(git diff --name-only --diff-filter=ACMR "$1" "$2" -- . ":(exclude)${FACTORY_DIR}")
+  done < <(git diff --relative --name-only --diff-filter=ACMR "$1" "$2" -- . ":(exclude)${FACTORY_DIR}")
 }
 
 # --- ticket state (D33, D34) --------------------------------------------------

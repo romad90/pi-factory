@@ -28,6 +28,8 @@ jobs:
         run: node --test tests/guard.test.mjs
       - name: end-to-end mission without models
         run: bash tests/factory.test.sh
+      - name: the same mission as one project of a monorepo
+        run: FACTORY_TEST_MONOREPO=1 bash tests/factory.test.sh
 
   commits:
     if: github.event_name == 'pull_request'

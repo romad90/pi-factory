@@ -27,15 +27,13 @@ done
 dst="$(cd "$dst" && pwd)"
 [ "$src" != "$dst" ] || { echo "target is the template repo itself"; exit 2; }
 git -C "$dst" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "$dst is not a git repo"; exit 2; }
-top="$(git -C "$dst" rev-parse --show-toplevel)"
-[ "$(cd "$top" && pwd -P)" = "$(cd "$dst" && pwd -P)" ] || {
-  echo "$dst is a folder inside the git repo $top."
-  echo "The factory installs at a repo root: worktrees, CI, patch paths and agent discovery all start there."
-  echo "Install into $top (scope missions with .factory/behavior-paths), or use a repo of its own."; exit 2; }
+# Monorepo (D56): a folder inside a bigger repo is a project of its own. Every
+# factory path, diff and gate is relative to it; nothing outside it is touched.
+prefix="$(git -C "$dst" rev-parse --show-prefix)"; prefix="${prefix%/}"
 version="$(cat "$src/.factory/VERSION" 2>/dev/null || echo dev)"
 
 if [ "$branch_mode" -eq 1 ]; then
-  [ -z "$(git -C "$dst" status --porcelain)" ] || { echo "$dst has uncommitted changes: commit or stash them, or pass --no-branch"; exit 2; }
+  [ -z "$(git -C "$dst" status --porcelain -- .)" ] || { echo "$dst has uncommitted changes: commit or stash them, or pass --no-branch"; exit 2; }
   br="chore/install-pi-factory-$version"
   if [ "$(git -C "$dst" branch --show-current)" != "$br" ]; then
     git -C "$dst" switch -q -c "$br" 2>/dev/null || git -C "$dst" switch -q "$br"
@@ -73,7 +71,22 @@ put_tree .factory/skills-pin template
 put .factory/model-families.json template
 put .factory/VERSION template
 mkdir -p "$dst/.factory/ci"
-cp "$src/templates/gitlab/factory.gitlab-ci.yml" "$dst/.factory/ci/factory.gitlab-ci.yml"
+# In a monorepo every project includes its own copy (D56): job names get the
+# project's slug, jobs run only when the project changed, from its folder.
+node - "$src/templates/gitlab/factory.gitlab-ci.yml" "$dst/.factory/ci/factory.gitlab-ci.yml" "$prefix" <<'NODE'
+const fs = require("fs");
+const [from, to, prefix] = process.argv.slice(2);
+let y = fs.readFileSync(from, "utf8");
+if (prefix) {
+  const slug = prefix.split("/").pop().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const q = JSON.stringify(prefix);
+  y = y.replace(/^(factory-gate|factory-config|behavior-replay|factory-readiness):$/gm, `$1-${slug}:`)
+       .replace(/^(\s*)- if: \$CI_PIPELINE_SOURCE == "merge_request_event"$/gm, `$1- if: $CI_PIPELINE_SOURCE == "merge_request_event"\n$1  changes: [${JSON.stringify(prefix + "/**/*")}]`)
+       .replace(/^  script:\n/gm, `  script:\n    - cd ${q}\n`);
+  y = `# Monorepo project: ${prefix}. Include from your CI with:\n#   include: [{ local: ${JSON.stringify(prefix + "/.factory/ci/factory.gitlab-ci.yml")} }]\n` + y;
+}
+fs.writeFileSync(to, y);
+NODE
 for f in contract-format.md verdict-format.md bot-harness.md ticket-format.md; do
   put "docs/agents/$f" template
 done
@@ -95,14 +108,16 @@ mkdir -p "$dst/instrument/scenarios"
 [ -n "$(ls -A "$dst/instrument/scenarios")" ] || : > "$dst/instrument/scenarios/.gitkeep"
 
 # .pi/settings.json: add the factory's "subagents" block, keep everything else.
-node - "$src/.pi/settings.json" "$dst/.pi/settings.json" <<'NODE'
+node - "$src/.pi/settings.json" "$dst/.pi/settings.json" "$prefix" <<'NODE'
 const fs = require("fs");
-const [srcFile, dstFile] = process.argv.slice(2);
+const [srcFile, dstFile, prefix] = process.argv.slice(2);
 const tpl = JSON.parse(fs.readFileSync(srcFile, "utf8"));
 const cur = fs.existsSync(dstFile) ? JSON.parse(fs.readFileSync(dstFile, "utf8")) : {};
 const had = !!cur.subagents;
 const { agentOverrides: _ignored, ...tplSub } = tpl.subagents;          // models live in agent frontmatter (D31)
 cur.subagents = { ...tplSub, ...(cur.subagents || {}) };
+// In a monorepo the project is this folder, not the git root (D56).
+if (prefix) cur.subagents.projectRootResolution = "nearest";
 const ov = cur.subagents.agentOverrides || {};
 for (const k of Object.keys(ov)) if (k.startsWith("factory-")) delete ov[k];  // would crash pi-subagents
 if (cur.subagents.agentOverrides && !Object.keys(ov).length) delete cur.subagents.agentOverrides;
@@ -136,6 +151,7 @@ if [ -d "$dst/.agents" ] && [ -n "$(find "$dst/.agents" -name '*.md' -print -qui
   note "WARNING: $dst/.agents/ contains markdown: pi-subagents will load it as agents. Move those skills to .pi/skills/."
 fi
 
+[ -z "$prefix" ] || note "monorepo project: $prefix (factory scoped to this folder; run its scripts from here)"
 echo "  files: $added added, $updated updated, $kept kept"
 models_profile="${PI_FACTORY_MODELS:-$HOME/.pi-factory/models.json}"
 if [ -f "$models_profile" ]; then
@@ -148,8 +164,8 @@ echo
 
 committed=""
 if [ "$branch_mode" -eq 1 ]; then
-  git -C "$dst" add -A
-  if ! git -C "$dst" diff --cached --quiet; then
+  git -C "$dst" add -A -- .
+  if ! git -C "$dst" diff --cached --quiet -- .; then
     git -C "$dst" commit -q -m "chore(factory): install pi-factory $version" \
       -m "Installed by pi-factory scripts/factory/install-into.sh. Tooling only, no feature change."
     committed="$(git -C "$dst" rev-parse --short HEAD)"
@@ -165,7 +181,7 @@ Left for you in $dst:
   2. .factory/behavior-paths    which paths change the bot's behavior
      docs/agents/quality-bar.md the quality bar G5 judges against: sharpen it for this repo
   In Pi, trust the project once so .pi/extensions/factory-guard.ts (command guard) loads.
-  3. .gitlab-ci.yml             add:  include: [{ local: .factory/ci/factory.gitlab-ci.yml }]
+  3. .gitlab-ci.yml             add:  include: [{ local: ${prefix:+$prefix/}.factory/ci/factory.gitlab-ci.yml }]  (in a monorepo: the CI that runs for this project)
   4. GitLab                     enable "Pipelines must succeed"
   5. /setup-matt-pocock-skills  local markdown tracker in .scratch/
 Then, in Pi from $dst: scripts/factory/doctor.sh, /subagents-models (9 factory-* agents).
