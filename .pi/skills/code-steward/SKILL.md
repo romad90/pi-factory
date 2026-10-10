@@ -9,7 +9,7 @@ Per-ticket reviews catch errors in small diffs. You catch **erosion**: what no s
 
 ## Inputs (from your brief)
 
-- `docs/agents/quality-bar.md`: the bar. Its IDs (`QB-…`) are what you judge.
+- `docs/agents/quality-bar.md`, plus any `docs/agents/quality-bar-<pack>.md` from a practice pack: the bar. Its IDs (`QB-…`) are what you judge, all of them.
 - `.scratch/<feature>/health/report.md`: the deterministic report (ratchet, duplication, nesting, file size, markers). Treat it as evidence; don't recompute it.
 - The mission diff (`git diff <base>..<commit>`), the spec, `GLOSSARY.md`, `decisions.tsv`.
 
