@@ -28,7 +28,7 @@ git init -q; mkdir -p src/tools; echo 'export const a = 1;' > src/tools/a.js; ec
 git add -A; git commit -q -m init
 bash "$root/scripts/factory/install-into.sh" "$repo" >"$work/install.log" 2>&1 || fail "install-into.sh" "$(cat "$work/install.log")"
 [ "$(git branch --show-current)" = "chore/install-pi-factory-$(cat "$root/.factory/VERSION")" ] && t "install lands on its own branch" || fail "install branch"
-[ -z "$(git status --porcelain)" ] && git log -1 --format=%s | grep -q '^chore(factory): install' && t "install is one commit" || fail "install commit"
+[ -z "$(git status --porcelain)" ] && grep -q '^chore(factory): install' <<<"$(git log -1 --format=%s)" && t "install is one commit" || fail "install commit"
 [ -f .factory/ci/factory.gitlab-ci.yml ] && [ -f docs/factory/CHEATSHEET.md ] && t "CI template and cheat sheet installed" || fail "CI template"
 
 # Fake models: author/worker one family, critic/judges another.
@@ -122,7 +122,7 @@ echo 'export const hello = () => "hello";' > src/tools/hello.js
 git add -N src/tools/hello.js; git diff -- src > "$work/01.patch"; git rm -q --cached src/tools/hello.js; rm src/tools/hello.js
 bash scripts/factory/integrate.sh demo 01-hello "$work/01.patch" >"$work/int.log" 2>&1 || fail "integrate 01" "$(cat "$work/int.log")"
 c1="$(cat $m/state/01-hello.integrated)"
-git log -1 --skip=1 --format=%s | grep -q '^feat(demo): 01-hello' && t "integration commit is a Conventional Commit" || fail "integration message: $(git log -3 --format=%s)"
+grep -q '^feat(demo): 01-hello' <<<"$(git log -1 --skip=1 --format=%s)" && t "integration commit is a Conventional Commit" || fail "integration message: $(git log -3 --format=%s)"
 expect_step review "integrated ticket waits for review"
 
 bid="$(brief reviewer demo 01-hello "$c1")"

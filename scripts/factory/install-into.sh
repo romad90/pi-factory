@@ -105,7 +105,7 @@ else
 fi
 
 # Legacy .agents/ markdown would be loaded as agents by pi-subagents.
-if [ -d "$dst/.agents" ] && find "$dst/.agents" -name '*.md' | grep -q .; then
+if [ -d "$dst/.agents" ] && [ -n "$(find "$dst/.agents" -name '*.md' -print -quit)" ]; then
   note "WARNING: $dst/.agents/ contains markdown: pi-subagents will load it as agents. Move those skills to .pi/skills/."
 fi
 

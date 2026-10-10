@@ -38,14 +38,14 @@ if [ "${1:-}" = "--quick" ]; then
 fi
 
 echo "Tooling"
-if command -v pi >/dev/null; then ok "pi $(pi --version 2>/dev/null | head -1)"; else bad "pi not on PATH"; fi
+if command -v pi >/dev/null; then ok "pi $(pi --version 2>/dev/null | awk 'NR == 1')"; else bad "pi not on PATH"; fi
 if command -v node >/dev/null; then ok "node $(node --version)"; else bad "node not on PATH (needed by models-lint and the worktree hook)"; fi
 if command -v pi >/dev/null; then
   pkgs="$(pi list 2>/dev/null || true)"
-  if printf '%s' "$pkgs" | grep -qE '(^|[^/])pi-subagents'; then ok "pi-subagents installed"
+  if grep -qE '(^|[^/])pi-subagents' <<<"$pkgs"; then ok "pi-subagents installed"
   else bad "install $want_pkg (D29)"; fi
-  printf '%s' "$pkgs" | grep -q "@tintinweb/pi-subagents" && bad "@tintinweb/pi-subagents still installed: two orchestration tools confuse the lead"
-  printf '%s' "$pkgs" | grep -q "0.76.1" || printf '  ! pinned version is %s; check "pi list" (D29)\n' "$want_pkg"
+  grep -q "@tintinweb/pi-subagents" <<<"$pkgs" && bad "@tintinweb/pi-subagents still installed: two orchestration tools confuse the lead"
+  grep -q "0.76.1" <<<"$pkgs" || printf '  ! pinned version is %s; check "pi list" (D29)\n' "$want_pkg"
 fi
 
 echo "pi-subagents config (user level)"

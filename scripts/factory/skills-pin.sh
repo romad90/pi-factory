@@ -39,7 +39,7 @@ case "${1:-verify}" in
       ok "$(skills | wc -l | tr -d ' ') upstream skills match the manifest"
     else
       bad "upstream skill files differ from the pinned manifest:"
-      diff <(hash_tree) "$manifest" | sed 's/^/      /' | head -20
+      diff <(hash_tree) "$manifest" | sed 's/^/      /' | awk 'NR <= 20'
     fi
     # Shadowing: other project locations a harness could load first or instead.
     for s in $(skills); do
@@ -49,7 +49,7 @@ case "${1:-verify}" in
     done
     # pi-subagents also scans legacy .agents/**/*.md for agent definitions;
     # any markdown there would register as an agent.
-    if [ -d .agents ] && find .agents -name '*.md' | grep -q .; then
+    if [ -d .agents ] && [ -n "$(find .agents -name '*.md' -print -quit)" ]; then
       bad ".agents/ contains markdown files, which pi-subagents would load as agents"
     else
       ok "no stray agent definitions under .agents/"

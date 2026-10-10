@@ -54,7 +54,7 @@ decisions=0
 models_list=""
 [ ${#models[@]} -gt 0 ] && models_list="$(printf '%s\n' "${models[@]}" | sort -u | paste -sd, - | sed 's/,/, /g')"
 
-first="$(git log --reverse --format=%ct -- "$dir" | head -1)"
+first="$(git log --reverse --format=%ct -- "$dir" | awk 'NR == 1')"
 last="$(git log -1 --format=%ct -- "$dir")"
 cycle="-"
 if [ -n "$first" ] && [ -n "$last" ]; then

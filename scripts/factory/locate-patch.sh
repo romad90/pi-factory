@@ -12,7 +12,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 
 feature="${1:?usage: locate-patch.sh <feature> <ticket>}"
 ticket="${2:?usage: locate-patch.sh <feature> <ticket>}"
-since="$(ls -t "$(mission_dir "$feature")"/workflows/*-build-wave*.js 2>/dev/null | head -1 || true)"
+since="$(ls -t "$(mission_dir "$feature")"/workflows/*-build-wave*.js 2>/dev/null | awk 'NR == 1' || true)"
 [ -n "$since" ] || die "no build-wave workflow for $feature yet"
 
 roots=(.pi-subagents "${TMPDIR:-/tmp}" /tmp)
