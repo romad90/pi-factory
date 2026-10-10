@@ -27,6 +27,11 @@ done
 dst="$(cd "$dst" && pwd)"
 [ "$src" != "$dst" ] || { echo "target is the template repo itself"; exit 2; }
 git -C "$dst" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "$dst is not a git repo"; exit 2; }
+top="$(git -C "$dst" rev-parse --show-toplevel)"
+[ "$(cd "$top" && pwd -P)" = "$(cd "$dst" && pwd -P)" ] || {
+  echo "$dst is a folder inside the git repo $top."
+  echo "The factory installs at a repo root: worktrees, CI, patch paths and agent discovery all start there."
+  echo "Install into $top (scope missions with .factory/behavior-paths), or use a repo of its own."; exit 2; }
 version="$(cat "$src/.factory/VERSION" 2>/dev/null || echo dev)"
 
 if [ "$branch_mode" -eq 1 ]; then
@@ -132,6 +137,12 @@ if [ -d "$dst/.agents" ] && [ -n "$(find "$dst/.agents" -name '*.md' -print -qui
 fi
 
 echo "  files: $added added, $updated updated, $kept kept"
+models_profile="${PI_FACTORY_MODELS:-$HOME/.pi-factory/models.json}"
+if [ -f "$models_profile" ]; then
+  (cd "$dst" && node scripts/factory/models-profile.mjs apply "$models_profile" | sed 's/^/  /')
+else
+  note "models: placeholders. Set them once, then save them for every repo: node scripts/factory/models-profile.mjs capture"
+fi
 echo
 (cd "$dst" && bash scripts/factory/skills-pin.sh verify | tail -1 && node scripts/factory/models-lint.mjs | tail -1) || true
 
@@ -157,6 +168,6 @@ Left for you in $dst:
   3. .gitlab-ci.yml             add:  include: [{ local: .factory/ci/factory.gitlab-ci.yml }]
   4. GitLab                     enable "Pipelines must succeed"
   5. /setup-matt-pocock-skills  local markdown tracker in .scratch/
-Then, in Pi from $dst: scripts/factory/doctor.sh, /subagents-models (7 factory-* agents).
+Then, in Pi from $dst: scripts/factory/doctor.sh, /subagents-models (9 factory-* agents).
 Cheat sheet: docs/factory/CHEATSHEET.md
 MSG
