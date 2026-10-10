@@ -73,7 +73,7 @@ Step 3 means agents delegate to agents and you supervise outcomes and exceptions
 | Durable missions, resumable from files | ✅ state in files, pause/pickup (v1.0) |
 | Escalation only on exceptions | ✅ STEP codes + notifications; ⚠️ the contract and tickets are still yours |
 | Supervision you can read at a glance | ❌ READY report (v1.2), dashboard (v1.3) |
-| Safe autonomy: sandbox, least privilege, kill switch, no default egress | ⚠️ guards in place (D51); OS sandbox, short-lived credentials and kill switch still to do (S5); Pi Durable execution environments are the candidate (X13) |
+| Safe autonomy: sandbox, least privilege, kill switch, no default egress | ⚠️ guards in place (D51); OS sandbox for commands next (S8, srt), micro-VM spike (X14), whole-mission isolation for Step 3 (S5, X13). Study: [research/agent-sandboxing.md](research/agent-sandboxing.md) |
 | Unattended missions that survive crashes, steerable from anywhere | ❌ candidate: a thin runner on Pi Durable (X13), after Step 2 |
 | Code that stays understandable without a human reading every line | ✅ G5 steward + ratchet; your MR review becomes a spot check |
 | Triggered work (issue → mission) | ❌ after Step 2 is declared |

@@ -205,7 +205,7 @@ The factory doesn't know whether you're building an API or a bot; packs tell it,
 
 - **The wall is firmer, not absolute.** Workers' worktrees don't contain `instrument/`, and the command guard blocks routes to it (git show, git log, reads). A separate repo is the hard version.
 - **Behavior evidence needs a harness.** Without one, G4 passes only on human acceptance, and the MR shows it under Known limits.
-- **The command guard is a deny-list, and it loads only in a trusted project.** It stops the known dangerous commands, not every possible one; that is why the patch guard and CI stand behind it. Whether pi-subagents children load project extensions is to be confirmed on mission 2 (the patch guard holds either way). An OS sandbox is the hard version (roadmap S5).
+- **The command guard is a deny-list, and it loads only in a trusted project.** It stops the known dangerous commands, not every possible one; that is why the patch guard and CI stand behind it. Whether pi-subagents children load project extensions is to be confirmed on mission 2 (the patch guard holds either way). An OS sandbox for agent commands is next (roadmap S8, see the [sandboxing study](docs/research/agent-sandboxing.md)).
 - **The steward is a model.** The ratchet and the "explain every file" check are mechanical; the judgement on clarity is not. Two families and evidence per item limit the risk; your review of the MR stays.
 - **The patch path from the wave depends on pi-subagents' result shape.** `locate-patch.sh` and `record-no-patch.sh` cover a miss, so it is never silent.
 - **It is built for one person on a laptop, under a shared request quota.** Concurrency defaults are conservative.
