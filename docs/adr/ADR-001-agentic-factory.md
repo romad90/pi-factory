@@ -1,8 +1,8 @@
 # ADR-001 — Agentic factory on Pi
 
-**Revision:** v1.0.0, after mission 1. Records the factory can't overstate (D38–D40), humans decide in one word (D43–D47), small changes stop costing a mission (D41, D42, D48).
+**Revision:** v1.1.0. The codebase is guarded as the team's fuel: code health gate G5 (D49, D50), agents that can't do harm (D51), tickets drafted for you (D52). v1.0.0 (after mission 1): records the factory can't overstate (D38–D40), humans decide in one word (D43–D47), small changes stop costing a mission (D41, D42, D48).
 **Status:** Accepted
-**Date:** 2026-10-10 (first revision 2026-10-07)
+**Date:** 2026-10-10 (v1.0.0 and v1.1.0; first revision 2026-10-07)
 **Scope:** The factory on Pi, from a laptop, bots projects first. The team can reuse skills, CI and conventions.
 **Target:** Step 2 (Parallel) on Boris Cherny's ladder, solidly and with as little friction as possible.
 
@@ -197,6 +197,25 @@ Mission 1 worked end to end, and showed where the factory could still lie or sta
 **D48. The factory is installed through its own MR.** `install-into.sh` commits on `chore/install-pi-factory-<version>`.
 *Why:* the first feature MR carried 193 files, mostly tooling, which hides the feature from its reviewer.
 
+### v1.1.0: the codebase as fuel, agents that can't do harm
+
+The codebase is what the team uses to bring value to customers. It must stay safe, understandable by any human, battle-tested and predictable, and agents with bash must not be able to damage it or anything around it.
+
+**D49. A code steward judges every mission before it merges (G5).** `factory-code-steward` (fresh, on another family than the workers) reads the **whole mission diff** (`mission_base..HEAD`) against a written, repo-owned quality bar (`docs/agents/quality-bar.md`): safe, understandable, battle-tested, predictable, as `QB-` items. Every item gets evidence or a label (D40), every changed source file gets a three-sentence explanation, and the gate fails on a file it could not explain. It reports; findings become fix tickets.
+*Why:* per-ticket reviews see small diffs; erosion happens across tickets (the same logic three times, a clever abstraction, an untested failure path). "Clarity over cleverness" needs an owner and a written bar, or it is everyone's opinion and nobody's job. A file a fresh model can't explain is a file a newcomer won't understand.
+
+**D50. Measured health first, with a ratchet.** `health.sh` measures duplication, large files, deep nesting, debt markers and skipped tests over the repo's source files, and runs the repo's own tool (`FACTORY_HEALTH_CMD`). The metrics may improve, never get worse than `.factory/health-baseline.json`; a justified exception is a human committing a new baseline with the reason. It runs before the steward, which gets the report as evidence. G5 verdicts go stale only when source files change.
+*Why:* deterministic checks before any LLM (D8). A ratchet improves a codebase without a big-bang cleanup: pre-existing debt is not the mission's fault, but no mission may add to it.
+
+**D51. Two guards: live commands and integrated patches.** The command guard (`.pi/extensions/factory-guard.ts`, rules in `guard-rules.mjs`, unit-tested) blocks dangerous tool calls by the lead and agents: pushes and history rewrites, `--no-verify`, privilege, recursive deletes of `/ ~ .. .git`, cluster/cloud/secret-store changes, uploads and remote shells, credential reads, publishing and merging, writes to the factory, CI or hooks, and routes to the instrument from a worker. The patch guard (`patch-guard.sh`) rejects, on every worker patch, changes to the instrument, the factory, CI or hooks, deleted/skipped/focused tests, silenced checks and secret-looking strings; a block is a recorded round. The fix lane applies it to human changes too, except paths.
+*Why:* agents have bash on a laptop with your identity. A prompt saying "don't" is not a control. The live guard stops harm before it happens; the patch guard is deterministic and holds even if the extension doesn't load (it needs a trusted project; loading in pi-subagents children is to be confirmed). Neither is a sandbox: that is S5, the bar for Step 3.
+
+**D52. Tickets are drafted by an agent and approved by you; size routes the worker.** `factory-ticket-writer` writes the tickets from the approved contract, and fix tickets from behavior or health findings (one per root cause). Nothing builds until a human runs `/factory-approve <feature> tickets`. A `**Size:** L` ticket goes straight to the heavy worker.
+*Why:* in mission 1, tickets were written by hand in the main session and fixed by hand afterwards (a missing ticket, missing `## Covers`), and the core ticket failed twice on the efficient worker. Approving a plan is cheap; writing it is not.
+
+**D53. A failing behavior verdict is re-validated once fixes are built.** If code changed since a failing behavior verdict, the next step is `validate`, not new fix tickets.
+*Why:* without it, the mission asked for fix tickets for findings that the built fixes had already addressed.
+
 ---
 
 ## 3. Flow
@@ -209,13 +228,14 @@ HUMAN, main session       /grill-with-docs → /to-spec → .scratch/<f>/spec.md
   contract     workflow.sh contract → author, then critic             D5, D32
                (fresh; critic on another family)                      D13, D31
   ── G1, HUMAN: /factory-approve  (or /factory-amend "<change>") ────── D7, D43
-HUMAN          /to-tickets (## Covers on each)
+  tickets      workflow.sh tickets → ticket writer (fresh)            D52
+  ── HUMAN: /factory-approve <f> tickets ───────────────────────────── D52
   ── G2: coverage.sh clean;  FACTORY_TEST_CMD set ─────────────────── D6, D44
   build        workflow.sh build-wave                                 D33
                ≤4 factory-workers in parallel, own worktrees,         D16, D27
                instrument hidden, own port; heavy model after round 2 D21, D24, D35
                → patch path returned → integrate.sh per patch:        D39
-                 lint + tests + extra → commit, or a recorded round   D8, D34, D38
+                 patch guard, lint, tests, extra → commit, or a round D8, D34, D38, D51
                no patch → record-no-patch.sh (a round)                D38
                DECISION NEEDED → human.sh ask → HUMAN /factory-decide D43, D47
   review       workflow.sh review-wave → fresh reviewers, other      D2, D13
@@ -225,9 +245,15 @@ HUMAN          /to-tickets (## Covers on each)
   validate     workflow.sh validate → validator in main checkout,     D14, D15
                holds the instrument → collect.sh                      D22, D23, D25
   ── G4: behavior PASS, evidence or accepted label, behavior fresh ── D10, D40, D42
+               (findings → ticket writer drafts fix tickets → approve) D25, D52, D53
+  health       health.sh check: ratchet + repo tool, no model         D50
+  steward      workflow.sh steward → code steward, whole mission diff  D49
+               vs quality bar → collect.sh                            D38, D39
+  ── G5: health PASS, bar met or accepted, every file explained ───── D49, D50
   pr           metrics.sh → HUMAN: /pr, MR, /retro                    D20, D26
+Always         command guard on every tool call (lead and agents)     D51
 CI             factory-config (skills pin, models), factory-gate      D9, D31, D36
-               (G1–G4, lanes, briefs, records, instrument rule)       D11, D23, D38
+               (G1–G5, lanes, briefs, records, instrument rule)       D11, D23, D38
 ```
 
 Every human STEP notifies you (D45). `/factory-pause` and `/factory` resume across sessions.
@@ -249,6 +275,8 @@ Every human STEP notifies you (D45). `/factory-pause` and `/factory` resume acro
 | Human decisions | `.scratch/<f>/decisions.tsv`; open question `state/open-question.md`; amendments `amendments/` |
 | Pause note | `.scratch/<f>/state/PAUSED.md` |
 | Fix lane | `.scratch/light/<slug>/request.md`, `blast-radius.md`, `verdicts/` |
+| Code health | `.scratch/<f>/health/report.md`, `verdicts/health.md`; bar `docs/agents/quality-bar.md`; ratchet `.factory/health-baseline.json` |
+| Guards | `.pi/extensions/factory-guard.ts`, `scripts/factory/guard-rules.mjs`, `scripts/factory/patch-guard.sh`; blocks logged in `.pi-subagents/guard.log` |
 | Instrument (validator only) | `instrument/scenarios/`; raw results `instrument/results/` (ignored) |
 | Factory agents | `.pi/agents/factory/*.md` |
 | Models per role | `.pi/agents/factory/*.md` frontmatter |
@@ -271,6 +299,7 @@ Every human STEP notifies you (D45). `/factory-pause` and `/factory` resume acro
 | G2 | Every assertion covered; tickets justified; no unknown IDs | `coverage.sh` |
 | G3 | Each ticket PASS, on its latest integration commit, with a generated brief id, recorded by `collect.sh` | `gate.sh` |
 | G4 | Behavior PASS, recorded, with a generated brief id; every assertion proven or accepted unverified; no behavior change since | `gate.sh` |
+| G5 | Health report PASS (ratchet, repo tool); steward PASS, recorded, generated brief, every `QB-` item proven or accepted, every changed source file explained; no source change since | `gate.sh` |
 | Lane | Behavior paths → mission required; else fresh light verdict; fix-lane verdicts checked in either lane | `gate.sh mr` |
 | Instrument | Changed/removed cases need a contract amendment | `gate.sh mr` |
 | Config | Skills match v1.3.1 pin, no shadows; models per role, families separated | `factory-config` |
@@ -283,7 +312,8 @@ Every human STEP notifies you (D45). `/factory-pause` and `/factory` resume acro
 
 | Role | Agent | Skills | Tools | Model (settings) |
 |---|---|---|---|---|
-| Clarifier, spec, tickets | human + main session | grill-with-docs, to-spec, to-tickets | — | session model |
+| Clarifier, spec | human + main session | grill-with-docs, to-spec | — | session model |
+| Ticket writer | factory-ticket-writer | ticket-writer | read, write (issues only) | frontier, any family |
 | Contract author | factory-contract-author | contract | read, write, edit | frontier, family A |
 | Contract critic | factory-contract-critic | contract-critic | read, write (critique only) | frontier, family ≠ A |
 | Worker | factory-worker | tdd, codebase-design | all builtins | efficient, family C |
@@ -291,6 +321,7 @@ Every human STEP notifies you (D45). `/factory-pause` and `/factory` resume acro
 | Reviewer | factory-reviewer | code-review | read, bash, write (verdict), subagent | frontier, family ∉ workers |
 | Review axis | factory-review-axis | — | read, bash | frontier, family ∉ workers |
 | Validator | factory-validator | verify-behavior | read, bash, write | frontier, family ∉ workers |
+| Code steward | factory-code-steward | code-steward | read, bash, write (verdict) | frontier, family ∉ workers |
 | Lead | main session, `/factory` | bundled pi-subagents skill | subagent | session model |
 
 ---
@@ -300,7 +331,7 @@ Every human STEP notifies you (D45). `/factory-pause` and `/factory` resume acro
 `.factory/skills-pin/UPSTREAM.md` has the full list, roles and upgrade procedure.
 
 - **Upstream v1.3.1 (18):** grilling, grill-with-docs, grill-me, domain-modeling, codebase-design, to-spec, to-tickets, setup-matt-pocock-skills, tdd, code-review, diagnosing-bugs, pr, retro, improve-codebase-architecture, writing-for-agents, handoff, teach, setup-pre-commit.
-- **Local:** contract, contract-critic, verify-behavior.
+- **Local:** contract, contract-critic, verify-behavior, ticket-writer, code-steward.
 - **Not vendored:** implement, implement-spec (orchestration is D33), and the rest.
 
 ---
@@ -312,6 +343,8 @@ Every human STEP notifies you (D45). `/factory-pause` and `/factory` resume acro
 - **Unbiased dispatch is structural:** fresh context by agent default, generated briefs, ids checked at the gate (D30, D32).
 - **Every subagent on its own model,** families separated and linted in CI (D31).
 - **Records can't overstate:** rounds, models and evidence are written by scripts (D38–D40).
+- **Code health has an owner and a floor:** a written bar, a ratchet, a steward on another family (D49, D50).
+- **Agents can't push, publish, touch production or read credentials,** and unsafe patches never land (D51).
 - **Less friction:** one command per mission (`/factory`); humans only at G1, tickets, behavior adjudication, escalations and the MR (D33). No runner extension to build.
 - **Reviewers see only green, committed code** (D34).
 - **v1.3.1 is enforced, not hoped for** (D36).
@@ -325,7 +358,9 @@ Every human STEP notifies you (D45). `/factory-pause` and `/factory` resume acro
 | Tokens and time | Reduced | D8, D17, D18, D34; heavy model only after failure (D24) |
 | Contract as single point of failure | Much smaller | D5, D6, D7, D20 |
 | The lead could still alter a brief | Detected, not prevented | Brief id at the gate; END OF BRIEF marker; children flag extra text |
-| The wall is soft | Accepted for Step 2 | AGENTS.md rule; separate repo if a worker is caught reading it |
+| The wall is soft | Firmer since D51 | Command guard blocks routes to `instrument/` from a worker worktree; patch guard rejects changes to it; separate repo is the hard version |
+| The command guard is a deny-list, loaded only in a trusted project | Accepted for Step 2 | Patch guard and CI stand behind it (D51); OS sandbox is the Step 3 bar (S5) |
+| The steward's clarity judgement is a model's | Reduced | Ratchet and "explain every file" are mechanical; other family; evidence per `QB-` item (D49, D50) |
 | Package moves fast | Pinned | Upgrade like skills: read changelog, rerun S0 |
 | Bot harness missing | One-time cost | First mission (D14) |
 
@@ -357,7 +392,8 @@ Steps: **1 Assisted** (one agent, you hold the context), **2 Parallel** (~10 age
 | Agents in isolated worktrees, in parallel | In use; now with the instrument hidden and ports (D35) |
 | Self-verification loop you trust | Built: contract, critic, integration gate, fresh reviewers, validator, CI (D4–D13, D32–D34) |
 | Automated review on another model | Built and enforced (D13, D31) |
-| No permission prompts stalling agents | Not seen in mission 1; deny-list for destructive commands planned (v1.1) |
+| No permission prompts stalling agents | Not seen in mission 1; dangerous commands now blocked by the guard, not prompted (D51) |
+| Code health held across missions | Built: G5 ratchet + code steward (D49, D50) |
 | You review final diffs, not every step | Verdicts + metrics in every MR (D26) |
 
 **Step 2 is declared when**, over 4 missions: 3–4 tickets per wave as routine; MRs approved from verdicts and metrics with spot checks only; first-pass review rate and escaped bugs stable or improving; zero unexplained bypasses.

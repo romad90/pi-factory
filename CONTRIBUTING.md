@@ -18,15 +18,20 @@ This repo is a template: improvements land here, then reach target repos with `s
 - `docs:`, `test:`, `chore:`, `ci:`, `refactor:` → no release.
 - In the body, say the **issue** (with mission evidence when there is some) and the **fix**. Curated release notes in `docs/releases/` are built from those bodies.
 
+## Working on the factory in Pi
+
+This repo ships the command guard (`.pi/extensions/factory-guard.ts`), which blocks writes to `scripts/factory/`, `.pi/` and `.factory/`, exactly what you change here. Start Pi with `FACTORY_GUARD=off pi` when you work on the factory itself. Never in a target repo: there the guard is what keeps agents from changing their own rules.
+
 ## Before a PR
 
 ```bash
 shellcheck -S warning scripts/factory/*.sh scripts/dev/*.sh tests/*.sh
 bash scripts/factory/skills-pin.sh verify
+node --test tests/guard.test.mjs
 bash tests/factory.test.sh
 ```
 
-A behavior change in a script needs a check in `tests/factory.test.sh`. A new decision needs an entry in the ADR (`docs/adr/ADR-001-agentic-factory.md`) with its *Why*.
+A behavior change in a script needs a check in `tests/factory.test.sh`; a guard rule needs a case in `tests/guard.test.mjs` (both what it blocks and what it must still allow). A new decision needs an entry in the ADR (`docs/adr/ADR-001-agentic-factory.md`) with its *Why*.
 
 ## Releases
 

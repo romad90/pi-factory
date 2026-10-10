@@ -1,6 +1,6 @@
 # Roadmap
 
-From mission 1's retro and from ideas borrowed (never installed) elsewhere. One item per issue; `scripts/dev/open-roadmap-issues.sh` creates the open ones on GitHub.
+From mission 1's retro and from ideas borrowed (never installed) elsewhere. One item per issue; `scripts/dev/open-roadmap-issues.sh` creates the open ones on GitHub (sections marked ✅ are skipped).
 
 Sources: **M** mission 1 retro · **A** Addy Osmani's agent-skills · **P** pstack · **E** ECC · **N** new, from reviewing the flow.
 Effort: S < half a day · M ≈ 1–2 days · L > 2 days.
@@ -33,7 +33,20 @@ Effort: S < half a day · M ≈ 1–2 days · L > 2 days.
 | F9 | Lead watchdog | M | ✅ 1.0.0 (playbook rule) |
 | F14 | Factory install in its own MR | M | ✅ 1.0.0 |
 
-## v1.0.x: fewer contract errors and oversized tickets
+## v1.1.0: code health and safety ✅
+
+| # | Item | Src | Release |
+|---|---|---|---|
+| CH1 | Code steward (G5): whole mission diff vs a written quality bar, every changed file explained | N, you | ✅ 1.1.0 |
+| CH2 | Health ratchet: duplication, size, nesting, debt markers, skipped tests, repo tool; never worse | N, E | ✅ 1.1.0 |
+| S1 | Block destructive and check-skipping commands: live command guard + patch guard at integration | E, A | ✅ 1.1.0 (guard loading in pi-subagents children to confirm on mission 2) |
+| F10 | Tickets by an agent, approved by you (and fix tickets from findings) | N | ✅ 1.1.0 |
+| F11 | Size-aware routing (L → heavy worker) | M | ✅ 1.1.0 |
+| C14 | Re-validate a failing behavior verdict once fixes are built | N | ✅ 1.1.0 |
+
+## v1.2.0: contract quality and supervision
+
+**Contract quality and fluidity**
 
 | # | Item | Src | Why | Fix | Effort |
 |---|---|---|---|---|---|
@@ -41,17 +54,14 @@ Effort: S < half a day · M ≈ 1–2 days · L > 2 days.
 | C7 | Critic output format enforced | M | Emoji headings, no `[blocking]` tags | Strict template; `next.sh` lints the critique before G1 | S |
 | C10 | Spec drift check before PR | M, N | Spec still described the old design after decisions | `STEP: pr` runs a fresh drift checker (spec ↔ contract ↔ tests ↔ README ↔ decisions.tsv) | M |
 | F8 | Compact only between waves | E | Lead context growth | Playbook rule | S |
-| F10 | Tickets by an agent, reviewed by you | N | `/to-tickets` then manual fixes | `factory-ticket-writer` (fresh), sized for the efficient worker; `/factory-approve tickets` | M |
-| F11 | Size-aware routing | M | Core ticket failed twice on the efficient worker | `**Size:** S/M/L`; L goes to the heavy worker | S |
 | F12 | Attack the premise at escalation | P | Real cause (too big) found by hand | Before round 3, log the shared premise of failed attempts; propose split / amend / heavy | S |
 | F13 | Draft MR and CI status from the factory | N | MR created by hand, CI log photographed | Project token for `glab`; `/pr` opens the draft; failed jobs feed the fix lane | S |
 | F15 | Starter kit ships the factory | N | Per-repo setup | New repos born with factory, CI include, commands.env, behavior-paths | M |
 
-## v1.1.0: safety and supervision
+**Safety and supervision**
 
 | # | Item | Src | Why | Fix | Effort |
 |---|---|---|---|---|---|
-| S1 | Block destructive and check-skipping commands | E, A | Workers have bash: `--no-verify`, force push, `rm -rf`, cluster CLIs | pi-subagents deny-list + `integrate.sh` rejects patches touching hooks, CI, skips, deleted tests | M |
 | S2 | Intake scan of vendored skills | E | Third-party text becomes instructions for agents with bash | Scan upstream text before re-pinning; record in UPSTREAM.md | M |
 | S3 | READY / NOT READY report | E | Evidence hard to read for a reviewer | Build / Lint / Tests / Secrets / Diff outside scope → READY | S |
 | S4 | Learnings unreviewed until promoted | E, P | Retro items could silently become rules | Status column in decisions and retro; only a human promotes | S |
@@ -59,7 +69,7 @@ Effort: S < half a day · M ≈ 1–2 days · L > 2 days.
 | S6 | Security review role | A | Features that delete production data | `factory-security-reviewer` per mission, triggered by `.factory/security-paths`, another family | M |
 | S7 | Install lifecycle | E | Multi-repo updates | `install-into.sh --dry-run`, `uninstall`; doctor warns on outdated `.factory/VERSION` | S |
 
-## v1.2.0: proof and scale
+## v1.3.0: proof and scale
 
 | # | Item | Src | Why | Fix | Effort |
 |---|---|---|---|---|---|
