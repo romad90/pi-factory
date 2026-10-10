@@ -50,6 +50,15 @@ Prompt injection is never prevented, only contained; the isolation level decides
 - **Model quota:** no effect at any level. **Time:** negligible (1); under a second per worker plus slower file I/O (2); one VM per mission (3).
 - **Company laptop:** Seatbelt is built into macOS (1); QEMU or virtualization to get approved (2); a Docker product with an unfinished licence to get approved (3). Show the options to the security team before investing: isolation is likely a prerequisite for unattended missions.
 
+## Hands-on validation
+
+| Machine | Result | Notes |
+|---|---|---|
+| macOS laptop (2026-10-10) | **Works.** Allowed domain goes through the srt proxy; other domains get `403` with `X-Proxy-Error: blocked-by-allowlist`; `~/.ssh` reads denied (`Operation not permitted`); writes in the allowed folder work. Write outside the allowed folder: to confirm. | Native Seatbelt, only `npm install -g @anthropic-ai/sandbox-runtime`. Run commands as `srt -c "<command>"`: a quoted string without `-c` is taken as one program name and fails with "No such file or directory". |
+| Linux dev VM | **To test.** Needs the `bubblewrap` package (not `bwa`, an unrelated tool the shell suggests) and unprivileged user namespaces: `bwrap --ro-bind / / --unshare-user --unshare-net true`. | Ubuntu 24.04+ may need an admin to lift an AppArmor restriction. A VM inside the company network may reach more internal hosts than the laptop, so network control matters even more there. |
+
+**Optional per machine (design for S8):** a machine-level setting `FACTORY_SANDBOX=srt|off` (the repo stays the same everywhere; allowed domains come from `commands.env`). Default `srt` where the pre-flight finds it working; `off` only as a recorded decision with a reason; the metrics and the MR state the level used; required once missions run unattended (Step 3).
+
 ## Recommendation
 
 1. **v1.2: level 1 for every command agents run** (roadmap S8). Turns "we hope the deny-list is complete" into "only this is allowed", for close to zero cost.
@@ -72,4 +81,4 @@ Quarterly, a scheduled task re-scans the field (new tools, maturity changes, lic
 
 ## Changelog
 
-- 2026-10-10: first study.
+- 2026-10-10: first study; srt validated on macOS; per-machine option designed for S8.
