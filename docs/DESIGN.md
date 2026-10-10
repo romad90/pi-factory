@@ -6,6 +6,8 @@ This is the readable version of the design: one page per idea, what it does and 
 
 ## 1. The problem it solves
 
+*What it is for, and how the gain is measured: [INTENT.md](INTENT.md).*
+
 Agents write code fast. What they don't do on their own is **know when they're done, judge themselves honestly, keep the codebase healthy, or stay out of trouble**. A single agent session that plans, builds, reviews and reports will happily approve its own work, invent a model name in its verdict, and declare victory on a feature nobody specified.
 
 The factory turns that into a loop you can trust without reading every line:

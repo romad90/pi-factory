@@ -44,14 +44,14 @@ Declared when, **over 4 missions**:
 
 ## Evidence log
 
-One row per mission, from `metrics.sh` and the retro.
+One row per mission, from `metrics.sh` and the retro. Human time is what the return is measured against ([INTENT.md](INTENT.md)): estimate the manual effort **before** the mission, record the minutes spent by hand until H1 computes them.
 
-| # | Mission (anonymized) | Tickets | Max per wave | First pass | Escaped bugs | Bypasses | Human interventions | Notes |
-|---|---|---|---|---|---|---|---|---|
-| 1 | Batch bot feature (clean up expired records) | 9 (3 added mid-mission) | 1 (quota) | not trustworthy (pre-1.0 rounds) | 0 known | 0 | many: see retro | [case study](case-studies/mission-01.md) |
-| 2 | | | | | | | | first mission on v1.1.0: confirm the guard loads in subagents, the patch path, the steward's cost |
-| 3 | | | | | | | | |
-| 4 | | | | | | | | |
+| # | Mission (anonymized) | Tickets | Max per wave | First pass | Escaped bugs | Bypasses | Human interventions | Manual estimate | Human time spent | MR review time | Notes |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | Batch bot feature (clean up expired records) | 9 (3 added mid-mission) | 1 (quota) | not trustworthy (pre-1.0 rounds) | 0 known | 0 | many: see retro | not recorded | not recorded | not recorded | [case study](case-studies/mission-01.md) |
+| 2 | | | | | | | | | | | first mission on v1.1.0: confirm the guard loads in subagents, the patch path, the steward's cost |
+| 3 | | | | | | | | | | | |
+| 4 | | | | | | | | | | | |
 
 Criteria check after mission 1: **2 ✗** (wave size limited by the quota, not the factory), **1 partial**, **3 not measurable** (fixed by v1.0.0), **4 ✓**.
 

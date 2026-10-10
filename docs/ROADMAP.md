@@ -52,6 +52,7 @@ Effort: S < half a day · M ≈ 1–2 days · L > 2 days.
 
 | # | Item | Src | Why | Fix | Effort |
 |---|---|---|---|---|---|
+| H1 | Human time ledger | N, you | The return is measured in human hours (see [INTENT.md](INTENT.md)), and nothing computes them | `human.sh` timestamps each human step; the mission records a manual estimate up front; `metrics.sh` reports human minutes by kind, MR review time and the ratio to the estimate | S |
 | C6 | Contract self-consistency | M | An outcome count contradicted another assertion and passed every judge | Critic mechanical checks: processed = succeeded + failed + deferred; one counting rule everywhere; Given = preconditions; regression fixture | M |
 | C7 | Critic output format enforced | M | Emoji headings, no `[blocking]` tags | Strict template; `next.sh` lints the critique before G1 | S |
 | C10 | Spec drift check before PR | M, N | Spec still described the old design after decisions | `STEP: pr` runs a fresh drift checker (spec ↔ contract ↔ tests ↔ README ↔ decisions.tsv) | M |
