@@ -67,6 +67,7 @@ check_fresh() {                         # <file> <label> [behavior]
   local f="$1" label="$2" sha fresh=verdict_is_fresh
   [ -f "$f" ] || return 0
   [ "${3:-}" = behavior ] && fresh=behavior_verdict_is_fresh
+  [ "${3:-}" = code ] && fresh=code_verdict_is_fresh
   sha="$(verdict_field "$f" Commit)"
   if "$fresh" "$sha"; then
     ok "$label: verdict matches current code (${sha:0:8})"
@@ -127,6 +128,37 @@ check_mission() {                       # <feature>
   check_model    "$b" "G4 behavior" factory-validator
   check_evidence "$b" "G4 behavior" "$spec"
   check_fresh    "$b" "G4 behavior" behavior
+  [ "${FACTORY_G5:-on}" = off ] || check_health "$feature"
+}
+
+# G5 (D49): the steward explained every changed source file. A file it
+# couldn't explain is a file a human won't understand either.
+check_explanations() {                  # <file> <label> <base> <commit>
+  local f="$1" label="$2" missing="" src section
+  [ -f "$f" ] && [ "$(verdict_field "$f" Result)" = "PASS" ] || return 0
+  section="$(awk '/^## Explanations/ { on = 1; next } on && /^## / { on = 0 } on' "$f")"
+  while IFS= read -r src; do
+    [ -n "$src" ] || continue
+    grep -qF -- "$src" <<<"$section" || missing+=" $src"
+  done < <(changed_code_files "$3" "$4")
+  if [ -n "$missing" ]; then bad "$label: no explanation for:$missing"
+  else ok "$label: every changed source file explained"; fi
+}
+
+check_health() {                        # <feature>
+  local feature="$1" dir report h commit
+  dir="$(mission_dir "$feature")"; report="$dir/health/report.md"; h="$dir/verdicts/health.md"
+  if [ ! -f "$report" ]; then bad "G5 health: no report (scripts/factory/health.sh check $feature)"
+  elif [ "$(verdict_field "$report" Result)" != "PASS" ]; then bad "G5 health: the health report fails (ratchet or repo tool)"
+  else ok "G5 health: ratchet and repo tool pass"; check_fresh "$report" "G5 health report" code; fi
+  check_verdict      "$h" "G5 steward"
+  check_recorded     "$h" "G5 steward"
+  commit="$(verdict_field "$h" Commit)"
+  check_brief        "$h" "G5 steward" code-steward "$feature" -
+  check_model        "$h" "G5 steward" factory-code-steward
+  check_evidence     "$h" "G5 steward" "$dir/spec.md"
+  check_explanations "$h" "G5 steward" "$(mission_base "$feature")" "${commit:-HEAD}"
+  check_fresh        "$h" "G5 steward" code
 }
 
 check_light() {                         # <verdict file>

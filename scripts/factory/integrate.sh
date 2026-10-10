@@ -27,8 +27,15 @@ load_commands
 dirty="$(git status --porcelain --untracked-files=no -- . ":(exclude)${FACTORY_DIR}")"
 [ -z "$dirty" ] || die "working tree has changes outside ${FACTORY_DIR}/; commit or stash them first"
 
-if grep -qE "^diff --git a/${FACTORY_INSTRUMENT_DIR}/" "$patch"; then
-  die "patch touches ${FACTORY_INSTRUMENT_DIR}/: workers must not see or change the instrument (D21)"
+# D51: nothing unsafe lands, whatever the agent did in its worktree. A block
+# is a failed round with the reasons, so the next build sees them.
+if ! guard_out="$(bash "$here/patch-guard.sh" "$patch")"; then
+  write_fail_verdict "$feature" "$ticket" patch-guard \
+    "The patch was blocked by the patch guard: $(printf '%s' "$guard_out" | tr '\n' ';' | sed 's/;$//')"
+  bash "$here/checkpoint.sh" "$feature" >/dev/null
+  printf '%s\n' "$guard_out"
+  echo "  ✗ patch blocked; recorded as a failed round in $dir/verdicts/$ticket-code.md"
+  exit 1
 fi
 
 if ! git apply --check --index "$patch" 2>/dev/null; then

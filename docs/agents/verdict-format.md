@@ -6,6 +6,7 @@ Written by `/code-review` (per ticket), `/verify-behavior` (per mission) and lig
 |---|---|
 | Code, per ticket | `.scratch/<feature>/verdicts/<ticket-file-stem>-code.md` |
 | Behavior, per mission | `.scratch/<feature>/verdicts/behavior.md` |
+| Code health, per mission (G5) | `.scratch/<feature>/verdicts/health.md` |
 | Light lane | `.scratch/light/<slug>/verdicts/code.md` |
 
 ```markdown
@@ -37,6 +38,24 @@ Rules:
 - Every recorded FAIL is a round: review FAILs, failed integrations (`**Brief:** integrate`) and worker runs without a patch (`**Brief:** worker-no-patch`). At round 3 still failing, the ticket escalates. From round 2 the heavy worker builds it.
 - Validators report. Each `[amendment]` goes to `/contract amend`.
 
+## Code health verdicts (G5, D49)
+
+Written by the code steward. Instead of `## Assertions`, a `## Bar` section judges every `QB-` item of `docs/agents/quality-bar.md` with the same rule (`PASS — <evidence>`, `FAIL — <what, where>`, `UNVERIFIED — <why>`), then:
+
+```markdown
+## Explanations
+### src/path/file.ts
+<three plain sentences: what it is for, how it works, what can go wrong>
+
+## Findings
+### H1: <root cause>
+- **Items:** QB-CLEAR-03, QB-TEST-01
+- **Where:** src/batch.ts:40-120
+- **Directive:** <what to change>
+```
+
+The gate fails if a changed source file has no `### <path>` under `## Explanations`. Findings become fix tickets through the ticket writer.
+
 ## Behavior verdicts: clustered findings (D25)
 
 The behavior verdict crosses the wall, so it carries **findings clustered by root cause**, never case contents or raw output (those stay in `instrument/results/`). Add this section:
@@ -49,4 +68,4 @@ The behavior verdict crosses the wall, so it carries **findings clustered by roo
 - **Directive:** <what is missing or wrong, in behavior terms; no case inputs>
 ```
 
-You (the orchestrator in phase 1) read the findings, reject noise, and turn each real one into **one** fix ticket (`NN-fix-<slug>.md`, `## Covers` = its assertions). One ticket per root cause, not per failed case.
+The ticket writer turns each finding into **one** fix ticket (`NN-fix-<slug>.md`, `## Covers` = its assertions), and you approve them: reject noise there. One ticket per root cause, not per failed case.

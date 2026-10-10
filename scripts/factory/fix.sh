@@ -58,6 +58,15 @@ case "$cmd" in
       [ -n "$blocked" ] && { echo; echo "## Why blocked"; echo "$blocked"; }
     } > "$dir/blast-radius.md"
     cat "$dir/blast-radius.md"
+    # D51: the same safety rules as for agents, except protected paths
+    # (changing CI or the factory may be the point of a human fix).
+    git diff "$base" HEAD -- . ":(exclude)${FACTORY_DIR}" > "$dir/change.patch"
+    if ! guard_out="$(bash "$here/patch-guard.sh" "$dir/change.patch" --human)"; then
+      blocked="${blocked:+$blocked; }$(printf '%s' "$guard_out" | tr '\n' ';' | sed 's/;$//')"
+      { echo; echo "## Patch guard"; printf '%s\n' "$guard_out"; } >> "$dir/blast-radius.md"
+      sed -i.bak 's/^\*\*Result:\*\* OK$/**Result:** BLOCKED/' "$dir/blast-radius.md" && rm -f "$dir/blast-radius.md.bak"
+      printf '%s\n' "$guard_out"
+    fi
     if [ -n "$blocked" ]; then bash "$here/checkpoint.sh" --light "$slug" >/dev/null; exit 1; fi
 
     load_commands

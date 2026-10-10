@@ -59,8 +59,14 @@ check "security scan in CI" "include Jobs/SAST and Jobs/Secret-Detection templat
 
 section "Lanes and models"
 check "behavior paths defined" "list behavior paths in .factory/behavior-paths" nonempty "$FACTORY_BEHAVIOR_PATHS_FILE"
-check "models: one per role, judges on other families" "fill .pi/settings.json agentOverrides; see node scripts/factory/models-lint.mjs" \
+check "models: one per role, judges on other families" "set model: in each .pi/agents/factory/*.md; see node scripts/factory/models-lint.mjs" \
   node "$here/models-lint.mjs"
+
+section "Code health and safety"
+check "quality bar written" "sharpen docs/agents/quality-bar.md for this repo (G5)" test -f docs/agents/quality-bar.md
+check "health baseline committed" "scripts/factory/health.sh baseline, then commit .factory/health-baseline.json" test -f "$FACTORY_HEALTH_BASELINE"
+check "repo health tool configured" "set FACTORY_HEALTH_CMD in .factory/commands.env (complexity/duplication thresholds, e.g. lizard, jscpd)" has_line '^FACTORY_HEALTH_CMD="[^"]+"' .factory/commands.env
+check "command guard installed" "copy .pi/extensions/factory-guard.ts; trust the project in Pi" test -f .pi/extensions/factory-guard.ts
 
 section "Behavior validation"
 check "instrument has scenarios" "write scenarios under $FACTORY_INSTRUMENT_DIR/scenarios (validator only)" any_file "$FACTORY_INSTRUMENT_DIR/scenarios/*.yaml"

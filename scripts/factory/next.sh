@@ -3,9 +3,9 @@
 # The first output line is machine-readable for the lead (/factory):
 #   STEP: <code>
 # Codes (human steps marked *, they notify you):
-#   paused* grill* contract approve* decide* tickets* coverage* setup*
-#   build review escalate* blocked* validate behavior-fix* behavior-stale
-#   unverified* pr*
+#   paused* grill* contract approve* decide* tickets approve-tickets* coverage*
+#   setup* build review escalate* blocked* validate behavior-fix
+#   behavior-stale health health-fix steward unverified* pr*
 #
 # Usage: scripts/factory/next.sh <feature>
 set -euo pipefail
@@ -20,7 +20,7 @@ critique="$dir/contract-critique.md"
 STATUS=""
 shopt -s nullglob
 
-HUMAN_STEPS=" paused grill approve decide tickets coverage setup escalate blocked behavior-fix unverified pr "
+HUMAN_STEPS=" paused grill approve decide approve-tickets coverage setup escalate blocked unverified pr "
 
 step() {                                  # <code> <human explanation>
   local code="$1"; shift
@@ -54,7 +54,12 @@ if ! contract_approved "$spec"; then
 fi
 
 tickets=("$dir"/issues/*.md)
-[ ${#tickets[@]} -gt 0 ] || step tickets "human, main session: /to-tickets (each ticket needs '## Covers'), then checkpoint.sh"
+# D52: tickets come from the ticket writer (or by hand), and wait for a human.
+if [ -f "$dir/state/tickets.pending" ]; then
+  STATUS="$(cat "$dir/state/tickets.pending")"$'\n'"Tickets now: $(ls "$dir/issues" 2>/dev/null | tr '\n' ' ')"$'\n'
+  step approve-tickets "human: review .scratch/$feature/issues/ (edit, split or delete freely), then /factory-approve $feature tickets"
+fi
+[ ${#tickets[@]} -gt 0 ] || step tickets "scripts/factory/workflow.sh tickets $feature all (ticket writer, fresh; you approve the result). Or write them by hand per docs/agents/ticket-format.md."
 
 if ! out="$(bash "$here/coverage.sh" "$feature" 2>&1)"; then
   STATUS="$out"$'\n'
@@ -97,22 +102,49 @@ b="$dir/verdicts/behavior.md"
 [ -f "$b" ] || step validate "scripts/factory/workflow.sh validate $feature (fresh, main checkout, holds the instrument)"
 r="$(verdict_field "$b" Result)"; n="$(verdict_round "$b")"
 if [ "$r" != "PASS" ]; then
+  # Code changed since the failing verdict (fix tickets built): validate again.
+  verdict_is_fresh "$(verdict_field "$b" Commit)" \
+    || step validate "fix tickets are built since the failing behavior verdict: scripts/factory/workflow.sh validate $feature"
   if [ -n "$n" ] && [ "$n" -ge "$FACTORY_ROUND_LIMIT" ]; then
-    step escalate "human: behavior still failing at round $n. Review the contract ('workflow.sh contract' to amend)."
+    step escalate "human: behavior still failing at round $n. Review the contract (/factory-amend)."
   fi
-  step behavior-fix "human (orchestrator, D25): turn each finding in $b into one fix ticket (issues/NN-fix-<slug>.md, '## Covers' = its assertions), then checkpoint.sh"
+  step behavior-fix "scripts/factory/workflow.sh tickets $feature fix-behavior (one fix ticket per finding in $b; you approve them, D25, D52)"
 fi
 behavior_verdict_is_fresh "$(verdict_field "$b" Commit)" \
   || step behavior-stale "behavior paths changed since the behavior verdict: scripts/factory/workflow.sh validate $feature"
 
 # D40: unverified assertions are not passes. Ship them only on a human's word.
-accepted=" $(accepted_unverified "$spec" | tr '\n' ' ') "
-missing=""
-for id in $(verdict_unverified_ids "$b"); do
-  [[ "$accepted" == *" ALL "* || "$accepted" == *" $id "* ]] || missing+=" $id"
-done
-if [ -n "$missing" ]; then
-  step unverified "human: behavior PASS leaves${missing} unverified. Prove them (harness), or /factory-accept-unverified $feature <ids|ALL> <why> to ship them as Known limits."
+unverified_step() {                    # <verdict> <label>
+  local accepted id missing=""
+  accepted=" $(accepted_unverified "$spec" | tr '\n' ' ') "
+  for id in $(verdict_unverified_ids "$1"); do
+    [[ "$accepted" == *" ALL "* || "$accepted" == *" $id "* ]] || missing+=" $id"
+  done
+  if [ -n "$missing" ]; then
+    step unverified "human: $2 PASS leaves${missing} unverified. Prove them, or /factory-accept-unverified $feature <ids|ALL> <why> to ship them as Known limits."
+  fi
+}
+unverified_step "$b" behavior
+
+# G5, code health (D49, D50): the deterministic ratchet first, then the steward.
+report="$dir/health/report.md"; h="$dir/verdicts/health.md"
+if [ ! -f "$report" ] || ! code_verdict_is_fresh "$(verdict_field "$report" Commit)"; then
+  step health "scripts/factory/health.sh check $feature (ratchet + repo tool; no model involved)"
 fi
+if [ "$(verdict_field "$report" Result)" != "PASS" ]; then
+  STATUS="$(sed -n '/^## Ratchet/,/^## Changed/p' "$report")"$'\n'
+  step health-fix "scripts/factory/workflow.sh tickets $feature fix-health (the health report fails; one fix ticket per cause). If a worse metric is justified, a human runs health.sh baseline and commits it with the reason."
+fi
+if [ ! -f "$h" ] || ! code_verdict_is_fresh "$(verdict_field "$h" Commit)"; then
+  step steward "scripts/factory/workflow.sh steward $feature (code steward, fresh, other family; judges the whole mission diff against docs/agents/quality-bar.md)"
+fi
+if [ "$(verdict_field "$h" Result)" != "PASS" ]; then
+  n="$(verdict_round "$h")"
+  if [ -n "$n" ] && [ "$n" -ge "$FACTORY_ROUND_LIMIT" ]; then
+    step escalate "human: code health still failing at round $n. Discuss the quality bar or the design."
+  fi
+  step health-fix "scripts/factory/workflow.sh tickets $feature fix-health (one fix ticket per finding in $h; you approve them)"
+fi
+unverified_step "$h" "code steward"
 
 step pr "scripts/factory/metrics.sh $feature → /pr (Evidence), open the MR, then /retro"

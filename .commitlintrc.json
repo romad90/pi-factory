@@ -2,6 +2,6 @@
   "extends": ["@commitlint/config-conventional"],
   "rules": {
     "body-max-line-length": [1, "always", 100],
-    "scope-enum": [1, "always", ["factory", "ci", "gate", "docs", "release", "deps", "tests", "skills", "models", "install"]]
+    "scope-enum": [1, "always", ["factory", "ci", "gate", "docs", "release", "deps", "tests", "skills", "models", "install", "guard", "health", "packs"]]
   }
 }

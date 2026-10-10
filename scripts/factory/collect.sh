@@ -3,7 +3,7 @@
 # Turns what the agents wrote into the record the gates trust:
 #   - each new verdict becomes the next round of its history (D38)
 #   - **Model:** is the agent's configured model, not its own guess (D39)
-#   - assertion lines are counted as PASS-with-evidence / FAIL / UNVERIFIED (D40)
+#   - assertion and quality-bar lines are counted as PASS-with-evidence / FAIL / UNVERIFIED (D40)
 # Then checkpoints the mission.
 #
 # Usage: scripts/factory/collect.sh <feature>
@@ -44,5 +44,8 @@ for v in "$dir"/verdicts/*-code.md; do
 done
 if [ -f "$dir/verdicts/behavior.md" ]; then
   record_verdict "$dir/verdicts/behavior.md" factory-validator; summary "$dir/verdicts/behavior.md"
+fi
+if [ -f "$dir/verdicts/health.md" ]; then
+  record_verdict "$dir/verdicts/health.md" factory-code-steward; summary "$dir/verdicts/health.md"
 fi
 bash "$here/checkpoint.sh" "$feature" >/dev/null

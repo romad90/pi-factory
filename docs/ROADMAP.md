@@ -1,6 +1,6 @@
 # Roadmap
 
-From mission 1's retro and from ideas borrowed (never installed) elsewhere. One item per issue; `scripts/dev/open-roadmap-issues.sh` creates the open ones on GitHub.
+From mission 1's retro and from ideas borrowed (never installed) elsewhere. One item per issue; `scripts/dev/open-roadmap-issues.sh` creates the open ones on GitHub (sections marked ✅ are skipped).
 
 Sources: **M** mission 1 retro · **A** Addy Osmani's agent-skills · **P** pstack · **E** ECC · **N** new, from reviewing the flow.
 Effort: S < half a day · M ≈ 1–2 days · L > 2 days.
@@ -33,40 +33,53 @@ Effort: S < half a day · M ≈ 1–2 days · L > 2 days.
 | F9 | Lead watchdog | M | ✅ 1.0.0 (playbook rule) |
 | F14 | Factory install in its own MR | M | ✅ 1.0.0 |
 
-## v1.0.x: fewer contract errors and oversized tickets
+## v1.1.0: code health, safety and practice packs ✅
+
+| # | Item | Src | Release |
+|---|---|---|---|
+| CH1 | Code steward (G5): whole mission diff vs a written quality bar, every changed file explained | N, you | ✅ 1.1.0 |
+| CH2 | Health ratchet: duplication, size, nesting, debt markers, skipped tests, repo tool; never worse | N, E | ✅ 1.1.0 |
+| S1 | Block destructive and check-skipping commands: live command guard + patch guard at integration | E, A | ✅ 1.1.0 (guard loading in pi-subagents children to confirm on mission 2) |
+| F10 | Tickets by an agent, approved by you (and fix tickets from findings) | N | ✅ 1.1.0 |
+| F11 | Size-aware routing (L → heavy worker) | M | ✅ 1.1.0 |
+| C14 | Re-validate a failing behavior verdict once fixes are built | N | ✅ 1.1.0 |
+| P1 | Practice packs: content for a kind of software (api, batch), `install-into.sh --pack` | N, you | ✅ 1.1.0 |
+| X4 | Batch contract checklist (now the `batch` pack) | M, A | ✅ 1.1.0 |
+
+## v1.2.0: contract quality and supervision
+
+**Contract quality and fluidity**
 
 | # | Item | Src | Why | Fix | Effort |
 |---|---|---|---|---|---|
+| H1 | Human time ledger | N, you | The return is measured in human hours (see [INTENT.md](INTENT.md)), and nothing computes them | `human.sh` timestamps each human step; the mission records a manual estimate up front; `metrics.sh` reports human minutes by kind, MR review time and the ratio to the estimate | S |
 | C6 | Contract self-consistency | M | An outcome count contradicted another assertion and passed every judge | Critic mechanical checks: processed = succeeded + failed + deferred; one counting rule everywhere; Given = preconditions; regression fixture | M |
 | C7 | Critic output format enforced | M | Emoji headings, no `[blocking]` tags | Strict template; `next.sh` lints the critique before G1 | S |
 | C10 | Spec drift check before PR | M, N | Spec still described the old design after decisions | `STEP: pr` runs a fresh drift checker (spec ↔ contract ↔ tests ↔ README ↔ decisions.tsv) | M |
 | F8 | Compact only between waves | E | Lead context growth | Playbook rule | S |
-| F10 | Tickets by an agent, reviewed by you | N | `/to-tickets` then manual fixes | `factory-ticket-writer` (fresh), sized for the efficient worker; `/factory-approve tickets` | M |
-| F11 | Size-aware routing | M | Core ticket failed twice on the efficient worker | `**Size:** S/M/L`; L goes to the heavy worker | S |
 | F12 | Attack the premise at escalation | P | Real cause (too big) found by hand | Before round 3, log the shared premise of failed attempts; propose split / amend / heavy | S |
 | F13 | Draft MR and CI status from the factory | N | MR created by hand, CI log photographed | Project token for `glab`; `/pr` opens the draft; failed jobs feed the fix lane | S |
 | F15 | Starter kit ships the factory | N | Per-repo setup | New repos born with factory, CI include, commands.env, behavior-paths | M |
 
-## v1.1.0: safety and supervision
+**Safety and supervision**
 
 | # | Item | Src | Why | Fix | Effort |
 |---|---|---|---|---|---|
-| S1 | Block destructive and check-skipping commands | E, A | Workers have bash: `--no-verify`, force push, `rm -rf`, cluster CLIs | pi-subagents deny-list + `integrate.sh` rejects patches touching hooks, CI, skips, deleted tests | M |
 | S2 | Intake scan of vendored skills | E | Third-party text becomes instructions for agents with bash | Scan upstream text before re-pinning; record in UPSTREAM.md | M |
 | S3 | READY / NOT READY report | E | Evidence hard to read for a reviewer | Build / Lint / Tests / Secrets / Diff outside scope → READY | S |
 | S4 | Learnings unreviewed until promoted | E, P | Retro items could silently become rules | Status column in decisions and retro; only a human promotes | S |
 | S5 | Minimum bar for autonomy (Step 3 ADR) | E | Agents run with your identity | Sandbox, least agency, kill switch, no default egress, short-lived credentials | L |
+| S8 | OS sandbox for agent commands (srt) | N, study | Deny-list stops known commands only; a dependency script or an unknown command isn't covered | Pi extension wrapping commands with sandbox-runtime: writes only in the worktree, network allowlist from commands.env, credentials unreadable. See [docs/research/agent-sandboxing.md](research/agent-sandboxing.md) | S |
 | S6 | Security review role | A | Features that delete production data | `factory-security-reviewer` per mission, triggered by `.factory/security-paths`, another family | M |
 | S7 | Install lifecycle | E | Multi-repo updates | `install-into.sh --dry-run`, `uninstall`; doctor warns on outdated `.factory/VERSION` | S |
 
-## v1.2.0: proof and scale
+## v1.3.0: proof and scale
 
 | # | Item | Src | Why | Fix | Effort |
 |---|---|---|---|---|---|
 | X1 | Bot harness / verification skill | M, P | G4 only by human acceptance | Generated verification skill that drives the bot like a user; replay in CI | L |
 | X2 | Skill evals with pass@k | A, E | Critic regressions found live | Fixtures per local skill, 3 runs, require 3/3 | M |
 | X3 | Anti-rationalization tables | A | "Tests pass so the assertion holds" | Excuse/rebuttal tables in contract, critic, verify-behavior, worker | S |
-| X4 | Batch-bot contract checklist | M, A | Conversational checklist produced noise | `contract-checklist-batch.md` | S |
 | X5 | Reviewer does both axes inline | A, M | 3 agents per review under a small quota | Axes inline; axis agents only for L tickets | S |
 | X6 | Interrogate panel for risky missions | P | Production deletes deserve more than one judge | Opt-in multi-family panel before `/pr` | M |
 | X7 | Definition of Done | A | No standing bar across missions | `docs/agents/definition-of-done.md`, checked by gate and `/pr` | S |
@@ -75,6 +88,13 @@ Effort: S < half a day · M ≈ 1–2 days · L > 2 days.
 | X10 | Request accounting + quota case | M | 429s under a shared quota | Requests per role from run metadata | S |
 | X11 | Model compatibility map + smoke | M | Thinking levels and reasoning replay found at run time | `.factory/model-compat.json` in models-lint; `/factory-smoke` | S |
 | X12 | Dashboard, perf-analyst | N | Supervision at a glance; ops | Static dashboard from `.scratch/`; perf-analyst read-only on captured artifacts | L |
+| X14 | Gondolin micro-VM spike for workers | N, study | Hardware boundary, instrument never mounted, secrets as placeholders | Route one or two workers into Gondolin for a mission; measure test time; security team review. See [docs/research/agent-sandboxing.md](research/agent-sandboxing.md) | M |
+
+## After Step 2 is declared
+
+| # | Item | Src | Why | Fix | Effort |
+|---|---|---|---|---|---|
+| X13 | Durable mission runner on Pi Durable | N | Step 3 needs unattended missions that survive crashes mid-wave, steering from phone or Slack, and per-agent sandboxed environments (S5) | A thin runner that loops on `next.sh` with Pi Durable checkpoints, execution environments and multi-client steering; scripts and files stay the source of truth. Wait for the API to settle. | L |
 
 ## Explicitly not taking
 
