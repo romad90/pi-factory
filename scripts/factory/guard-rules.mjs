@@ -7,7 +7,7 @@
 //
 // check({ tool, input, cwd, home }) → null | { rule, reason }
 import { existsSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 
 // Bash commands that are never an agent's to run. Each: [rule, regex, reason].
 const BASH_RULES = [
@@ -55,15 +55,26 @@ const PROTECTED_WRITE = /^(\.git\/|\.factory\/|scripts\/factory\/|\.pi\/|\.githu
 const SECRET_READ = /^\/(var\/)?run\/secrets(\/|$)|(^|\/)\.(ssh|aws|gnupg|kube|netrc|npmrc|pypirc)(\/|$)|(^|\/)\.env(\.[a-z]+)?$|(^|\/)id_(rsa|ed25519|ecdsa)(\.pub)?$/;
 const SECRET_READ_OK = /(^|\/)\.env\.(example|sample|template|factory)$/;
 
-function rel(p, cwd) {
+function rel(p, cwd, root = cwd) {      // resolve from the agent's cwd, report from the project root
   const abs = isAbsolute(p) ? p : resolve(cwd, p);
-  return abs.startsWith(cwd + "/") ? abs.slice(cwd.length + 1) : abs;
+  return abs.startsWith(root + "/") ? abs.slice(root.length + 1) : abs;
+}
+
+// The factory project the agent works in: the nearest folder with .factory/
+// (a repo root, or a folder of a monorepo, D56); else a plain git repo root.
+function projectRoot(cwd) {
+  for (let d = resolve(cwd); ; d = dirname(d)) {
+    if (existsSync(join(d, ".factory"))) return d;
+    if (dirname(d) === d) break;
+  }
+  return existsSync(join(cwd, ".git")) ? cwd : null;
 }
 
 // A worker's worktree has no instrument/ (sparse checkout, D35). From there,
 // any route to it (git show, git log -p, another checkout) breaks the wall.
 function hidesInstrument(cwd) {
-  return existsSync(join(cwd, ".git")) && !existsSync(join(cwd, "instrument"));
+  const root = projectRoot(cwd);
+  return !!root && !existsSync(join(root, "instrument"));
 }
 
 export function check({ tool, input = {}, cwd = process.cwd() }) {
@@ -80,7 +91,7 @@ export function check({ tool, input = {}, cwd = process.cwd() }) {
   }
   const path = input.path ?? input.file_path ?? input.filePath;
   if (!path) return null;
-  const r = rel(String(path), cwd);
+  const r = rel(String(path), resolve(cwd), projectRoot(cwd) ?? resolve(cwd));
   if ((tool === "write" || tool === "edit") && PROTECTED_WRITE.test(r)) {
     return { rule: "paths", reason: `${r} belongs to the factory, CI or hooks: blocked by the factory guard` };
   }

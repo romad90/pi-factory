@@ -23,8 +23,14 @@ gate_fail() { if bash scripts/factory/gate.sh mission demo >"$work/gate.log" 2>&
 brief() { bash scripts/factory/brief.sh "$@" | sed -n 's/^brief-id: //p'; }
 
 echo "Install"
-repo="$work/bot repo & co"; mkdir -p "$repo"; cd "$repo"
-git init -q; mkdir -p src/tools; echo 'export const a = 1;' > src/tools/a.js; echo 'x' > README.md
+if [ "${FACTORY_TEST_MONOREPO:-0}" = 1 ]; then      # the same mission, as one project of a monorepo (D56)
+  mono="$work/mono"; mkdir -p "$mono/projects/other"; git -C "$mono" init -q
+  echo 'keep' > "$mono/projects/other/keep.js"; echo 'root' > "$mono/README.md"
+  repo="$mono/projects/bot repo & co"; mkdir -p "$repo"; cd "$repo"
+else
+  repo="$work/bot repo & co"; mkdir -p "$repo"; cd "$repo"; git init -q
+fi
+mkdir -p src/tools; echo 'export const a = 1;' > src/tools/a.js; echo 'x' > README.md
 git add -A; git commit -q -m init
 bash "$root/scripts/factory/install-into.sh" "$repo" --pack api --pack batch >"$work/install.log" 2>&1 || fail "install-into.sh" "$(cat "$work/install.log")"
 [ "$(git branch --show-current)" = "chore/install-pi-factory-$(cat "$root/.factory/VERSION")" ] && t "install lands on its own branch" || fail "install branch"
@@ -49,7 +55,54 @@ const fs=require("fs"); const f=".factory/model-families.json"; const j=JSON.par
 j.families.push({match:"*maker*",family:"makers"},{match:"*judge*",family:"judges"}); fs.writeFileSync(f, JSON.stringify(j,null,2));
 const s=".pi/settings.json"; const k=JSON.parse(fs.readFileSync(s,"utf8")); k.subagents.modelScope.allow=["gw/*"]; fs.writeFileSync(s, JSON.stringify(k,null,2));'
 node scripts/factory/models-lint.mjs >"$work/lint.log" 2>&1 && t "models-lint passes with separated families" || fail "models-lint" "$(cat "$work/lint.log")"
+export PI_FACTORY_MODELS="$work/home/models.json"
+node scripts/factory/models-profile.mjs capture >/dev/null && grep -q 'gw/judge-1' "$PI_FACTORY_MODELS" && t "models profile captured from a configured repo" || fail "models capture"
+repo2="$work/second repo"; mkdir -p "$repo2"; git -C "$repo2" init -q; echo x > "$repo2/README.md"; git -C "$repo2" add -A; git -C "$repo2" commit -q -m init
+bash "$root/scripts/factory/install-into.sh" "$repo2" >"$work/install2.log" 2>&1 || fail "second install" "$(cat "$work/install2.log")"
+(cd "$repo2" && node scripts/factory/models-lint.mjs >/dev/null 2>&1) && t "a new repo gets the models from the profile at install" || fail "models apply" "$(cat "$work/install2.log")"
+unset PI_FACTORY_MODELS
+mkdir -p "$repo2/sub"; echo y > "$repo2/sub/y.js"; echo z > "$repo2/z.js"; git -C "$repo2" add -A; git -C "$repo2" commit -q -m sub
+echo 'local change' >> "$repo2/z.js"                # outside the project: not ours, must stay as it is
+bash "$root/scripts/factory/install-into.sh" "$repo2/sub" >"$work/install3.log" 2>&1 || fail "monorepo project install" "$(cat "$work/install3.log")"
+[ -z "$(git -C "$repo2" show --name-only --format= HEAD | grep -v '^sub/')" ] && [ -f "$repo2/sub/.factory/VERSION" ] \
+  && git -C "$repo2" diff --quiet -- sub && ! git -C "$repo2" diff --quiet -- z.js \
+  && grep -q '"projectRootResolution": "nearest"' "$repo2/sub/.pi/settings.json" \
+  && t "a monorepo project installs into its folder only" || fail "monorepo install scope" "$(cat "$work/install3.log"; git -C "$repo2" show --stat HEAD)"
 git add -A; git commit -q -m "chore: models"; base0="$(git rev-parse HEAD)"
+
+if [ -n "${mono:-}" ]; then
+  pre="projects/bot repo & co"
+  grep -q '^factory-gate-projects-bot-repo-co:$' .factory/ci/factory.gitlab-ci.yml && grep -q 'changes: \["projects/bot repo & co/\*\*/\*"\]' .factory/ci/factory.gitlab-ci.yml \
+    && grep -q '"projectRootResolution": "nearest"' .pi/settings.json \
+    && t "monorepo: CI jobs named after the project, run only when it changed; Pi resolves the nearest project" || fail "monorepo CI" "$(head -40 .factory/ci/factory.gitlab-ci.yml)"
+  printf 'diff --git a/%s/.github/ci.yml b/%s/.github/ci.yml\nnew file mode 100644\n--- /dev/null\n+++ b/%s/.github/ci.yml\n@@ -0,0 +1 @@\n+on: push\n' "$pre" "$pre" "$pre" > "$work/root-evil.patch"
+  bash -c '. scripts/factory/lib.sh; project_patch "$1" "$2"' _ "$work/root-evil.patch" "$work/norm.patch" \
+    && grep -q '^+++ b/.github/ci.yml' "$work/norm.patch" && ! bash scripts/factory/patch-guard.sh "$work/norm.patch" >/dev/null \
+    && t "monorepo: a root-relative patch is made project-relative, so the patch guard still sees CI paths" || fail "project_patch" "$(cat "$work/norm.patch")"
+  printf 'diff --git a/%s/src/a.js b/%s/src/a.js\n--- a/%s/src/a.js\n+++ b/%s/src/a.js\n@@ -1 +1 @@\n-x\n+y\ndiff --git a/projects/other/keep.js b/projects/other/keep.js\n--- a/projects/other/keep.js\n+++ b/projects/other/keep.js\n@@ -1 +1 @@\n-keep\n+gone\n' "$pre" "$pre" "$pre" "$pre" > "$work/leak.patch"
+  if bash -c '. scripts/factory/lib.sh; project_patch "$1" "$2"' _ "$work/leak.patch" "$work/norm2.patch"; then fail "a patch reaching a sibling project must be refused"; fi
+  t "monorepo: a patch reaching outside the project is refused"
+  printf 'diff --git a/projects/other/new.js b/projects/other/new.js\nnew file mode 100644\n--- /dev/null\n+++ b/projects/other/new.js\n@@ -0,0 +1 @@\n+x\n' > "$work/sibling-only.patch"
+  if bash -c '. scripts/factory/lib.sh; project_patch "$1" "$2"' _ "$work/sibling-only.patch" "$work/n3.patch"; then fail "a patch only touching a sibling must be refused"; fi
+  t "monorepo: a patch touching only a sibling project is refused, not moved into ours"
+  printf 'diff --git "a/%s/src/\\303\\251.js" "b/%s/src/\\303\\251.js"\nnew file mode 100644\n--- /dev/null\n+++ "b/%s/src/\\303\\251.js"\n@@ -0,0 +1,2 @@\n+-- a/%s/x\n+y\n' "$pre" "$pre" "$pre" "$pre" > "$work/quoted.patch"
+  bash -c '. scripts/factory/lib.sh; project_patch "$1" "$2"' _ "$work/quoted.patch" "$work/n4.patch" \
+    && grep -q '^+++ "b/src/\\303\\251.js"$' "$work/n4.patch" && grep -qF -- "+-- a/$pre/x" "$work/n4.patch" \
+    && t "monorepo: quoted paths are rewritten, hunk lines that look like headers are left alone" || fail "quoted rewrite" "$(cat "$work/n4.patch")"
+fi
+
+pg_blocks() {                          # <label> <patch text>
+  printf '%b' "$2" > "$work/pg.patch"
+  if bash scripts/factory/patch-guard.sh "$work/pg.patch" >"$work/pg.log"; then fail "$1" "$(cat "$work/pg.patch")"; fi
+  t "$1"
+}
+pg_blocks "patch guard: an instrument path with a space" 'diff --git a/instrument/x y.txt b/instrument/x y.txt\nnew file mode 100644\n--- /dev/null\n+++ b/instrument/x y.txt\n@@ -0,0 +1 @@\n+x\n'
+pg_blocks "patch guard: a quoted (non-ASCII) instrument path" 'diff --git "a/instrument/\\303\\251.txt" "b/instrument/\\303\\251.txt"\nnew file mode 100644\n--- /dev/null\n+++ "b/instrument/\\303\\251.txt"\n@@ -0,0 +1 @@\n+x\n'
+pg_blocks "patch guard: a rename out of the instrument" 'diff --git a/instrument/s.txt b/src/leak.txt\nsimilarity index 100%%\nrename from instrument/s.txt\nrename to src/leak.txt\n'
+pg_blocks "patch guard: a test renamed away" 'diff --git a/tests/a.test.js b/src/a.js\nsimilarity index 100%%\nrename from tests/a.test.js\nrename to src/a.js\n'
+pg_blocks "patch guard: a new symbolic link" 'diff --git a/src/l b/src/l\nnew file mode 120000\n--- /dev/null\n+++ b/src/l\n@@ -0,0 +1 @@\n+../instrument\n\\ No newline at end of file\n'
+printf 'diff --git a/tests/a.test.js b/tests/b.test.js\nsimilarity index 100%%\nrename from tests/a.test.js\nrename to tests/b.test.js\n' > "$work/pg.patch"
+bash scripts/factory/patch-guard.sh "$work/pg.patch" >/dev/null && t "patch guard: moving a test file is fine" || fail "test move" "$(bash scripts/factory/patch-guard.sh "$work/pg.patch")"
 
 echo "Mission: planning"
 m=.scratch/demo
@@ -303,5 +356,10 @@ echo dirty >> src/tools/a.js
 if bash scripts/factory/doctor.sh --quick >"$work/pre.log" 2>&1; then fail "dirty tree must fail pre-flight"; fi
 t "pre-flight fails on a dirty tree"
 git checkout -q -- src/tools/a.js
+
+if [ -n "${mono:-}" ]; then
+  [ "$(cat "$mono/projects/other/keep.js")" = keep ] && [ -z "$(git -C "$mono" log --format=%H -- projects/other README.md | awk 'NR > 1')" ] \
+    && t "monorepo: a whole mission never touched the sibling project or the root" || fail "monorepo leak" "$(git -C "$mono" log --stat -- projects/other README.md)"
+fi
 
 echo; echo "ALL $pass CHECKS PASSED"

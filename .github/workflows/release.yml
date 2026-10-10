@@ -17,7 +17,9 @@ concurrency:
 
 jobs:
   release:
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    # Its own commits (release, sync) carry no skip marker, so the required
+    # checks still run on them; they are skipped here by subject instead.
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):') && !startsWith(github.event.head_commit.message, 'chore: sync develop with main')"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -46,7 +48,8 @@ jobs:
       # After a release on main, bring the release commit (CHANGELOG.md,
       # .factory/VERSION) back into develop, so the next develop → main has no
       # conflict and nobody opens a sync PR by hand. Uses RELEASE_TOKEN, whose
-      # owner bypasses the ruleset. [skip ci]: nothing new to test or release.
+      # owner bypasses the ruleset. CI runs on it (it may head the next release PR);
+      # the release job skips it by subject.
       - name: sync develop with main
         if: github.ref == 'refs/heads/main'
         env:
@@ -61,7 +64,7 @@ jobs:
             exit 0
           fi
           git switch -C develop origin/develop
-          if ! git merge --no-ff origin/main -m "chore: sync develop with main [skip ci]"; then
+          if ! git merge --no-ff origin/main -m "chore: sync develop with main"; then
             echo "::error::develop and main conflict: open a main → develop PR and resolve it by hand."
             exit 1
           fi

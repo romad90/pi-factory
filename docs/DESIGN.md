@@ -1,6 +1,6 @@
 # How the factory works, and why
 
-This is the readable version of the design: one page per idea, what it does and the reason behind it. The [ADR](adr/ADR-001-agentic-factory.md) holds every decision in order (D1–D54) with its history; this guide groups them by concept and links back. For what to type, see the [cheat sheet](../CHEATSHEET.md).
+This is the readable version of the design: one page per idea, what it does and the reason behind it. The [ADR](adr/ADR-001-agentic-factory.md) holds every decision in order (D1–D56) with its history; this guide groups them by concept and links back. For what to type, see the [cheat sheet](../CHEATSHEET.md).
 
 ---
 
@@ -127,6 +127,8 @@ The factory builds and maintains bots, APIs, front ends and batch jobs, in any l
 | Fix lane with blast radius (D41) | A three-line fix shouldn't cost a mission, nor bypass every gate. It gets checks, the patch guard and one fresh reviewer. |
 | Behavior verdicts stale only on behavior paths; G5 only on source files (D42) | Re-validating after a README edit wastes scarce requests. |
 | Install through its own MR (D48) | Tooling hid the feature in mission 1's MR (193 files). |
+| Models set once per machine (D55) | Re-entering nine models per repo is error-prone busywork, and the rules (families, scope) don't change between repos. |
+| A monorepo folder is its own project (D56) | Many teams keep each domain in a folder with its own CI. Installing at the root would impose the factory on every team; scoping every diff, patch, gate and CI job to the folder keeps the pilot to your project, and the guards prove nothing leaks to a sibling. |
 | Skills pinned by checksum (D36), models linted (D31) | "Use version X" and "judges on another family" must be checkable, not conventions. |
 
 ## 12. What it deliberately doesn't do
