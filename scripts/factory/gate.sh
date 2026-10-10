@@ -161,8 +161,7 @@ case "$mode" in
     if [ -n "$shrunk" ]; then
       echo "Instrument cases changed or removed:"
       printf '%s\n' "$shrunk" | sed 's/^/    /'
-      if git diff "$base"...HEAD -- "$FACTORY_DIR" \
-           | grep -qE '^\+.*\*\*(Amended|Withdrawn):\*\*'; then
+      if grep -qE '^\+.*\*\*(Amended|Withdrawn):\*\*' <<<"$(git diff "$base"...HEAD -- "$FACTORY_DIR")"; then
         ok "instrument change backed by a contract amendment"
       else
         bad "instrument weakened without a contract amendment (/contract amend)"

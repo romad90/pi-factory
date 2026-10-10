@@ -225,7 +225,7 @@ behavior_verdict_is_fresh() {
   [ -n "$patterns" ] || { verdict_is_fresh "$sha"; return; }
   changed="$(git diff --name-only "$sha" HEAD -- . ":(exclude)${FACTORY_DIR}")"
   [ -z "$changed" ] && return 0
-  ! printf '%s\n' "$changed" | grep -qE -f <(printf '%s\n' "$patterns"; printf '^%s/\n' "$FACTORY_INSTRUMENT_DIR")
+  ! grep -qE -f <(printf '%s\n' "$patterns"; printf '^%s/\n' "$FACTORY_INSTRUMENT_DIR") <<<"$changed"
 }
 
 # --- commands.env (D8, D34) ---------------------------------------------------
