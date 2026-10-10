@@ -24,6 +24,8 @@ jobs:
         run: for f in scripts/factory/*.mjs; do node --check "$f"; done
       - name: skills pin (v1.3.1, no shadows)
         run: bash scripts/factory/skills-pin.sh verify
+      - name: command guard rules
+        run: node --test tests/guard.test.mjs
       - name: end-to-end mission without models
         run: bash tests/factory.test.sh
 
