@@ -1,6 +1,6 @@
 # Factory cheat sheet
 
-Everything you type, in the order you'll need it. Why each rule exists: [ADR-001](docs/adr/ADR-001-agentic-factory.md).
+Everything you type, in the order you'll need it. Why the factory works this way: [DESIGN.md](docs/DESIGN.md); every decision in order: [ADR-001](docs/adr/ADR-001-agentic-factory.md).
 
 > **The one rule:** drive missions with `/factory …` commands in Pi. Don't run `!scripts/...` by hand mid-mission and don't commit mission files yourself. The scripts commit their own state, and the lead relays.
 
@@ -201,6 +201,7 @@ A blocked agent stops and asks; it never looks for another way. Blocks are logge
 .scratch/<f>/workflows/              every workflow that ran (audit)
 .scratch/light/<slug>/               fix lane: request, blast radius, verdict
 docs/agents/quality-bar.md           the bar G5 judges against (repo-owned)
+docs/agents/*-<pack>.md              practice pack checklists and bar items (repo-owned)
 .factory/health-baseline.json        the ratchet (repo-owned)
 instrument/scenarios/                behavior cases (validator only)
 ```
