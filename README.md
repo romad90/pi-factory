@@ -186,7 +186,8 @@ The factory doesn't know whether you're building an API or a bot; packs tell it,
 |---|---|
 | `api` | Stripe-inspired conventions: one error shape, idempotency keys, cursor pagination, request IDs, additive changes; **Public** items for third-party APIs (versioning, signed webhooks) |
 | `batch` | Exit codes, counts that add up, safe re-runs, caps, dry-run, no overlap, stop on upstream failure |
-| `bot` | Conversational bots: routing, tools, prompt injection, multi-turn |
+
+A pack is a shape (how the software runs and fails), not a label: a batch bot is `batch`. New packs (`front-end`, `llm-app`) are written from the first mission that needs them.
 
 `install-into.sh <repo> --pack api`. Each pack is a checklist for the contract critic (G1) and `QB-` items for the code steward (G5); both are yours to edit once installed. **On a blank page, install the pack:** conventions are cheapest before the first line. **On existing code, prune it first:** consistency with what's there beats any ideal. Details: [packs/README.md](packs/README.md).
 
@@ -234,7 +235,7 @@ tests/                     end-to-end mission without models (71 checks), guard 
 | Release | Theme |
 |---|---|
 | v1.0.0 | Records that can't overstate; humans in one word; fix lane |
-| **v1.1.0** (this) | Code health (G5: ratchet + code steward), command and patch guards, ticket writer, size routing, practice packs (api, batch, bot), MIT licence |
+| **v1.1.0** (this) | Code health (G5: ratchet + code steward), command and patch guards, ticket writer, size routing, practice packs (api, batch), MIT licence |
 | next | Contract quality and supervision: critic checks, drift check, draft MR from the factory, READY report, security reviewer, skill intake scan, install lifecycle |
 | later | Proof and scale: bot harness, skill evals, request accounting, dashboard. After Step 2: a durable mission runner on Pi Durable |
 
