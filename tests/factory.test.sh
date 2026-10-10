@@ -34,7 +34,7 @@ bash "$root/scripts/factory/install-into.sh" "$repo" >"$work/install.log" 2>&1 |
 # Fake models: author/worker one family, critic/judges another.
 for a in .pi/agents/factory/*.md; do
   case "$(basename "$a")" in
-    factory-contract-critic.md|factory-reviewer.md|factory-review-axis.md|factory-validator.md) m=gw/judge-1 ;;
+    factory-contract-critic.md|factory-reviewer.md|factory-review-axis.md|factory-validator.md|factory-code-steward.md) m=gw/judge-1 ;;
     *) m=gw/maker-1 ;;
   esac
   sed -i.bak "s|^model: .*|model: $m|" "$a" && rm -f "$a.bak"
@@ -83,19 +83,27 @@ wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
 grep -q '^\*\*Status:\*\* sent' $m/amendments/*.md && t "amendment marked sent" || fail "amendment status"
 bash scripts/factory/human.sh approve demo >/dev/null
 expect_step tickets "approved, no tickets"
+bash scripts/factory/workflow.sh tickets demo all >"$work/wf.log"
+wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
+grep -q '"agent": "factory-ticket-writer"' "$wf" && grep -q 'write the mission' "$wf" && t "tickets come from the ticket writer" || fail "ticket writer wave" "$(cat "$wf")"
+# What the ticket writer would write:
 cat > $m/issues/01-hello.md <<'TK'
 # 01 hello
+**Size:** S
 ## Covers
 VAL-HELLO-001
 TK
 cat > $m/issues/02-count.md <<'TK'
 # 02 count
+**Size:** L
 ## Covers
 VAL-HELLO-002
 ## Blocked by
 01
 TK
-bash scripts/factory/checkpoint.sh demo >/dev/null
+expect_step approve-tickets "proposed tickets wait for a human"
+bash scripts/factory/human.sh approve demo tickets >/dev/null
+grep -q $'\tapprove-tickets\t' $m/decisions.tsv && t "/factory-approve <f> tickets logs the approval" || fail "approve tickets"
 expect_step setup "no FACTORY_TEST_CMD"
 printf 'FACTORY_LINT_CMD="true"\nFACTORY_TEST_CMD="test -f src/tools/a.js"\n' > .factory/commands.env
 git add -A; git commit -q -m "chore: commands"
@@ -149,6 +157,13 @@ expect_step decide "open question stops the mission"
 bash scripts/factory/human.sh decide demo B "keep data, irreversible" >/dev/null
 grep -q $'02-count\tdecide\tDelete old counts' $m/decisions.tsv && t "/factory-decide logs question and answer" || fail "decide log" "$(cat $m/decisions.tsv)"
 expect_step build "answered, ticket 02 builds"
+bash scripts/factory/workflow.sh build-wave demo >"$work/wf.log"
+wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
+grep -q '"agent": "factory-worker-heavy"' "$wf" && t "a Size: L ticket goes straight to the heavy worker" || fail "size routing" "$(cat "$wf")"
+printf 'diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml\nnew file mode 100644\n--- /dev/null\n+++ b/.github/workflows/ci.yml\n@@ -0,0 +1 @@\n+on: push\n' > "$work/evil.patch"
+if bash scripts/factory/integrate.sh demo 02-count "$work/evil.patch" >"$work/int.log" 2>&1; then fail "a patch touching CI must be blocked"; fi
+[ "$(bash -c '. scripts/factory/lib.sh; verdict_field .scratch/demo/verdicts/02-count-code.md Brief')" = patch-guard ] && [ ! -e .github/workflows/ci.yml ] \
+  && t "patch guard blocks a worker patch touching CI (recorded as a round)" || fail "patch guard" "$(cat "$work/int.log")"
 echo 'export const count = (n) => n;' > src/tools/count.js
 git add -N src/tools/count.js; git diff -- src > "$work/02.patch"; git rm -q --cached src/tools/count.js; rm src/tools/count.js
 bash scripts/factory/integrate.sh demo 02-count "$work/02.patch" >/dev/null
@@ -181,15 +196,55 @@ bash scripts/factory/collect.sh demo >/dev/null
 expect_step unverified "PASS without evidence is unverified"
 gate_fail "gate blocks unverified behavior" "unverified, not accepted: VAL-HELLO-001"
 bash scripts/factory/human.sh accept-unverified demo VAL-HELLO-001 "no harness yet" >/dev/null
-expect_step pr "accepted by a human"
-gate_ok "gate passes the whole mission"
+expect_step health "accepted by a human, code health next (G5)"
+
+echo "Code health (G5)"
+bash scripts/factory/health.sh check demo >"$work/health.log" 2>&1 && grep -q '^\*\*Result:\*\* PASS' $m/health/report.md \
+  && t "health ratchet passes (no metric worse than the baseline)" || fail "health check" "$(cat "$work/health.log")"
+bash scripts/factory/checkpoint.sh demo >/dev/null
+expect_step steward "health report fresh, steward next"
+bash scripts/factory/workflow.sh steward demo >"$work/wf.log"
+wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
+grep -q '"agent": "factory-code-steward"' "$wf" && grep -q 'quality-bar.md' "$wf" && t "steward wave judges the mission diff against the quality bar" || fail "steward wave" "$(cat "$wf")"
+head="$(git rev-parse HEAD)"
+steward_verdict() {                       # <explained files...>
+  { printf '# Verdict: health\n**Result:** PASS\n**Commit:** %s\n**Brief:** %s\n\n## Bar\n' "$head" "$(brief code-steward demo - "$head")"
+    for q in QB-SAFE-01 QB-CLEAR-01 QB-TEST-01 QB-PRED-01; do echo "- $q: PASS — src/tools/*.js reviewed, tests/*.test.js"; done
+    printf '\n## Explanations\n'; for f in "$@"; do printf '### %s\nWhat, how, what can go wrong.\n' "$f"; done
+    printf '\n## Findings\n- none\n'; } > $m/verdicts/health.md
+}
+steward_verdict src/tools/hello.js
+bash scripts/factory/collect.sh demo >/dev/null
+gate_fail "gate blocks a steward verdict that leaves a changed file unexplained" "no explanation for: src/tools/count.js"
+steward_verdict src/tools/hello.js src/tools/count.js
+bash scripts/factory/collect.sh demo >/dev/null
+grep -q '^\*\*Model:\*\* gw/judge-1 (configured for factory-code-steward)' $m/verdicts/health.md && t "steward verdict recorded with the configured model" || fail "steward model"
+expect_step pr "G5 passed"
+gate_ok "gate passes the whole mission (G1-G5)"
 bash scripts/factory/metrics.sh demo > "$work/metrics.md"
-grep -q 'First-pass review rate | 50% (1/2)' "$work/metrics.md" && t "metrics: first pass from history (ticket 01 is not a first pass)" || fail "metrics first pass" "$(cat "$work/metrics.md")"
-grep -q '(2)' "$work/metrics.md" && t "metrics: deterministic fails counted" || fail "metrics det"
+grep -q 'First-pass review rate | 0% (0/2)' "$work/metrics.md" && t "metrics: first pass from history (no ticket passed its first round)" || fail "metrics first pass" "$(cat "$work/metrics.md")"
+grep -q '(3)' "$work/metrics.md" && grep -q 'patch guard | 1' "$work/metrics.md" && t "metrics: deterministic fails and guard blocks counted" || fail "metrics det" "$(cat "$work/metrics.md")"
+
+echo "Health ratchet"
+mkdir -p src/lib
+for f in one two; do printf 'export function %s(a, b) {\n  const x = a + b;\n  const y = x * 2;\n  const z = y - a;\n  const w = z / b;\n  const v = w + x;\n  return v + y + z;\n}\n' "$f" > src/lib/$f.js; done
+git add -A src/lib; git commit -q -m "feat: copy-paste"
+expect_step health "source change makes the health report stale"
+if bash scripts/factory/health.sh check demo >"$work/health.log" 2>&1; then fail "duplication must fail the ratchet" "$(cat "$work/health.log")"; fi
+grep -q 'duplicate_blocks | 0 | [1-9]' $m/health/report.md && t "ratchet fails on new duplication" || fail "ratchet dup" "$(cat $m/health/report.md)"
+bash scripts/factory/checkpoint.sh demo >/dev/null
+expect_step health-fix "failing health report asks for fix tickets"
+bash scripts/factory/workflow.sh tickets demo fix-health >"$work/wf.log"
+grep -q 'fix ticket per finding in .scratch/demo/verdicts/health.md' "$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")" && t "fix-health tickets drafted by the ticket writer" || fail "fix-health wave"
+git rm -q -r src/lib; git commit -q -m "fix: remove duplication"
+bash scripts/factory/human.sh approve demo tickets >/dev/null
+expect_step health "fix built, health checked again"
+bash scripts/factory/health.sh check demo >/dev/null && bash scripts/factory/checkpoint.sh demo >/dev/null
+expect_step pr "back to the measured baseline; steward verdict still fresh"
 
 echo "Staleness and pause"
 echo '# docs' >> README.md; git commit -q -am "docs: readme"
-expect_step pr "docs change keeps the behavior verdict fresh"
+expect_step pr "docs change keeps behavior and health verdicts fresh"
 echo 'export const b = 2;' >> src/tools/a.js; git commit -q -am "feat: behavior change"
 expect_step behavior-stale "behavior path change makes it stale"
 bash scripts/factory/pause.sh demo "context" >/dev/null
@@ -230,6 +285,12 @@ echo 'export const c = 3;' >> src/tools/a.js; git commit -q -am "feat: sneak"
 if bash scripts/factory/gate.sh mr "$base0" >"$work/mr.log" 2>&1; then fail "behavior without mission must fail"; fi
 grep -q 'no mission is part of this MR' "$work/mr.log" && t "behavior change without a mission is blocked" || fail "full lane" "$(cat "$work/mr.log")"
 git switch -q -
+
+bash scripts/factory/fix.sh start lint-hush "silence a warning" >/dev/null
+printf '// eslint-disable-next-line\n' >> README.md; git commit -q -am "fix: hush"
+if bash scripts/factory/fix.sh check lint-hush >"$work/fix.log" 2>&1; then fail "silenced check must be blocked in the fix lane"; fi
+grep -q 'BLOCKED silence' "$work/fix.log" && t "patch guard applies to human fixes too (silenced check)" || fail "fix guard" "$(cat "$work/fix.log")"
+git revert --no-edit HEAD >/dev/null
 
 echo "Pre-flight"
 bash scripts/factory/doctor.sh --quick >"$work/pre.log" 2>&1 && t "pre-flight OK on a configured repo" || fail "preflight" "$(cat "$work/pre.log")"
