@@ -132,7 +132,7 @@ The codebase is the fuel that brings value to customers, so every mission must l
 
 | Layer | When | What it stops |
 |---|---|---|
-| **Command guard** (`.pi/extensions/factory-guard.ts`) | Live, on every tool call of the lead and agents | push, force, `--no-verify`, history rewrites, `sudo`, recursive deletes of `/ ~ .. .git`, cluster/cloud/secret-store changes, uploads and remote shells, reading credentials or `.env`, publishing, merging, writing to the factory, CI or hooks, any route to `instrument/` from a worker |
+| **Command guard** (`.pi/extensions/factory-guard.ts`) | Live, on every tool call of the lead and agents | push, force, `--no-verify`, history rewrites, `sudo`, recursive deletes of `/ ~ .. .git`, cluster/cloud/secret-store changes, uploads and remote shells, reading credentials (home folder, `.env`, secrets mounted in a container such as a Kubernetes service account token), publishing, merging, writing to the factory, CI or hooks, any route to `instrument/` from a worker |
 | **Patch guard** (`patch-guard.sh`) | Every worker patch, every fix-lane change | changes to the instrument, the factory, CI or hooks; deleted, skipped or focused tests; silenced checks (`eslint-disable`, `@ts-ignore`, `noqa`, …); anything that looks like a secret |
 | **CI gate** | Every MR | all of G1–G5, lanes, instrument rule |
 
