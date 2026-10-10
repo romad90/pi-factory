@@ -4,7 +4,8 @@
 # The lead runs them through /factory-approve, /factory-decide, /factory-amend.
 #
 # Usage:
-#   human.sh approve           <feature> [note]
+#   human.sh approve           <feature> [note]        G1: the contract
+#   human.sh approve           <feature> tickets       the tickets the ticket writer proposed
 #   human.sh ask               <feature> <ticket|-> <question>      (lead, when relaying)
 #   human.sh decide            <feature> <answer> [why...]
 #   human.sh amend             <feature> <change...>
@@ -33,6 +34,16 @@ set_contract_line() {                  # <label> <value>
 
 case "$cmd" in
   approve)
+    if [ "${1:-}" = tickets ]; then
+      [ -f "$dir/state/tickets.pending" ] || die "no tickets waiting for approval"
+      task="$(verdict_field "$dir/state/tickets.pending" Task)"
+      rm -f "$dir/state/tickets.pending"
+      shopt -s nullglob; list=("$dir"/issues/*.md)
+      decision_log "$feature" - approve-tickets "Approve the tickets ($task)" "approved: ${#list[@]} ticket(s)" tickets
+      bash "$here/checkpoint.sh" "$feature" >/dev/null
+      echo "Tickets approved (${#list[@]} in issues/). Coverage (G2) runs next."
+      exit 0
+    fi
     has_contract "$spec" || die "no validation contract in $spec yet"
     if [ -f "$dir/contract-critique.md" ] && grep -q '\[blocking\]' "$dir/contract-critique.md"; then
       echo "Note: the critique still lists [blocking] findings. Approving means you accept them as they are."

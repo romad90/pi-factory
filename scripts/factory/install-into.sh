@@ -59,9 +59,10 @@ put .factory/model-families.json template
 put .factory/VERSION template
 mkdir -p "$dst/.factory/ci"
 cp "$src/templates/gitlab/factory.gitlab-ci.yml" "$dst/.factory/ci/factory.gitlab-ci.yml"
-for f in contract-format.md verdict-format.md contract-checklist-bots.md bot-harness.md; do
+for f in contract-format.md verdict-format.md contract-checklist-bots.md bot-harness.md ticket-format.md; do
   put "docs/agents/$f" template
 done
+put .pi/extensions/factory-guard.ts template
 mkdir -p "$dst/docs/factory"
 cp "$src/docs/adr/ADR-001-agentic-factory.md" "$dst/docs/factory/ADR-001-agentic-factory.md"
 cp "$src/CHEATSHEET.md" "$dst/docs/factory/CHEATSHEET.md"
@@ -69,6 +70,7 @@ cp "$src/CHEATSHEET.md" "$dst/docs/factory/CHEATSHEET.md"
 # Repo-owned: created once, then yours.
 put .factory/commands.env repo
 put .factory/behavior-paths repo
+put docs/agents/quality-bar.md repo
 mkdir -p "$dst/instrument/scenarios"
 [ -n "$(ls -A "$dst/instrument/scenarios")" ] || : > "$dst/instrument/scenarios/.gitkeep"
 
@@ -88,6 +90,11 @@ fs.mkdirSync(require("path").dirname(dstFile), { recursive: true });
 fs.writeFileSync(dstFile, JSON.stringify(cur, null, 2) + "\n");
 console.log(`  .pi/settings.json: ${had ? "merged (your existing subagents values kept)" : "factory subagents block added"}`);
 NODE
+
+# Health ratchet (D50): lock in the repo's current metrics once.
+if [ ! -f "$dst/.factory/health-baseline.json" ]; then
+  (cd "$dst" && bash scripts/factory/health.sh baseline >/dev/null) && note ".factory/health-baseline.json created (ratchet starts from today's code)"
+fi
 
 # .gitignore: append missing lines.
 touch "$dst/.gitignore"
@@ -130,6 +137,8 @@ ${committed:+Committed $committed on $br. Push it and open its own MR before any
 Left for you in $dst:
   1. .factory/commands.env      FACTORY_TEST_CMD (required), lint, extra check, gateway URL
   2. .factory/behavior-paths    which paths change the bot's behavior
+     docs/agents/quality-bar.md the quality bar G5 judges against: sharpen it for this repo
+  In Pi, trust the project once so .pi/extensions/factory-guard.ts (command guard) loads.
   3. .gitlab-ci.yml             add:  include: [{ local: .factory/ci/factory.gitlab-ci.yml }]
   4. GitLab                     enable "Pipelines must succeed"
   5. /setup-matt-pocock-skills  local markdown tracker in .scratch/

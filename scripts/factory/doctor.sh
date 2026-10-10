@@ -27,6 +27,12 @@ if [ "${1:-}" = "--quick" ]; then
   [ -z "$dirty" ] && ok "clean tree outside ${FACTORY_DIR}/" || bad "uncommitted changes outside ${FACTORY_DIR}/ (commit or stash)"
   if node "$here/models-lint.mjs" >/dev/null 2>&1; then ok "models: one per role, families separated"
   else bad "models-lint fails (node scripts/factory/models-lint.mjs)"; fi
+  if [ -f .pi/extensions/factory-guard.ts ] && node -e '
+      import("./scripts/factory/guard-rules.mjs").then(({ check }) => {
+        process.exit(check({ tool: "bash", input: { command: "git push" }, cwd: process.cwd() }) ? 0 : 1); });' 2>/dev/null; then
+    ok "command guard present and blocking (trust the project in Pi so it loads)"
+  else bad "command guard missing or broken (.pi/extensions/factory-guard.ts, scripts/factory/guard-rules.mjs)"; fi
+  [ -f "$FACTORY_HEALTH_BASELINE" ] && ok "health baseline present" || bad "no $FACTORY_HEALTH_BASELINE (scripts/factory/health.sh baseline, then commit)"
   if [ -n "$FACTORY_GATEWAY_URL" ]; then
     if curl -sS -m 5 -o /dev/null "$FACTORY_GATEWAY_URL" 2>/dev/null; then ok "model gateway reachable"
     else bad "model gateway unreachable ($FACTORY_GATEWAY_URL): VPN or network down?"; fi

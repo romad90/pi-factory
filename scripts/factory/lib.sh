@@ -13,6 +13,11 @@ FACTORY_SKILLS_DIR="${FACTORY_SKILLS_DIR:-.pi/skills}"          # pinned skills 
 FACTORY_BRIEFS_DIR="${FACTORY_BRIEFS_DIR:-.factory/briefs}"     # brief templates (D32)
 FACTORY_AGENTS_DIR="${FACTORY_AGENTS_DIR:-.pi/agents/factory}"  # models live here (D31)
 FACTORY_FIX_MAX_LINES="${FACTORY_FIX_MAX_LINES:-80}"            # fix-lane blast radius (D41)
+FACTORY_HEALTH_BASELINE="${FACTORY_HEALTH_BASELINE:-.factory/health-baseline.json}"  # ratchet (D50)
+# Source files the health checks and the steward look at (D49, D50).
+FACTORY_CODE_RE="${FACTORY_CODE_RE:-\.(js|jsx|ts|tsx|mjs|cjs|py|go|java|kt|kts|rb|rs|cs|php|scala|swift|sh)$}"
+FACTORY_TEST_RE="${FACTORY_TEST_RE:-(^|/)(tests?|__tests__|spec|specs)/|[._-](test|spec)\.[a-z]+$|_test\.(go|py)$}"
+FACTORY_EXCLUDE_RE="${FACTORY_EXCLUDE_RE:-^(\.scratch|\.pi|\.factory|scripts/factory|instrument|node_modules|vendor|dist|build|coverage)/}"
 
 die() { printf 'factory: %s\n' "$*" >&2; exit 2; }
 
@@ -162,10 +167,10 @@ VERDICT
 verdict_evidence_counts() {
   [ -f "$1" ] || { echo "0 0 0"; return 0; }
   awk '
-    /^## Assertions/ { in_a = 1; next }
+    /^## (Assertions|Bar)/ { in_a = 1; next }
     in_a && /^## /   { in_a = 0 }
-    in_a && /^- *VAL-[A-Z0-9]+-[0-9][0-9][0-9]/ {
-      line = $0; sub(/^- *VAL-[A-Z0-9]+-[0-9][0-9][0-9][^:]*: */, "", line)
+    in_a && /^- *(VAL-[A-Z0-9]+-[0-9][0-9][0-9]|QB-[A-Z]+-[0-9][0-9])/ {
+      line = $0; sub(/^- *(VAL-[A-Z0-9]+-[0-9][0-9][0-9]|QB-[A-Z]+-[0-9][0-9])[^:]*: */, "", line)
       split(line, w, /[ \t]/); status = toupper(w[1])
       ev = line; sub(/^[A-Za-z]+[ \t]*/, "", ev); sub(/^(—|–|-|:)+[ \t]*/, "", ev)
       if (status == "PASS" && ev != "") p++
@@ -180,11 +185,11 @@ verdict_evidence_counts() {
 verdict_unverified_ids() {
   [ -f "$1" ] || return 0
   awk '
-    /^## Assertions/ { in_a = 1; next }
+    /^## (Assertions|Bar)/ { in_a = 1; next }
     in_a && /^## /   { in_a = 0 }
-    in_a && match($0, /VAL-[A-Z0-9]+-[0-9][0-9][0-9]/) {
+    in_a && match($0, /(VAL-[A-Z0-9]+-[0-9][0-9][0-9]|QB-[A-Z]+-[0-9][0-9])/) {
       id = substr($0, RSTART, RLENGTH)
-      line = $0; sub(/^- *VAL-[A-Z0-9]+-[0-9][0-9][0-9][^:]*: */, "", line)
+      line = $0; sub(/^- *(VAL-[A-Z0-9]+-[0-9][0-9][0-9]|QB-[A-Z]+-[0-9][0-9])[^:]*: */, "", line)
       split(line, w, /[ \t]/); status = toupper(w[1])
       ev = line; sub(/^[A-Za-z]+[ \t]*/, "", ev); sub(/^(—|–|-|:)+[ \t]*/, "", ev)
       if (status == "PASS" && ev != "") next
@@ -197,7 +202,7 @@ verdict_unverified_ids() {
 # `human.sh accept-unverified`:  **Accepted unverified:** <date> VAL-…, VAL-… — <why>
 accepted_unverified() {                # <spec> → accepted IDs ("ALL" for all)
   { grep -E '^\*\*Accepted unverified:\*\*' "$1" || true; } \
-    | sed -E 's/ (—|-) .*$//' | grep -oE 'VAL-[A-Z0-9]+-[0-9]{3}|\bALL\b' || true
+    | sed -E 's/ (—|-) .*$//' | grep -oE 'VAL-[A-Z0-9]+-[0-9]{3}|QB-[A-Z]+-[0-9]{2}|\bALL\b' || true
 }
 
 # A verdict is fresh when no file outside the missions dir changed
@@ -228,14 +233,27 @@ behavior_verdict_is_fresh() {
   ! grep -qE -f <(printf '%s\n' "$patterns"; printf '^%s/\n' "$FACTORY_INSTRUMENT_DIR") <<<"$changed"
 }
 
+# Code health verdicts (G5) go stale only when source files (code or tests)
+# change: a README or values tweak doesn't need a new steward run.
+code_verdict_is_fresh() {
+  local sha="$1" f
+  [ -n "$sha" ] || return 1
+  git cat-file -e "${sha}^{commit}" 2>/dev/null || return 1
+  while IFS= read -r f; do
+    [ -n "$f" ] && is_code_file "$f" && return 1
+  done < <(git diff --name-only "$sha" HEAD -- . ":(exclude)${FACTORY_DIR}")
+  return 0
+}
+
 # --- commands.env (D8, D34) ---------------------------------------------------
 
 load_commands() {
-  FACTORY_LINT_CMD=""; FACTORY_TEST_CMD=""; FACTORY_EXTRA_CMD=""; FACTORY_GATEWAY_URL=""
+  FACTORY_LINT_CMD=""; FACTORY_TEST_CMD=""; FACTORY_EXTRA_CMD=""; FACTORY_GATEWAY_URL=""; FACTORY_HEALTH_CMD=""
   # shellcheck source=/dev/null
   if [ -f .factory/commands.env ]; then . .factory/commands.env; fi
   FACTORY_LINT_CMD="${FACTORY_LINT_CMD:-}"; FACTORY_TEST_CMD="${FACTORY_TEST_CMD:-}"
   FACTORY_EXTRA_CMD="${FACTORY_EXTRA_CMD:-}"; FACTORY_GATEWAY_URL="${FACTORY_GATEWAY_URL:-}"
+  FACTORY_HEALTH_CMD="${FACTORY_HEALTH_CMD:-}"
 }
 
 # --- humans: decisions, notifications (D43, D45) --------------------------------
@@ -276,6 +294,30 @@ sha256() {                  # sha256 [file] — stdin when no file
 
 # brief_id <role> <scope> <ticket|-> <commit>: stable id recorded in verdicts.
 brief_id() { printf '%s|%s|%s|%s' "$1" "$2" "$3" "$4" | sha256 "" | cut -c1-12; }
+
+# --- mission diff (D49) -------------------------------------------------------
+
+# The commit before the mission started: parent of the first commit that
+# touched the mission directory. The steward and health check judge
+# mission_base..HEAD, i.e. everything the mission changed.
+mission_base() {
+  local first
+  first="$(git log --reverse --format=%H -- "$(mission_dir "$1")" | awk 'NR == 1')"
+  [ -n "$first" ] || { git rev-parse HEAD; return 0; }
+  git rev-parse "${first}^" 2>/dev/null || git rev-parse "$first"
+}
+
+is_code_file()  { [[ "$1" =~ $FACTORY_CODE_RE ]] && ! [[ "$1" =~ $FACTORY_EXCLUDE_RE ]]; }
+is_test_file()  { [[ "$1" =~ $FACTORY_TEST_RE ]]; }
+
+# Changed source files (not tests) between two commits, existing at the second.
+changed_code_files() {                 # <base> <commit>
+  local f
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    is_code_file "$f" && ! is_test_file "$f" && echo "$f"
+  done < <(git diff --name-only --diff-filter=ACMR "$1" "$2" -- . ":(exclude)${FACTORY_DIR}")
+}
 
 # --- ticket state (D33, D34) --------------------------------------------------
 # Per ticket: built and integrated by integrate.sh (marker = integration

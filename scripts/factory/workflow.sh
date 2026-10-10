@@ -8,16 +8,18 @@
 #
 # Usage:
 #   scripts/factory/workflow.sh contract    <feature>
+#   scripts/factory/workflow.sh tickets     <feature> <all|fix-behavior|fix-health>
 #   scripts/factory/workflow.sh build-wave  <feature>
 #   scripts/factory/workflow.sh review-wave <feature>
 #   scripts/factory/workflow.sh validate    <feature>
+#   scripts/factory/workflow.sh steward     <feature>
 #   scripts/factory/workflow.sh light       <slug> <base-ref>
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib.sh
 . "$here/lib.sh"
 
-mode="${1:?usage: workflow.sh <contract|build-wave|review-wave|validate|light> <feature> ...}"
+mode="${1:?usage: workflow.sh <contract|tickets|build-wave|review-wave|validate|steward|light> <feature> ...}"
 feature="${2:?usage: workflow.sh <mode> <feature> ...}"
 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
@@ -66,6 +68,31 @@ for (const it of ITEMS) {            // sequential: the critic reads the author'
 return out;'
     ;;
 
+  tickets)
+    # D52: tickets (or fix tickets from a verdict's findings) by a fresh agent;
+    # a human approves them (/factory-approve <feature> tickets) before any build.
+    task="${3:?usage: workflow.sh tickets <feature> <all|fix-behavior|fix-health>}"
+    d="$(mission_dir "$feature")"; mkdir -p "$d/state" "$d/issues"
+    printf '**Task:** %s\n**Requested:** %s\n' "$task" "$(date +%F)" > "$d/state/tickets.pending"
+    bash "$here/checkpoint.sh" "$feature" >/dev/null
+    add ticket-writer factory-ticket-writer false ticket-writer "$feature" "$task"
+    body='const it = ITEMS[0];
+const r = await runs.run(it.key, { agent: it.agent, task: it.task });
+return { output: r.output };'
+    ;;
+
+  steward)
+    # D49: the code steward judges the whole mission diff against the quality
+    # bar, with the deterministic health report (health.sh check) as evidence.
+    d="$(mission_dir "$feature")"
+    code_verdict_is_fresh "$(verdict_field "$d/health/report.md" Commit)" \
+      || die "no health report for HEAD: run scripts/factory/health.sh check $feature first"
+    add code-steward factory-code-steward false code-steward "$feature" - "$(git rev-parse HEAD)" "$(mission_base "$feature")"
+    body='const it = ITEMS[0];
+const r = await runs.run(it.key, { agent: it.agent, task: it.task });
+return { output: r.output };'
+    ;;
+
   build-wave)
     # Worktrees branch from HEAD, so mission state must be committed (D46).
     bash "$here/checkpoint.sh" "$feature" >/dev/null
@@ -76,6 +103,8 @@ return out;'
       [ "$n" -ge "$FACTORY_MAX_PARALLEL" ] && break
       agent=factory-worker
       [ "${T_ROUND[$name]:-0}" -ge 2 ] && agent=factory-worker-heavy      # D24 escalation
+      # D52: an L ticket goes straight to the heavy worker.
+      grep -qE '^\*\*Size:\*\* *L\b' "$(mission_dir "$feature")/issues/$name.md" && agent=factory-worker-heavy
       add "$name" "$agent" true worker "$feature" "$name"
       n=$((n + 1))
     done

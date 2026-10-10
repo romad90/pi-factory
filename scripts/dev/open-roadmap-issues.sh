@@ -10,8 +10,8 @@ command -v gh >/dev/null || { echo "gh not found"; exit 2; }
 
 existing="$(gh issue list --state all --limit 500 --json title --jq '.[].title' 2>/dev/null || true)"
 awk -F'|' '
-  /^## v1\.0\.x/ { m = "v1.0.x" } /^## v1\.1\.0/ { m = "v1.1.0" } /^## v1\.2\.0/ { m = "v1.2.0" }
-  /^## (v1\.0\.0|Explicitly)/ { m = "" }
+  /^## / { m = "" }
+  /^## v[0-9]+\.[0-9]+\.[0-9x]+:/ && !/✅/ { m = $0; sub(/^## /, "", m); sub(/:.*/, "", m) }
   m != "" && $2 ~ /^ *[CFSX][0-9]+ *$/ {
     gsub(/^ +| +$/, "", $2); gsub(/^ +| +$/, "", $3); gsub(/^ +| +$/, "", $5); gsub(/^ +| +$/, "", $6); gsub(/^ +| +$/, "", $7)
     printf "%s\t%s: %s\t%s\t%s\t%s\n", m, $2, $3, $5, $6, $7

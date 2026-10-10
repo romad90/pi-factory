@@ -12,7 +12,7 @@ flowchart LR
     style S3 stroke-dasharray: 5 5
 ```
 
-**Now:** Step 2 mechanics and trust layer built (v1.0.0). **Evidence: 1 mission of 4.**
+**Now:** Step 2 mechanics, trust layer and code-health gate built (v1.1.0). **Evidence: 1 mission of 4.**
 **Target:** declare Step 2 solidly, from a laptop. **Long-term goal:** Step 3, still from a laptop.
 
 ---
@@ -28,8 +28,10 @@ flowchart LR
 | Records that can't overstate | ✅ v1.0.0: rounds, models, evidence written by scripts | D38–D40 |
 | Gates nobody can skip silently | ✅ CI template; requires "Pipelines must succeed" | D9 |
 | Humans decide quickly, never watch | ✅ v1.0.0: one-word gates, notifications, pause | D43, D45 |
+| Tickets without hand-writing | ✅ v1.1.0: ticket writer, you approve in one word | D52 |
+| Code health held mission after mission | ✅ v1.1.0: ratchet + code steward against a written quality bar (G5) | D49, D50 |
 | Behavior proven, not assumed | ⚠️ no harness yet: G4 relies on human acceptance | D14, D40 |
-| No permission prompts or destructive commands | ⚠️ none seen; deny-list planned for v1.1 | roadmap S1 |
+| No permission prompts or destructive commands | ✅ v1.1.0: command guard live, patch guard at integration (loading in subagents to confirm on mission 2) | D51 |
 
 ## Exit criteria for Step 2
 
@@ -47,7 +49,7 @@ One row per mission, from `metrics.sh` and the retro.
 | # | Mission (anonymized) | Tickets | Max per wave | First pass | Escaped bugs | Bypasses | Human interventions | Notes |
 |---|---|---|---|---|---|---|---|---|
 | 1 | Batch bot feature (clean up expired records) | 9 (3 added mid-mission) | 1 (quota) | not trustworthy (pre-1.0 rounds) | 0 known | 0 | many: see retro | [case study](case-studies/mission-01.md) |
-| 2 | | | | | | | | first mission on v1.0.0 |
+| 2 | | | | | | | | first mission on v1.1.0: confirm the guard loads in subagents, the patch path, the steward's cost |
 | 3 | | | | | | | | |
 | 4 | | | | | | | | |
 
@@ -70,8 +72,9 @@ Step 3 means agents delegate to agents and you supervise outcomes and exceptions
 | Nested delegation (reviewer → axes) | ✅ depth 2 in use |
 | Durable missions, resumable from files | ✅ state in files, pause/pickup (v1.0) |
 | Escalation only on exceptions | ✅ STEP codes + notifications; ⚠️ the contract and tickets are still yours |
-| Supervision you can read at a glance | ❌ dashboard (v1.2), READY report (v1.1) |
-| Safe autonomy: sandbox, least privilege, kill switch, no default egress | ❌ v1.1 minimum bar (ADR to write) |
+| Supervision you can read at a glance | ❌ READY report (v1.2), dashboard (v1.3) |
+| Safe autonomy: sandbox, least privilege, kill switch, no default egress | ⚠️ guards in place (D51); OS sandbox, short-lived credentials and kill switch still to do (S5) |
+| Code that stays understandable without a human reading every line | ✅ G5 steward + ratchet; your MR review becomes a spot check |
 | Triggered work (issue → mission) | ❌ after Step 2 is declared |
 
-**Next:** run mission 2 on v1.0.0, do the retro, then improve supervision (v1.1).
+**Next:** run mission 2 on v1.1.0, do the retro, then contract quality and supervision (v1.2).
