@@ -13,8 +13,11 @@ Install with `scripts/factory/install-into.sh <repo> --pack api` (repeatable). P
 |---|---|
 | [`api`](api/) | HTTP APIs. Stripe-inspired: one error shape, idempotency keys, cursor pagination, request IDs, additive changes. Items marked **Public** only apply to APIs used by third parties. |
 | [`batch`](batch/) | Scheduled jobs and batch bots: exit codes, safe re-runs, caps, dry-run, stop on upstream failure. |
-| [`bot`](bot/) | Conversational bots: routing, tools, prompt injection, multi-turn. |
+
+**A pack is a shape, not a label.** It captures how a kind of software runs, how it fails and what "done" means for it: request → response (`api`), scheduled work over items (`batch`). Names like "bot" or "service" say where software sits, not how it behaves; a batch bot is a `batch` job. Packs combine: an agent working through a backlog with an LLM would be `batch` + `llm-app`.
+
+**A pack comes from a real mission.** `batch` was written from mission 1's decisions. A new pack is added when a mission needs it, written from that mission, with both files (checklist and quality bar). The exception is a pack grounded in a solid external reference that pays off from the first line (`api`, Stripe-inspired). Planned, to be written from their first mission: `front-end` (accessibility, loading and error states, performance, i18n) and `llm-app` (prompt injection, invented answers, tool failures, evals instead of plain tests). A thin pack is worse than none: it looks covered and isn't.
 
 **Enforce or not?** On a blank page, install the pack: conventions are cheapest before the first endpoint, and every item stays amendable at G1. On an existing code base, consistency with what is there beats any ideal: prune the items that contradict it before the first mission. The steward judges the diff, never the past.
 
-**Write a pack:** two files, items that are checkable on a diff or as an assertion, stable IDs. Keep it short; a pack nobody reads is noise.
+**Write a pack:** two files (both required), items that are checkable on a diff or as an assertion, stable IDs. Keep it short; a pack nobody reads is noise.

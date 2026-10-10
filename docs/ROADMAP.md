@@ -43,7 +43,7 @@ Effort: S < half a day · M ≈ 1–2 days · L > 2 days.
 | F10 | Tickets by an agent, approved by you (and fix tickets from findings) | N | ✅ 1.1.0 |
 | F11 | Size-aware routing (L → heavy worker) | M | ✅ 1.1.0 |
 | C14 | Re-validate a failing behavior verdict once fixes are built | N | ✅ 1.1.0 |
-| P1 | Practice packs: content for a kind of software (api, batch, bot), `install-into.sh --pack` | N, you | ✅ 1.1.0 |
+| P1 | Practice packs: content for a kind of software (api, batch), `install-into.sh --pack` | N, you | ✅ 1.1.0 |
 | X4 | Batch contract checklist (now the `batch` pack) | M, A | ✅ 1.1.0 |
 
 ## v1.2.0: contract quality and supervision

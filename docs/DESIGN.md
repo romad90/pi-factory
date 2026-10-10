@@ -112,9 +112,11 @@ The factory builds and maintains bots, APIs, front ends and batch jobs, in any l
 |---|---|---|
 | `AGENTS.md` | your company's engineering taste, for everything | every agent |
 | `docs/agents/quality-bar.md` | the code health bar | the steward (G5) |
-| `packs/<name>/` → `contract-checklist-<name>.md`, `quality-bar-<name>.md` | practices for a kind of software (`api`, `batch`, `bot`) | the contract author and critic (G1), the steward (G5) |
+| `packs/<name>/` → `contract-checklist-<name>.md`, `quality-bar-<name>.md` | practices for a shape of software (`api`, `batch`) | the contract author and critic (G1), the steward (G5) |
 
 **Why content, not code:** a factory that knows "APIs" in its scripts is neither agnostic nor lean. Markdown read by the existing roles adds knowledge without adding machinery, and you can read, edit and prune it. Install a pack on a blank page, where conventions cost nothing (the `api` pack is Stripe-inspired). On existing code, prune it first: consistency with what's there beats any ideal, and the steward judges the diff, never the past.
+
+**Why shapes, from missions:** a pack captures how a kind of software runs, fails and is proven done, so "bot" is not a pack: a batch bot is `batch`, a chat bot would be `llm-app`. Each pack is written from the first real mission that needs it, because a checklist written from imagination is thin, and a thin pack looks covered and isn't. That is why the conversational `bot` checklist was dropped before 1.1.0.
 
 ## 11. Enforcement: gates nobody can skip silently
 

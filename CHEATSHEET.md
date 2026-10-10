@@ -64,7 +64,7 @@ Under a small shared quota (about 10 requests per window), set `parallel.concurr
 ## 4. Once per target repo
 
 ```bash
-scripts/factory/install-into.sh "/path/to/repo" [--pack api|batch|bot]...   # quotes matter with spaces or &
+scripts/factory/install-into.sh "/path/to/repo" [--pack api|batch]...   # quotes matter with spaces or &
 ```
 
 That puts the install on its own branch, `chore/install-pi-factory-<version>`, as one commit (with today's health baseline). Merge it through its own MR before any mission. Then in the target:

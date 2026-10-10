@@ -9,8 +9,8 @@
 #
 # Usage (from the template repo root):
 #   scripts/factory/install-into.sh <path-to-target-repo> [--pack <name>]... [--no-branch]
-#   Packs (packs/<name>/): practice content for a kind of software (api,
-#   batch, bot); repo-owned once copied. See packs/README.md (D54).
+#   Packs (packs/<name>/): practice content for a shape of software (api,
+#   batch); repo-owned once copied. See packs/README.md (D54).
 set -euo pipefail
 
 src="$(cd "$(dirname "$0")/../.." && pwd)"
