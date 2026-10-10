@@ -27,6 +27,17 @@ load_commands
 dirty="$(git status --porcelain --untracked-files=no -- . ":(exclude)${FACTORY_DIR}")"
 [ -z "$dirty" ] || die "working tree has changes outside ${FACTORY_DIR}/; commit or stash them first"
 
+# D56: in a monorepo, every patch is made relative to the project first; a
+# patch that reaches outside the project is blocked like any unsafe patch.
+raw_patch="$patch"; patch="$(mktemp)"; trap 'rm -f "$patch"' EXIT
+if ! project_patch "$raw_patch" "$patch"; then
+  write_fail_verdict "$feature" "$ticket" patch-guard \
+    "The patch was blocked by the patch guard: paths: it changes files outside the project $(project_prefix)/"
+  bash "$here/checkpoint.sh" "$feature" >/dev/null
+  echo "  ✗ patch touches files outside the project; recorded as a failed round in $dir/verdicts/$ticket-code.md"
+  exit 1
+fi
+
 # D51: nothing unsafe lands, whatever the agent did in its worktree. A block
 # is a failed round with the reasons, so the next build sees them.
 if ! guard_out="$(bash "$here/patch-guard.sh" "$patch")"; then
@@ -38,8 +49,8 @@ if ! guard_out="$(bash "$here/patch-guard.sh" "$patch")"; then
   exit 1
 fi
 
-if ! git apply --check --index "$patch" 2>/dev/null; then
-  if ! git apply --check --3way --index "$patch" 2>/dev/null; then
+if ! project_apply --check --index "$patch" 2>/dev/null; then
+  if ! project_apply --check --3way --index "$patch" 2>/dev/null; then
     write_fail_verdict "$feature" "$ticket" integrate \
       "The worker's patch does not apply on $(git rev-parse --short HEAD). Rebuild from the current code."
     bash "$here/checkpoint.sh" "$feature" >/dev/null
@@ -47,7 +58,7 @@ if ! git apply --check --index "$patch" 2>/dev/null; then
     exit 1
   fi
 fi
-git apply --3way --index "$patch"
+project_apply --3way --index "$patch"
 
 mkdir -p "$dir/logs" "$dir/state"
 log="$dir/logs/$ticket-integrate.log"
@@ -68,7 +79,7 @@ if run_check lint "$FACTORY_LINT_CMD" && run_check tests "$FACTORY_TEST_CMD" \
   bash "$here/checkpoint.sh" "$feature" >/dev/null
   echo "  ✓ committed $(git rev-parse --short "$(cat "$dir/state/$ticket.integrated")"); ready for review"
 else
-  git apply -R --index "$patch"
+  project_apply -R --index "$patch"
   # The failure is a round like any review FAIL, so escalation is automatic (D38).
   write_fail_verdict "$feature" "$ticket" integrate \
     "Lint, tests or the extra check failed when integrating the worker's patch. Log: $log"

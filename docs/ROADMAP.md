@@ -59,6 +59,8 @@ Effort: S < half a day · M ≈ 1–2 days · L > 2 days.
 | F8 | Compact only between waves | E | Lead context growth | Playbook rule | S |
 | F12 | Attack the premise at escalation | P | Real cause (too big) found by hand | Before round 3, log the shared premise of failed attempts; propose split / amend / heavy | S |
 | F13 | Draft MR and CI status from the factory | N | MR created by hand, CI log photographed | Project token for `glab`; `/pr` opens the draft; failed jobs feed the fix lane | S |
+| F16 | Models profile per machine | you | Nine models re-entered per repo | `models-profile.mjs capture/apply`, applied at install (D55) | ✅ |
+| F17 | Monorepo projects | you | Each domain is a folder with its own CI | Factory scoped to the folder: relative diffs, patches, guards, CI jobs (D56) | ✅ |
 | F15 | Starter kit ships the factory | N | Per-repo setup | New repos born with factory, CI include, commands.env, behavior-paths | M |
 
 **Safety and supervision**

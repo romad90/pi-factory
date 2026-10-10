@@ -29,24 +29,28 @@ human=0; [ "${2:-}" = "--human" ] && human=1
 reasons=()
 block() { reasons+=("$1"); }
 
-# Files touched, with their status (D = deleted), from the patch headers.
-touched="$(awk '
-  /^diff --git a\// { if (f != "") print st, f; f = substr($4, 3); st = "M" }
-  /^deleted file mode/ { st = "D" }
-  /^new file mode/ { st = "A" }
-  END { if (f != "") print st, f }' "$patch")"
+# Files touched, both sides (a rename moves a file out of somewhere too),
+# with quoted paths decoded: status, old, new, new mode (separator \x1f,
+# never whitespace, so an empty side stays an empty field).
+touched="$(node "$here/patch-paths.mjs" list "$patch")"
 
 protected="^(${FACTORY_INSTRUMENT_DIR}/|\\.factory/|scripts/factory/|\\.pi/|\\.github/|\\.gitlab-ci\\.yml$|\\.husky/|\\.pre-commit-config\\.yaml$|lefthook\\.yml$|\\.git/)"
-while read -r st f; do
-  [ -n "${f:-}" ] || continue
+check_path() {                          # <path>
+  local f="$1"
+  [ -n "$f" ] || return 0
   if [[ "$f" =~ ^${FACTORY_INSTRUMENT_DIR}/ ]]; then
     block "paths: $f is in the instrument, hidden from workers (D21)"
   elif [ "$human" -eq 0 ] && [[ "$f" =~ $protected ]]; then
     block "paths: $f belongs to the factory, CI or hooks; agents never change them (a human does, through the fix lane)"
   fi
-  if [ "$st" = "D" ] && is_test_file "$f"; then
-    block "tests: $f deleted; tests are never removed to make a change pass"
+}
+while IFS=$'\x1f' read -r st old new mode; do
+  [ -n "${st:-}" ] || continue
+  check_path "$old"; [ "$new" = "$old" ] || check_path "$new"
+  if is_test_file "$old" && { [ "$st" = D ] || { [ "$st" = R ] && ! is_test_file "$new"; }; }; then
+    block "tests: $old deleted; tests are never removed to make a change pass"
   fi
+  [ "$mode" != 120000 ] || block "paths: ${new:-$old} is a symbolic link; a link can point at the instrument or outside the project"
 done <<<"$touched"
 
 # Added lines only (not the +++ header).

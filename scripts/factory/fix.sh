@@ -39,9 +39,9 @@ case "$cmd" in
   check)
     [ -f "$req" ] || die "no fix $slug (fix.sh start first)"
     base="$(verdict_field "$req" Base)"
-    files="$(git diff --name-only "$base" HEAD -- . ":(exclude)${FACTORY_DIR}")"
+    files="$(git diff --relative --name-only "$base" HEAD -- . ":(exclude)${FACTORY_DIR}")"
     [ -n "$files" ] || die "no committed change since $base: commit the fix first"
-    lines="$(git diff --numstat "$base" HEAD -- . ":(exclude)${FACTORY_DIR}" | awk '{ n += $1 + $2 } END { print n + 0 }')"
+    lines="$(git diff --relative --numstat "$base" HEAD -- . ":(exclude)${FACTORY_DIR}" | awk '{ n += $1 + $2 } END { print n + 0 }')"
     patterns="$(behavior_patterns)"
     behavior=""
     [ -n "$patterns" ] && behavior="$(printf '%s\n' "$files" | grep -E -f <(printf '%s\n' "$patterns") || true)"
@@ -60,7 +60,7 @@ case "$cmd" in
     cat "$dir/blast-radius.md"
     # D51: the same safety rules as for agents, except protected paths
     # (changing CI or the factory may be the point of a human fix).
-    git diff "$base" HEAD -- . ":(exclude)${FACTORY_DIR}" > "$dir/change.patch"
+    git diff --relative "$base" HEAD -- . ":(exclude)${FACTORY_DIR}" > "$dir/change.patch"
     if ! guard_out="$(bash "$here/patch-guard.sh" "$dir/change.patch" --human)"; then
       blocked="${blocked:+$blocked; }$(printf '%s' "$guard_out" | tr '\n' ';' | sed 's/;$//')"
       { echo; echo "## Patch guard"; printf '%s\n' "$guard_out"; } >> "$dir/blast-radius.md"

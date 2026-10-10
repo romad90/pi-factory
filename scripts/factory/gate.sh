@@ -184,11 +184,11 @@ case "$mode" in
       exit 0
     fi
 
-    changed="$(git diff --name-only "$base"...HEAD)"
+    changed="$(git diff --relative --name-only "$base"...HEAD -- .)"
 
     # D23: the instrument can grow freely; changing or deleting a case
     # needs a contract amendment in the same MR.
-    shrunk="$(git diff --name-status "$base"...HEAD -- "$FACTORY_INSTRUMENT_DIR/scenarios" \
+    shrunk="$(git diff --relative --name-status "$base"...HEAD -- "$FACTORY_INSTRUMENT_DIR/scenarios" \
       | awk '$1 !~ /^A/' || true)"
     if [ -n "$shrunk" ]; then
       echo "Instrument cases changed or removed:"
