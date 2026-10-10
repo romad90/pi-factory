@@ -31,7 +31,7 @@ node --test tests/guard.test.mjs
 bash tests/factory.test.sh
 ```
 
-A behavior change in a script needs a check in `tests/factory.test.sh`; a guard rule needs a case in `tests/guard.test.mjs` (both what it blocks and what it must still allow). A new decision needs an entry in the ADR (`docs/adr/ADR-001-agentic-factory.md`) with its *Why*.
+A behavior change in a script needs a check in `tests/factory.test.sh`; a guard rule needs a case in `tests/guard.test.mjs` (both what it blocks and what it must still allow). A new decision needs an entry in the ADR (`docs/adr/ADR-001-agentic-factory.md`) with its *Why*, and a line in the section of `docs/DESIGN.md` it belongs to. A feature isn't done until the cheat sheet says how to use it and the design guide says why it exists.
 
 ## Releases
 

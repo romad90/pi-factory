@@ -15,7 +15,7 @@ It applies the principles of Factory's *Missions* to Pi with nothing but agents,
 - **Agents can't do harm.** A command guard blocks dangerous tool calls live; a patch guard rejects unsafe changes deterministically.
 - **Agnostic machinery, owned content.** No language or framework baked in. Practices arrive as content the existing roles read, never as new code.
 
-> **Where this stands:** v1.2, Step 2 (Parallel) on Boris Cherny's adoption ladder, mechanics and trust layer built, **1 of 4 evidence missions run**. See [docs/LADDER.md](docs/LADDER.md).
+> **Where this stands:** v1.1, Step 2 (Parallel) on Boris Cherny's adoption ladder, mechanics and trust layer built, **1 of 4 evidence missions run**. See [docs/LADDER.md](docs/LADDER.md).
 
 ---
 
@@ -32,7 +32,7 @@ It applies the principles of Factory's *Missions* to Pi with nothing but agents,
 - [Roadmap](#roadmap)
 - [Credits](#credits)
 
-**Start here:** [CHEATSHEET.md](CHEATSHEET.md) (one page, everything you type) · [ADR-001](docs/adr/ADR-001-agentic-factory.md) (every decision and why) · [mission 1 case study](docs/case-studies/mission-01.md)
+**Start here:** [DESIGN.md](docs/DESIGN.md) (how it works and why, one idea per section) · [CHEATSHEET.md](CHEATSHEET.md) (everything you type) · [ADR-001](docs/adr/ADR-001-agentic-factory.md) (every decision, in order) · [mission 1 case study](docs/case-studies/mission-01.md)
 
 ---
 
@@ -223,7 +223,7 @@ scripts/factory/           the factory: next, workflow, brief, integrate, collec
 templates/gitlab/          CI jobs to include in a target repo
 instrument/scenarios/      behavior cases, hidden from workers (example)
 packs/                     practice packs: api, batch, bot (checklists + quality-bar items)
-docs/                      ADR, ladder, case study, retro, roadmap, agent formats, quality bar
+docs/                      design guide, ADR, ladder, case study, retro, roadmap, agent formats, quality bar
 tests/                     end-to-end mission without models (71 checks), guard rule tests
 ```
 
@@ -232,8 +232,7 @@ tests/                     end-to-end mission without models (71 checks), guard 
 | Release | Theme |
 |---|---|
 | v1.0.0 | Records that can't overstate; humans in one word; fix lane |
-| **v1.1.0** | Code health (G5: ratchet + code steward), command and patch guards, ticket writer, size routing |
-| **v1.2.0** (this) | Practice packs (api, batch, bot), MIT licence |
+| **v1.1.0** (this) | Code health (G5: ratchet + code steward), command and patch guards, ticket writer, size routing, practice packs (api, batch, bot), MIT licence |
 | next | Contract quality and supervision: critic checks, drift check, draft MR from the factory, READY report, security reviewer, skill intake scan, install lifecycle |
 | later | Proof and scale: bot harness, skill evals, request accounting, dashboard. After Step 2: a durable mission runner on Pi Durable |
 

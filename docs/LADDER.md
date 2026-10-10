@@ -12,7 +12,7 @@ flowchart LR
     style S3 stroke-dasharray: 5 5
 ```
 
-**Now:** Step 2 mechanics, trust layer and code-health gate built (v1.1.0). **Evidence: 1 mission of 4.**
+**Now:** Step 2 mechanics, trust layer, code-health gate and practice packs built (v1.1.0). **Evidence: 1 mission of 4.**
 **Target:** declare Step 2 solidly, from a laptop. **Long-term goal:** Step 3, still from a laptop.
 
 ---
@@ -59,8 +59,8 @@ Criteria check after mission 1: **2 ✗** (wave size limited by the quota, not t
 
 | Blocker | Effect | Plan |
 |---|---|---|
-| Shared request quota (about 10 per window) | Waves of 1; slow missions | Request accounting (v1.2) → evidence for a quota request |
-| No bot harness | G4 needs human acceptance | Harness as its own mission (v1.2) |
+| Shared request quota (about 10 per window) | Waves of 1; slow missions | Request accounting (v1.3) → evidence for a quota request |
+| No bot harness | G4 needs human acceptance | Harness as its own mission (v1.3) |
 | Lead model stability | One repetition loop in mission 1 | Watchdog rule (v1.0), steadier lead model |
 
 ## Toward Step 3 (from a laptop)
@@ -72,10 +72,10 @@ Step 3 means agents delegate to agents and you supervise outcomes and exceptions
 | Nested delegation (reviewer → axes) | ✅ depth 2 in use |
 | Durable missions, resumable from files | ✅ state in files, pause/pickup (v1.0) |
 | Escalation only on exceptions | ✅ STEP codes + notifications; ⚠️ the contract and tickets are still yours |
-| Supervision you can read at a glance | ❌ READY report (v1.3), dashboard (v1.4) |
+| Supervision you can read at a glance | ❌ READY report (v1.2), dashboard (v1.3) |
 | Safe autonomy: sandbox, least privilege, kill switch, no default egress | ⚠️ guards in place (D51); OS sandbox, short-lived credentials and kill switch still to do (S5); Pi Durable execution environments are the candidate (X13) |
 | Unattended missions that survive crashes, steerable from anywhere | ❌ candidate: a thin runner on Pi Durable (X13), after Step 2 |
 | Code that stays understandable without a human reading every line | ✅ G5 steward + ratchet; your MR review becomes a spot check |
 | Triggered work (issue → mission) | ❌ after Step 2 is declared |
 
-**Next:** run mission 2 on v1.1.0, do the retro, then contract quality and supervision (v1.3).
+**Next:** run mission 2 on v1.1.0, do the retro, then contract quality and supervision (v1.2).

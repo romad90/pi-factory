@@ -33,7 +33,7 @@ Effort: S < half a day · M ≈ 1–2 days · L > 2 days.
 | F9 | Lead watchdog | M | ✅ 1.0.0 (playbook rule) |
 | F14 | Factory install in its own MR | M | ✅ 1.0.0 |
 
-## v1.1.0: code health and safety ✅
+## v1.1.0: code health, safety and practice packs ✅
 
 | # | Item | Src | Release |
 |---|---|---|---|
@@ -43,15 +43,10 @@ Effort: S < half a day · M ≈ 1–2 days · L > 2 days.
 | F10 | Tickets by an agent, approved by you (and fix tickets from findings) | N | ✅ 1.1.0 |
 | F11 | Size-aware routing (L → heavy worker) | M | ✅ 1.1.0 |
 | C14 | Re-validate a failing behavior verdict once fixes are built | N | ✅ 1.1.0 |
+| P1 | Practice packs: content for a kind of software (api, batch, bot), `install-into.sh --pack` | N, you | ✅ 1.1.0 |
+| X4 | Batch contract checklist (now the `batch` pack) | M, A | ✅ 1.1.0 |
 
-## v1.2.0: practice packs ✅
-
-| # | Item | Src | Release |
-|---|---|---|---|
-| P1 | Practice packs: content for a kind of software (api, batch, bot), `install-into.sh --pack` | N, you | ✅ 1.2.0 |
-| X4 | Batch contract checklist (now the `batch` pack) | M, A | ✅ 1.2.0 |
-
-## v1.3.0: contract quality and supervision
+## v1.2.0: contract quality and supervision
 
 **Contract quality and fluidity**
 
@@ -76,7 +71,7 @@ Effort: S < half a day · M ≈ 1–2 days · L > 2 days.
 | S6 | Security review role | A | Features that delete production data | `factory-security-reviewer` per mission, triggered by `.factory/security-paths`, another family | M |
 | S7 | Install lifecycle | E | Multi-repo updates | `install-into.sh --dry-run`, `uninstall`; doctor warns on outdated `.factory/VERSION` | S |
 
-## v1.4.0: proof and scale
+## v1.3.0: proof and scale
 
 | # | Item | Src | Why | Fix | Effort |
 |---|---|---|---|---|---|
