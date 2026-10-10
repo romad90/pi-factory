@@ -1,5 +1,0 @@
-# Agent factory (worktrees live in ../wt-* outside the repo)
-.factory/handoffs/
-.factory/mr/
-# Commit .factory/runs.jsonl for shared metrics, or uncomment:
-# .factory/runs.jsonl

@@ -1,0 +1,11 @@
+{
+  "retry": { "enabled": true, "maxRetries": 6, "baseDelayMs": 5000 },
+  "subagents": {
+    "projectRootResolution": "git-root",
+    "disableBuiltins": true,
+    "modelScope": {
+      "enforce": true,
+      "allow": ["<provider>/*"]
+    }
+  }
+}

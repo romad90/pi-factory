@@ -1,0 +1,21 @@
+# Validator-only. Hidden from worker worktrees (D21). Format: docs/agents/bot-harness.md
+# Cases may be added freely; changing or removing one needs /contract amend (D23).
+assertion: VAL-ROUTE-001
+weight: 3                       # share of the behavior this case represents
+runs: 3                         # N runs, pass threshold below (D15)
+threshold: 3
+given:
+  kb_articles:
+    - id: password-reset
+      title: Reset your password
+      body: "Go to Settings > Security > Reset password."
+turns:
+  - user: "how do I reset my password?"
+checks:                         # deterministic by default (D22)
+  - tool_called: search_kb
+  - tool_call_count: { tool: search_kb, equals: 1 }
+  - reply_contains: "Settings > Security"
+  - reply_contains_link_to: password-reset
+relaxations:                    # each one named and licensed (D22)
+  - judge: "The reply gives the reset steps in order and invents nothing beyond the article."
+    license: "Wording varies run to run; step order and absence of invented steps can't be checked by string match."

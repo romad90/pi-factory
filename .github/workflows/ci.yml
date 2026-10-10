@@ -1,0 +1,43 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+      - name: shellcheck
+        run: shellcheck -S warning scripts/factory/*.sh scripts/dev/*.sh tests/*.sh
+      - name: node syntax
+        run: for f in scripts/factory/*.mjs; do node --check "$f"; done
+      - name: skills pin (v1.3.1, no shadows)
+        run: bash scripts/factory/skills-pin.sh verify
+      - name: end-to-end mission without models
+        run: bash tests/factory.test.sh
+
+  commits:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+      - name: Conventional Commits
+        run: |
+          npm install --no-save --no-package-lock @commitlint/cli@19 @commitlint/config-conventional@19
+          npx commitlint --from "${{ github.event.pull_request.base.sha }}" --to "${{ github.event.pull_request.head.sha }}" --verbose

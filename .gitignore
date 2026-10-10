@@ -1,0 +1,6 @@
+# Agentic factory
+instrument/results/
+.env.factory
+.pi-subagents/
+.DS_Store
+node_modules/
