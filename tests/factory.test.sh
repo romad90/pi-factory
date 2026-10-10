@@ -72,7 +72,7 @@ git add -A; git commit -q -m "chore: models"; base0="$(git rev-parse HEAD)"
 
 if [ -n "${mono:-}" ]; then
   pre="projects/bot repo & co"
-  grep -q '^factory-gate-bot-repo-co:$' .factory/ci/factory.gitlab-ci.yml && grep -q 'changes: \["projects/bot repo & co/\*\*/\*"\]' .factory/ci/factory.gitlab-ci.yml \
+  grep -q '^factory-gate-projects-bot-repo-co:$' .factory/ci/factory.gitlab-ci.yml && grep -q 'changes: \["projects/bot repo & co/\*\*/\*"\]' .factory/ci/factory.gitlab-ci.yml \
     && grep -q '"projectRootResolution": "nearest"' .pi/settings.json \
     && t "monorepo: CI jobs named after the project, run only when it changed; Pi resolves the nearest project" || fail "monorepo CI" "$(head -40 .factory/ci/factory.gitlab-ci.yml)"
   printf 'diff --git a/%s/.github/ci.yml b/%s/.github/ci.yml\nnew file mode 100644\n--- /dev/null\n+++ b/%s/.github/ci.yml\n@@ -0,0 +1 @@\n+on: push\n' "$pre" "$pre" "$pre" > "$work/root-evil.patch"
@@ -82,7 +82,27 @@ if [ -n "${mono:-}" ]; then
   printf 'diff --git a/%s/src/a.js b/%s/src/a.js\n--- a/%s/src/a.js\n+++ b/%s/src/a.js\n@@ -1 +1 @@\n-x\n+y\ndiff --git a/projects/other/keep.js b/projects/other/keep.js\n--- a/projects/other/keep.js\n+++ b/projects/other/keep.js\n@@ -1 +1 @@\n-keep\n+gone\n' "$pre" "$pre" "$pre" "$pre" > "$work/leak.patch"
   if bash -c '. scripts/factory/lib.sh; project_patch "$1" "$2"' _ "$work/leak.patch" "$work/norm2.patch"; then fail "a patch reaching a sibling project must be refused"; fi
   t "monorepo: a patch reaching outside the project is refused"
+  printf 'diff --git a/projects/other/new.js b/projects/other/new.js\nnew file mode 100644\n--- /dev/null\n+++ b/projects/other/new.js\n@@ -0,0 +1 @@\n+x\n' > "$work/sibling-only.patch"
+  if bash -c '. scripts/factory/lib.sh; project_patch "$1" "$2"' _ "$work/sibling-only.patch" "$work/n3.patch"; then fail "a patch only touching a sibling must be refused"; fi
+  t "monorepo: a patch touching only a sibling project is refused, not moved into ours"
+  printf 'diff --git "a/%s/src/\\303\\251.js" "b/%s/src/\\303\\251.js"\nnew file mode 100644\n--- /dev/null\n+++ "b/%s/src/\\303\\251.js"\n@@ -0,0 +1,2 @@\n+-- a/%s/x\n+y\n' "$pre" "$pre" "$pre" "$pre" > "$work/quoted.patch"
+  bash -c '. scripts/factory/lib.sh; project_patch "$1" "$2"' _ "$work/quoted.patch" "$work/n4.patch" \
+    && grep -q '^+++ "b/src/\\303\\251.js"$' "$work/n4.patch" && grep -qF -- "+-- a/$pre/x" "$work/n4.patch" \
+    && t "monorepo: quoted paths are rewritten, hunk lines that look like headers are left alone" || fail "quoted rewrite" "$(cat "$work/n4.patch")"
 fi
+
+pg_blocks() {                          # <label> <patch text>
+  printf '%b' "$2" > "$work/pg.patch"
+  if bash scripts/factory/patch-guard.sh "$work/pg.patch" >"$work/pg.log"; then fail "$1" "$(cat "$work/pg.patch")"; fi
+  t "$1"
+}
+pg_blocks "patch guard: an instrument path with a space" 'diff --git a/instrument/x y.txt b/instrument/x y.txt\nnew file mode 100644\n--- /dev/null\n+++ b/instrument/x y.txt\n@@ -0,0 +1 @@\n+x\n'
+pg_blocks "patch guard: a quoted (non-ASCII) instrument path" 'diff --git "a/instrument/\\303\\251.txt" "b/instrument/\\303\\251.txt"\nnew file mode 100644\n--- /dev/null\n+++ "b/instrument/\\303\\251.txt"\n@@ -0,0 +1 @@\n+x\n'
+pg_blocks "patch guard: a rename out of the instrument" 'diff --git a/instrument/s.txt b/src/leak.txt\nsimilarity index 100%%\nrename from instrument/s.txt\nrename to src/leak.txt\n'
+pg_blocks "patch guard: a test renamed away" 'diff --git a/tests/a.test.js b/src/a.js\nsimilarity index 100%%\nrename from tests/a.test.js\nrename to src/a.js\n'
+pg_blocks "patch guard: a new symbolic link" 'diff --git a/src/l b/src/l\nnew file mode 120000\n--- /dev/null\n+++ b/src/l\n@@ -0,0 +1 @@\n+../instrument\n\\ No newline at end of file\n'
+printf 'diff --git a/tests/a.test.js b/tests/b.test.js\nsimilarity index 100%%\nrename from tests/a.test.js\nrename to tests/b.test.js\n' > "$work/pg.patch"
+bash scripts/factory/patch-guard.sh "$work/pg.patch" >/dev/null && t "patch guard: moving a test file is fine" || fail "test move" "$(bash scripts/factory/patch-guard.sh "$work/pg.patch")"
 
 echo "Mission: planning"
 m=.scratch/demo

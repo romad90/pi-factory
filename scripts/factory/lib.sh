@@ -4,6 +4,7 @@
 # Rationale for each rule: docs/adr/ADR-001-agentic-factory.md.
 
 FACTORY_DIR="${FACTORY_DIR:-.scratch}"            # one path segment, no slash
+FACTORY_SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FACTORY_ROUND_LIMIT="${FACTORY_ROUND_LIMIT:-3}"
 FACTORY_BEHAVIOR_PATHS_FILE="${FACTORY_BEHAVIOR_PATHS_FILE:-.factory/behavior-paths}"
 FACTORY_DOCS_RE="${FACTORY_DOCS_RE:-^(docs/|[^/]*\.md$)}"
@@ -257,25 +258,7 @@ project_prefix() { local p; p="$(git rev-parse --show-prefix 2>/dev/null)"; prin
 project_patch() {                      # <in> <out>
   local prefix; prefix="$(project_prefix)"
   if [ -z "$prefix" ]; then cp "$1" "$2"; return 0; fi
-  node - "$1" "$2" "$prefix" <<'NODE'
-const fs = require("fs");
-const [inp, out, prefix] = process.argv.slice(2);
-const pre = prefix + "/";
-let files = 0, rooted = 0;
-const lines = fs.readFileSync(inp, "utf8").split("\n").map((l) => {
-  if (l.startsWith("diff --git ")) {
-    files++;
-    if (l.includes(" a/" + pre) || l.includes(" b/" + pre)) rooted++;
-    return l.split(" a/" + pre).join(" a/").split(" b/" + pre).join(" b/");
-  }
-  if (/^(--- a\/|\+\+\+ b\/)/.test(l) && l.slice(6).startsWith(pre)) return l.slice(0, 6) + l.slice(6 + pre.length);
-  const m = l.match(/^(rename from |rename to |copy from |copy to )(.*)$/);
-  if (m && m[2].startsWith(pre)) return m[1] + m[2].slice(pre.length);
-  return l;
-});
-fs.writeFileSync(out, lines.join("\n"));
-process.exit(rooted > 0 && rooted < files ? 3 : 0);
-NODE
+  node "$FACTORY_SCRIPTS/patch-paths.mjs" project "$1" "$2" "$prefix" "$(git rev-parse --show-toplevel)" "$PWD"
 }
 
 # git apply for a project-relative patch, from the repo root in a monorepo.

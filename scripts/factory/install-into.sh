@@ -78,11 +78,15 @@ const fs = require("fs");
 const [from, to, prefix] = process.argv.slice(2);
 let y = fs.readFileSync(from, "utf8");
 if (prefix) {
-  const slug = prefix.split("/").pop().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const slug = prefix.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");   // full path: two "bot" folders can't collide
   const q = JSON.stringify(prefix);
+  const jobs = (y.match(/^[a-z][\w-]*:$/gm) || []).filter((k) => k !== "variables:").length;
   y = y.replace(/^(factory-gate|factory-config|behavior-replay|factory-readiness):$/gm, `$1-${slug}:`)
        .replace(/^(\s*)- if: \$CI_PIPELINE_SOURCE == "merge_request_event"$/gm, `$1- if: $CI_PIPELINE_SOURCE == "merge_request_event"\n$1  changes: [${JSON.stringify(prefix + "/**/*")}]`)
        .replace(/^  script:\n/gm, `  script:\n    - cd ${q}\n`);
+  const renamed = (y.match(new RegExp(`^[a-z-]+-${slug}:$`, "gm")) || []).length;
+  const scoped = (y.match(/^\s+changes: \[/gm) || []).length;
+  if (renamed !== jobs || scoped !== jobs) { console.error(`CI template: ${renamed}/${jobs} jobs renamed, ${scoped} scoped; update install-into.sh`); process.exit(1); }
   y = `# Monorepo project: ${prefix}. Include from your CI with:\n#   include: [{ local: ${JSON.stringify(prefix + "/.factory/ci/factory.gitlab-ci.yml")} }]\n` + y;
 }
 fs.writeFileSync(to, y);
@@ -167,7 +171,7 @@ if [ "$branch_mode" -eq 1 ]; then
   git -C "$dst" add -A -- .
   if ! git -C "$dst" diff --cached --quiet -- .; then
     git -C "$dst" commit -q -m "chore(factory): install pi-factory $version" \
-      -m "Installed by pi-factory scripts/factory/install-into.sh. Tooling only, no feature change."
+      -m "Installed by pi-factory scripts/factory/install-into.sh. Tooling only, no feature change." -- .
     committed="$(git -C "$dst" rev-parse --short HEAD)"
   fi
 fi
