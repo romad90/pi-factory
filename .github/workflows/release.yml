@@ -31,7 +31,10 @@ jobs:
         run: bash tests/factory.test.sh
       - name: semantic-release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # RELEASE_TOKEN: fine-grained token of a repo admin on the ruleset's
+          # bypass list, so the release commit can land on protected develop/main.
+          # Falls back to the default token while the secret doesn't exist.
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
         run: >
           npx --yes
           -p semantic-release@24
