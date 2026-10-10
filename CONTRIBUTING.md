@@ -30,7 +30,9 @@ A behavior change in a script needs a check in `tests/factory.test.sh`. A new de
 
 ## Releases
 
-semantic-release runs on pushes to `develop` and `main` (`.github/workflows/release.yml`): it computes the version, tags `v<version>`, updates `CHANGELOG.md` and `.factory/VERSION`, and publishes a GitHub release. Write `docs/releases/<version>.md` for releases with user-facing changes.
+semantic-release runs on pushes to `develop` and `main` (`.github/workflows/release.yml`): it computes the version, tags `v<version>`, updates `CHANGELOG.md` and `.factory/VERSION`, and publishes a GitHub release. After a release on `main`, the same workflow merges `main` back into `develop` (`chore: sync develop with main [skip ci]`), so there is no sync PR to open by hand. If the two branches conflict, the step fails and says so: open a `main` → `develop` PR and resolve it.
+
+It pushes with the `RELEASE_TOKEN` secret (a fine-grained token of a repo admin on the ruleset's bypass list), so it works on protected branches. Write `docs/releases/<version>.md` for releases with user-facing changes.
 
 ## After a mission
 
