@@ -49,6 +49,15 @@ const fs=require("fs"); const f=".factory/model-families.json"; const j=JSON.par
 j.families.push({match:"*maker*",family:"makers"},{match:"*judge*",family:"judges"}); fs.writeFileSync(f, JSON.stringify(j,null,2));
 const s=".pi/settings.json"; const k=JSON.parse(fs.readFileSync(s,"utf8")); k.subagents.modelScope.allow=["gw/*"]; fs.writeFileSync(s, JSON.stringify(k,null,2));'
 node scripts/factory/models-lint.mjs >"$work/lint.log" 2>&1 && t "models-lint passes with separated families" || fail "models-lint" "$(cat "$work/lint.log")"
+export PI_FACTORY_MODELS="$work/home/models.json"
+node scripts/factory/models-profile.mjs capture >/dev/null && grep -q 'gw/judge-1' "$PI_FACTORY_MODELS" && t "models profile captured from a configured repo" || fail "models capture"
+repo2="$work/second repo"; mkdir -p "$repo2"; git -C "$repo2" init -q; echo x > "$repo2/README.md"; git -C "$repo2" add -A; git -C "$repo2" commit -q -m init
+bash "$root/scripts/factory/install-into.sh" "$repo2" >"$work/install2.log" 2>&1 || fail "second install" "$(cat "$work/install2.log")"
+(cd "$repo2" && node scripts/factory/models-lint.mjs >/dev/null 2>&1) && t "a new repo gets the models from the profile at install" || fail "models apply" "$(cat "$work/install2.log")"
+unset PI_FACTORY_MODELS
+mkdir -p "$repo2/sub"
+if bash "$root/scripts/factory/install-into.sh" "$repo2/sub" --no-branch >"$work/install3.log" 2>&1; then fail "a sub-folder install must fail"; fi
+grep -q "installs at a repo root" "$work/install3.log" && t "a folder inside a repo is refused" || fail "sub-folder message" "$(cat "$work/install3.log")"
 git add -A; git commit -q -m "chore: models"; base0="$(git rev-parse HEAD)"
 
 echo "Mission: planning"

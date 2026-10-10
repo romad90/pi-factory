@@ -42,7 +42,7 @@ scripts/factory/install-pi-config.sh     # worktree hook (hides instrument/), co
 
 Under a small shared quota (about 10 requests per window), set `parallel.concurrency: 1` in `~/.pi/agent/extensions/subagent/config.json` and `export FACTORY_MAX_PARALLEL=1`. The retry block in `.pi/settings.json` (6 × 5 s) absorbs short 429 bursts.
 
-## 3. Once per template (your models)
+## 3. Once per machine (your models)
 
 | File | Set |
 |---|---|
@@ -51,6 +51,8 @@ Under a small shared quota (about 10 requests per window), set `parallel.concurr
 | `.factory/model-families.json` | a `{ "match": "*name*", "family": "x" }` line per model you use |
 
 `node scripts/factory/models-lint.mjs` must print `MODELS: PASS`. It enforces: critic ≠ author family; reviewer, review-axis, validator and code steward ≠ worker families; no `fallbackModels` line (removed upstream, stops the agent from launching); no `factory-*` in `agentOverrides` (crashes discovery).
+
+**Set them once, reuse them everywhere.** In a repo where `MODELS: PASS`, run `node scripts/factory/models-profile.mjs capture`: it saves the models, thinking levels, scope and families to `~/.pi-factory/models.json` (outside every repo; `PI_FACTORY_MODELS` overrides the path). From then on, `install-into.sh` applies the profile to each new repo. To refresh a repo after changing the profile: `node scripts/factory/models-profile.mjs apply`, then the lint.
 
 **Model notes from mission 1:**
 
@@ -67,7 +69,7 @@ Under a small shared quota (about 10 requests per window), set `parallel.concurr
 scripts/factory/install-into.sh "/path/to/repo" [--pack api|batch]...   # quotes matter with spaces or &
 ```
 
-That puts the install on its own branch, `chore/install-pi-factory-<version>`, as one commit (with today's health baseline). Merge it through its own MR before any mission. Then in the target:
+The target must be a **repo root**: a folder inside a bigger repo is refused (worktrees, CI, patch paths and agent discovery all start at the root). That puts the install on its own branch, `chore/install-pi-factory-<version>`, as one commit (with today's health baseline). Merge it through its own MR before any mission. Then in the target:
 
 1. `.factory/commands.env`: `FACTORY_TEST_CMD` (required), `FACTORY_LINT_CMD`, `FACTORY_EXTRA_CMD` (e.g. `helm lint --strict charts/x`), `FACTORY_HEALTH_CMD` (your complexity/duplication tool), `FACTORY_GATEWAY_URL` (pre-flight network check).
 2. `.factory/behavior-paths`: regexes of paths that change behavior.
