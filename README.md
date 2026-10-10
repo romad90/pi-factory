@@ -15,6 +15,8 @@ It applies the principles of Factory's *Missions* to Pi with nothing but agents,
 - **Agents can't do harm.** A command guard blocks dangerous tool calls live; a patch guard rejects unsafe changes deterministically.
 - **Agnostic machinery, owned content.** No language or framework baked in. Practices arrive as content the existing roles read, never as new code.
 
+> **The goal:** shift the work, not the volume. Correction and maintenance run in the background, verified by the factory itself, so the team spends its time on what was never in scope. See [docs/INTENT.md](docs/INTENT.md).
+
 > **Where this stands:** v1.1, Step 2 (Parallel) on Boris Cherny's adoption ladder, mechanics and trust layer built, **1 of 4 evidence missions run**. See [docs/LADDER.md](docs/LADDER.md).
 
 ---
@@ -32,7 +34,7 @@ It applies the principles of Factory's *Missions* to Pi with nothing but agents,
 - [Roadmap](#roadmap)
 - [Credits](#credits)
 
-**Start here:** [DESIGN.md](docs/DESIGN.md) (how it works and why, one idea per section) · [CHEATSHEET.md](CHEATSHEET.md) (everything you type) · [ADR-001](docs/adr/ADR-001-agentic-factory.md) (every decision, in order) · [mission 1 case study](docs/case-studies/mission-01.md)
+**Start here:** [INTENT.md](docs/INTENT.md) (why it exists and how we measure the gain) · [DESIGN.md](docs/DESIGN.md) (how it works and why, one idea per section) · [CHEATSHEET.md](CHEATSHEET.md) (everything you type) · [ADR-001](docs/adr/ADR-001-agentic-factory.md) (every decision, in order) · [mission 1 case study](docs/case-studies/mission-01.md)
 
 ---
 
