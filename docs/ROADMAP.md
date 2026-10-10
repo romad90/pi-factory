@@ -68,6 +68,7 @@ Effort: S < half a day · M ≈ 1–2 days · L > 2 days.
 | S3 | READY / NOT READY report | E | Evidence hard to read for a reviewer | Build / Lint / Tests / Secrets / Diff outside scope → READY | S |
 | S4 | Learnings unreviewed until promoted | E, P | Retro items could silently become rules | Status column in decisions and retro; only a human promotes | S |
 | S5 | Minimum bar for autonomy (Step 3 ADR) | E | Agents run with your identity | Sandbox, least agency, kill switch, no default egress, short-lived credentials | L |
+| S8 | OS sandbox for agent commands (srt) | N, study | Deny-list stops known commands only; a dependency script or an unknown command isn't covered | Pi extension wrapping commands with sandbox-runtime: writes only in the worktree, network allowlist from commands.env, credentials unreadable. See [docs/research/agent-sandboxing.md](research/agent-sandboxing.md) | S |
 | S6 | Security review role | A | Features that delete production data | `factory-security-reviewer` per mission, triggered by `.factory/security-paths`, another family | M |
 | S7 | Install lifecycle | E | Multi-repo updates | `install-into.sh --dry-run`, `uninstall`; doctor warns on outdated `.factory/VERSION` | S |
 
@@ -86,6 +87,7 @@ Effort: S < half a day · M ≈ 1–2 days · L > 2 days.
 | X10 | Request accounting + quota case | M | 429s under a shared quota | Requests per role from run metadata | S |
 | X11 | Model compatibility map + smoke | M | Thinking levels and reasoning replay found at run time | `.factory/model-compat.json` in models-lint; `/factory-smoke` | S |
 | X12 | Dashboard, perf-analyst | N | Supervision at a glance; ops | Static dashboard from `.scratch/`; perf-analyst read-only on captured artifacts | L |
+| X14 | Gondolin micro-VM spike for workers | N, study | Hardware boundary, instrument never mounted, secrets as placeholders | Route one or two workers into Gondolin for a mission; measure test time; security team review. See [docs/research/agent-sandboxing.md](research/agent-sandboxing.md) | M |
 
 ## After Step 2 is declared
 

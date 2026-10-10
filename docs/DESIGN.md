@@ -100,7 +100,7 @@ Agents have bash on your laptop, with your identity. "Please don't" in a prompt 
 - **Command guard** (live): a Pi extension blocks dangerous tool calls by the lead and every agent: pushes and history rewrites, `--no-verify`, `sudo`, recursive deletes of `/ ~ .. .git`, cluster/cloud/secret-store changes, uploads and remote shells, credential reads, publishing, merging, writes to the factory/CI/hooks, routes to the instrument. A blocked agent stops and asks; it never looks for another way.
 - **Patch guard** (deterministic): every worker patch is checked before integration. No changes to the instrument, the factory, CI or hooks; no deleted, skipped or focused tests; no silenced checks; no secrets. A block is a recorded round.
 
-**Why two:** the live guard prevents harm before it happens but depends on Pi loading the extension. The patch guard can't be skipped and holds even if the extension doesn't load. **What it is not:** a sandbox. A deny-list stops known dangerous commands, not every possible one. Real isolation (OS sandbox, short-lived credentials, kill switch) is the bar for Step 3.
+**Why two:** the live guard prevents harm before it happens but depends on Pi loading the extension. The patch guard can't be skipped and holds even if the extension doesn't load. **What it is not:** a sandbox. A deny-list stops known dangerous commands, not every possible one. Real isolation (OS sandbox, short-lived credentials, kill switch) is the bar for Step 3; the options and the plan are in the [sandboxing study](research/agent-sandboxing.md), refreshed quarterly.
 
 ## 10. Agnostic machinery, owned content
 
