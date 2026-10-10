@@ -33,7 +33,7 @@ for t in "$dir"/issues/*.md; do
   r1="${v%.md}.r1.md"; [ -f "$r1" ] || r1="$v"
   [ "$(verdict_field "$r1" Result)" = "PASS" ] && first_pass=$((first_pass + 1))
   for h in "${v%.md}".r*.md; do
-    case "$(verdict_field "$h" Brief)" in integrate|worker-no-patch) det_fail=$((det_fail + 1)) ;; esac
+    case "$(verdict_field "$h" Brief)" in integrate|worker-no-patch|patch-guard) det_fail=$((det_fail + 1)) ;; esac
   done
 done
 
@@ -49,6 +49,14 @@ if [ -f "$b" ]; then
   read -r ep ef eu < <(verdict_evidence_counts "$b")
   evidence="$ep proven, $ef failed, $eu unverified"
 fi
+health="-"; steward="-"
+[ -f "$dir/health/report.md" ] && health="$(verdict_field "$dir/health/report.md" Result)"
+if [ -f "$dir/verdicts/health.md" ]; then
+  read -r hp hf hu < <(verdict_evidence_counts "$dir/verdicts/health.md")
+  steward="$(verdict_field "$dir/verdicts/health.md" Result) (round $(verdict_round "$dir/verdicts/health.md")): $hp met, $hf failed, $hu unverified"
+fi
+guard=0
+for h in "$dir"/verdicts/*-code.r*.md; do [ "$(verdict_field "$h" Brief)" = patch-guard ] && guard=$((guard + 1)); done
 decisions=0
 [ -f "$dir/decisions.tsv" ] && decisions=$(( $(wc -l < "$dir/decisions.tsv") - 1 ))
 models_list=""
@@ -77,6 +85,9 @@ cat <<EOF
 | Rounds, total (of which deterministic fails: integration, no patch) | $rounds ($det_fail) |
 | Behavior validation rounds | ${behavior_rounds:--} |
 | Behavior assertions (evidence or label) | $evidence |
+| Code health: ratchet and repo tool (G5) | $health |
+| Code steward, quality bar items (G5) | $steward |
+| Patches blocked by the patch guard | $guard |
 | Human decisions logged | $decisions |
 | Cycle time (first → last mission commit) | $cycle |
 | Tokens reported in verdicts | $( [ "$tokens" -gt 0 ] && echo "$tokens" || echo "not reported" ) |

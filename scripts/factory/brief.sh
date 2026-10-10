@@ -4,8 +4,10 @@
 # verbatim; anything appended after the end marker is flagged by the child.
 #
 # Usage: scripts/factory/brief.sh <role> <feature|slug> [ticket] [commit] [base]
-#   roles: contract-author contract-critic worker reviewer validator light-reviewer
-#   commit defaults to HEAD.
+#   roles: contract-author contract-critic ticket-writer worker reviewer
+#          validator code-steward light-reviewer
+#   commit defaults to HEAD. For ticket-writer, [ticket] is the task:
+#   all | fix-behavior | fix-health.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib.sh
@@ -21,7 +23,19 @@ template="$FACTORY_BRIEFS_DIR/$role.md"
 
 id="$(brief_id "$role" "$feature" "$ticket" "$commit")"
 
-sed -e "s|{{FEATURE}}|$feature|g" -e "s|{{TICKET}}|$ticket|g" \
+# The ticket writer's task line, from its mode (D52).
+task=""
+if [ "$role" = ticket-writer ]; then
+  case "$ticket" in
+    all)          task="Task: write the mission's tickets from the approved contract (none exist yet)." ;;
+    fix-behavior) task="Task: write one fix ticket per finding in .scratch/$feature/verdicts/behavior.md (named NN-fix-<slug>.md, numbered after the last ticket)." ;;
+    fix-health)   task="Task: write one fix ticket per finding in .scratch/$feature/verdicts/health.md and in .scratch/$feature/health/report.md (named NN-fix-<slug>.md, numbered after the last ticket)." ;;
+    *) die "ticket-writer task must be all, fix-behavior or fix-health" ;;
+  esac
+fi
+
+shown_ticket="$ticket"; [ "$role" = ticket-writer ] && shown_ticket="$task"
+sed -e "s|{{FEATURE}}|$feature|g" -e "s|{{TICKET}}|$shown_ticket|g" \
     -e "s|{{COMMIT}}|$commit|g"   -e "s|{{BASE}}|$base|g" \
     -e "s|{{BRIEF_ID}}|$id|g" "$template"
 printf '\nbrief-id: %s\n' "$id"

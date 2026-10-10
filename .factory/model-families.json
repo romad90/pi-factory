@@ -1,21 +1,75 @@
 {
-  "_doc": "Maps model ids to families (D31). First match wins; '*' is a wildcard, case-insensitive. Each rule lists two role groups whose models (primary AND fallbacks) must share no family.",
+  "_doc": "Maps model ids to families (D31). First match wins; '*' is a wildcard, case-insensitive. Each rule lists two role groups whose models must share no family: judges never share a family with what they judge.",
   "families": [
-    { "match": "*claude*",   "family": "anthropic" },
-    { "match": "*gpt*",      "family": "openai" },
-    { "match": "*o3*",       "family": "openai" },
-    { "match": "*gemini*",   "family": "google" },
-    { "match": "*mistral*",  "family": "mistral" },
-    { "match": "*codestral*","family": "mistral" },
-    { "match": "*llama*",    "family": "meta" },
-    { "match": "*qwen*",     "family": "qwen" },
-    { "match": "*deepseek*", "family": "deepseek" },
-    { "match": "*nemotron*", "family": "nvidia" },
-    { "match": "*granite*",  "family": "ibm" },
-    { "match": "*kimi*",     "family": "moonshot" }
+    {
+      "match": "*claude*",
+      "family": "anthropic"
+    },
+    {
+      "match": "*gpt*",
+      "family": "openai"
+    },
+    {
+      "match": "*o3*",
+      "family": "openai"
+    },
+    {
+      "match": "*gemini*",
+      "family": "google"
+    },
+    {
+      "match": "*mistral*",
+      "family": "mistral"
+    },
+    {
+      "match": "*codestral*",
+      "family": "mistral"
+    },
+    {
+      "match": "*llama*",
+      "family": "meta"
+    },
+    {
+      "match": "*qwen*",
+      "family": "qwen"
+    },
+    {
+      "match": "*deepseek*",
+      "family": "deepseek"
+    },
+    {
+      "match": "*nemotron*",
+      "family": "nvidia"
+    },
+    {
+      "match": "*granite*",
+      "family": "ibm"
+    },
+    {
+      "match": "*kimi*",
+      "family": "moonshot"
+    }
   ],
   "rules": [
-    [["factory-contract-critic"], ["factory-contract-author"]],
-    [["factory-reviewer", "factory-review-axis", "factory-validator"], ["factory-worker", "factory-worker-heavy"]]
+    [
+      [
+        "factory-contract-critic"
+      ],
+      [
+        "factory-contract-author"
+      ]
+    ],
+    [
+      [
+        "factory-reviewer",
+        "factory-review-axis",
+        "factory-validator",
+        "factory-code-steward"
+      ],
+      [
+        "factory-worker",
+        "factory-worker-heavy"
+      ]
+    ]
   ]
 }
