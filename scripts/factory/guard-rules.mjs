@@ -39,6 +39,7 @@ const BASH_RULES = [
   ["egress", /\/dev\/(tcp|udp)\//, "raw network socket"],
   // Secrets on the machine
   ["secrets", /(~|\$HOME|\/home\/[^/\s]+|\/Users\/[^/\s]+)\/\.(ssh|aws|gnupg|kube|docker|netrc|npmrc|pypirc|config\/gcloud)/, "reading credentials from the home folder"],
+  ["secrets", /(^|[\s"'=:])\/(var\/)?run\/secrets(\/|\s|$)/, "reading secrets mounted into a container (Kubernetes service account token)"],
   ["secrets", /(^|[;&|]\s*)(printenv|env)\s*($|[;&|>])|\/proc\/\S*\/environ|\bsecurity\s+find-(generic|internet)-password\b/, "dumping environment or keychain secrets"],
   ["secrets", /\b(cat|less|more|head|tail|source|\.)(\s[^|;&]*)?[\s/]\.env(\.(?!example\b|sample\b|template\b|factory\b)[a-z]+)?(\s|$)/, "reading a .env file"],
   // Publishing and merging
@@ -51,7 +52,7 @@ const BASH_RULES = [
 // Paths no agent writes or edits.
 const PROTECTED_WRITE = /^(\.git\/|\.factory\/|scripts\/factory\/|\.pi\/|\.github\/|\.gitlab-ci\.yml$|\.husky\/|\.pre-commit-config\.yaml$|lefthook\.yml$)/;
 // Paths no agent reads.
-const SECRET_READ = /(^|\/)\.(ssh|aws|gnupg|kube|netrc|npmrc|pypirc)(\/|$)|(^|\/)\.env(\.[a-z]+)?$|(^|\/)id_(rsa|ed25519|ecdsa)(\.pub)?$/;
+const SECRET_READ = /^\/(var\/)?run\/secrets(\/|$)|(^|\/)\.(ssh|aws|gnupg|kube|netrc|npmrc|pypirc)(\/|$)|(^|\/)\.env(\.[a-z]+)?$|(^|\/)id_(rsa|ed25519|ecdsa)(\.pub)?$/;
 const SECRET_READ_OK = /(^|\/)\.env\.(example|sample|template|factory)$/;
 
 function rel(p, cwd) {
