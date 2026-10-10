@@ -61,7 +61,7 @@ All of these lived only in chat during the mission. In v1.0.0 they go to `decisi
 1. **Split specs above roughly 12 stories.** 25 made the contract and G1 long.
 2. **Keep core tickets small.** The efficient worker passed three small tickets and failed the core one twice. Ticket size matters more than the model.
 3. **Default assertions to `Kind: code` until a harness exists.** Behavior assertions without a harness only produce labels.
-4. **Use a batch-bot checklist, not a conversational one.** Prompt injection and tone don't apply to a batch job; exit codes, idempotency, partial failure, caps and dry-run do. (Roadmap X4.)
+4. **Use a batch-bot checklist, not a conversational one.** Prompt injection and tone don't apply to a batch job; exit codes, idempotency, partial failure, caps and dry-run do. (Now the `batch` pack, v1.2.0.)
 5. **Check the contract's arithmetic.** One assertion counted outcomes differently from another, and it passed the critic, eight reviews and the validator. (Roadmap C6.)
 
 Full findings: [docs/retros/mission-01.md](../retros/mission-01.md).

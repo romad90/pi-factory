@@ -1,6 +1,8 @@
 # pi-factory
 
-**An agentic software factory for [Pi](https://github.com/badlogic/pi-mono), run from a laptop.** You write the spec and approve the definition of done. Fresh-context agents build, review and validate in parallel, on separate model families. Scripts, not the model, decide what happens next and keep the record. CI enforces the gates on every merge request.
+**An agnostic, agentic software factory for [Pi](https://github.com/badlogic/pi-mono), run from a laptop.** It builds and maintains whatever you work on (a bot, an API, a front end, a batch job, in any language) with the same disciplined loop. What it knows about *your* kind of software and *your* company's taste comes from files you own: `AGENTS.md`, the quality bar, and optional practice packs.
+
+You write the spec and approve the definition of done. Fresh-context agents build, review and validate in parallel, on separate model families. Scripts, not the model, decide what happens next and keep the record. CI enforces the gates on every merge request.
 
 It applies the principles of Factory's *Missions* to Pi with nothing but agents, prompts, shell scripts and files:
 
@@ -11,8 +13,9 @@ It applies the principles of Factory's *Missions* to Pi with nothing but agents,
 - **Judges from another model family.** Critic ≠ author; reviewers, validator and code steward ≠ workers, linted in CI.
 - **The codebase is the fuel.** Every mission must leave it safe, understandable by any human, battle-tested and predictable: a measured ratchet plus a code steward judge it against a written quality bar before it can merge.
 - **Agents can't do harm.** A command guard blocks dangerous tool calls live; a patch guard rejects unsafe changes deterministically.
+- **Agnostic machinery, owned content.** No language or framework baked in. Practices arrive as content the existing roles read, never as new code.
 
-> **Where this stands:** v1.1, Step 2 (Parallel) on Boris Cherny's adoption ladder, mechanics and trust layer built, **1 of 4 evidence missions run**. See [docs/LADDER.md](docs/LADDER.md).
+> **Where this stands:** v1.2, Step 2 (Parallel) on Boris Cherny's adoption ladder, mechanics and trust layer built, **1 of 4 evidence missions run**. See [docs/LADDER.md](docs/LADDER.md).
 
 ---
 
@@ -23,6 +26,7 @@ It applies the principles of Factory's *Missions* to Pi with nothing but agents,
 - [The roles](#the-roles)
 - [Quick start](#quick-start)
 - [Daily use](#daily-use)
+- [Practice packs](#practice-packs)
 - [What it guarantees, and what it doesn't](#what-it-guarantees-and-what-it-doesnt)
 - [Repository layout](#repository-layout)
 - [Roadmap](#roadmap)
@@ -172,6 +176,18 @@ In Pi, from the target repo: trust the project once (it loads the command guard)
 
 What stays manual, what is automatic and why, the full list of commands, troubleshooting and model notes: [the cheat sheet](CHEATSHEET.md).
 
+## Practice packs
+
+The factory doesn't know whether you're building an API or a bot; packs tell it, as plain markdown the existing roles already read. No new role, no new script.
+
+| Pack | What it adds |
+|---|---|
+| `api` | Stripe-inspired conventions: one error shape, idempotency keys, cursor pagination, request IDs, additive changes; **Public** items for third-party APIs (versioning, signed webhooks) |
+| `batch` | Exit codes, counts that add up, safe re-runs, caps, dry-run, no overlap, stop on upstream failure |
+| `bot` | Conversational bots: routing, tools, prompt injection, multi-turn |
+
+`install-into.sh <repo> --pack api`. Each pack is a checklist for the contract critic (G1) and `QB-` items for the code steward (G5); both are yours to edit once installed. **On a blank page, install the pack:** conventions are cheapest before the first line. **On existing code, prune it first:** consistency with what's there beats any ideal. Details: [packs/README.md](packs/README.md).
+
 ## What it guarantees, and what it doesn't
 
 **Guaranteed by scripts and CI** (not by a model's goodwill):
@@ -206,8 +222,9 @@ What stays manual, what is automatic and why, the full list of commands, trouble
 scripts/factory/           the factory: next, workflow, brief, integrate, collect, gate, human, fix, …
 templates/gitlab/          CI jobs to include in a target repo
 instrument/scenarios/      behavior cases, hidden from workers (example)
+packs/                     practice packs: api, batch, bot (checklists + quality-bar items)
 docs/                      ADR, ladder, case study, retro, roadmap, agent formats, quality bar
-tests/                     end-to-end mission without models (68 checks), guard rule tests
+tests/                     end-to-end mission without models (71 checks), guard rule tests
 ```
 
 ## Roadmap
@@ -215,15 +232,20 @@ tests/                     end-to-end mission without models (68 checks), guard 
 | Release | Theme |
 |---|---|
 | v1.0.0 | Records that can't overstate; humans in one word; fix lane |
-| **v1.1.0** (this) | Code health (G5: ratchet + code steward), command and patch guards, ticket writer, size routing |
-| v1.2.0 | Contract quality and supervision: critic checks, drift check, draft MR from the factory, READY report, security reviewer, skill intake scan, install lifecycle |
-| v1.3.0 | Proof and scale: bot harness, skill evals, request accounting, dashboard |
+| **v1.1.0** | Code health (G5: ratchet + code steward), command and patch guards, ticket writer, size routing |
+| **v1.2.0** (this) | Practice packs (api, batch, bot), MIT licence |
+| next | Contract quality and supervision: critic checks, drift check, draft MR from the factory, READY report, security reviewer, skill intake scan, install lifecycle |
+| later | Proof and scale: bot harness, skill evals, request accounting, dashboard. After Step 2: a durable mission runner on Pi Durable |
 
 Details and status per item: [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Contributing and releases
 
 Conventional Commits, `develop` is the default branch, `main` carries releases, versions and the changelog come from [semantic-release](https://semantic-release.gitbook.io). See [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md).
+
+## Licence
+
+[MIT](LICENSE). The vendored mattpocock/skills keep their own MIT licence (`.factory/skills-pin/`).
 
 ## Credits
 

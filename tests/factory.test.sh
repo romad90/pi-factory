@@ -26,10 +26,15 @@ echo "Install"
 repo="$work/bot repo & co"; mkdir -p "$repo"; cd "$repo"
 git init -q; mkdir -p src/tools; echo 'export const a = 1;' > src/tools/a.js; echo 'x' > README.md
 git add -A; git commit -q -m init
-bash "$root/scripts/factory/install-into.sh" "$repo" >"$work/install.log" 2>&1 || fail "install-into.sh" "$(cat "$work/install.log")"
+bash "$root/scripts/factory/install-into.sh" "$repo" --pack api --pack batch >"$work/install.log" 2>&1 || fail "install-into.sh" "$(cat "$work/install.log")"
 [ "$(git branch --show-current)" = "chore/install-pi-factory-$(cat "$root/.factory/VERSION")" ] && t "install lands on its own branch" || fail "install branch"
 [ -z "$(git status --porcelain)" ] && grep -q '^chore(factory): install' <<<"$(git log -1 --format=%s)" && t "install is one commit" || fail "install commit"
 [ -f .factory/ci/factory.gitlab-ci.yml ] && [ -f docs/factory/CHEATSHEET.md ] && t "CI template and cheat sheet installed" || fail "CI template"
+[ -f docs/agents/contract-checklist-api.md ] && [ -f docs/agents/quality-bar-batch.md ] && [ ! -f docs/agents/contract-checklist-bots.md ] \
+  && t "only the requested practice packs are installed" || fail "packs" "$(ls docs/agents)"
+grep -q 'every docs/agents/quality-bar-\*.md' .factory/briefs/code-steward.md && t "the steward brief reads the packs' quality bars" || fail "steward pack brief"
+if bash "$root/scripts/factory/install-into.sh" "$repo" --pack nope --no-branch >/dev/null 2>&1; then fail "unknown pack must fail"; fi
+t "an unknown pack is refused"
 
 # Fake models: author/worker one family, critic/judges another.
 for a in .pi/agents/factory/*.md; do

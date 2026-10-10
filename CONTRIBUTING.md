@@ -39,6 +39,14 @@ semantic-release runs on pushes to `develop` and `main` (`.github/workflows/rele
 
 It pushes with the `RELEASE_TOKEN` secret (a fine-grained token of a repo admin on the ruleset's bypass list), so it works on protected branches. Write `docs/releases/<version>.md` for releases with user-facing changes.
 
+## Practice packs
+
+A pack is content, never code (ADR D54): `packs/<name>/docs/agents/contract-checklist-<name>.md` and `quality-bar-<name>.md`, with stable `QB-<NAME>-NN` IDs, listed in `packs/README.md` and the README. Items must be checkable as an assertion or on a diff. Short beats complete.
+
+## Licence
+
+MIT. By contributing you agree your contribution is under the same licence.
+
 ## After a mission
 
 1. `/retro` in the target repo; findings go to `docs/retros/mission-NN.md` here.
