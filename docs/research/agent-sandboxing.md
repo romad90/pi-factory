@@ -55,7 +55,7 @@ Prompt injection is never prevented, only contained; the isolation level decides
 | Machine | Result | Notes |
 |---|---|---|
 | macOS laptop (2026-10-10) | **Works.** Allowed domain goes through the srt proxy; other domains get `403` with `X-Proxy-Error: blocked-by-allowlist`; `~/.ssh` reads denied (`Operation not permitted`); writes in the allowed folder work; writes outside it (home folder) denied (`Operation not permitted`). All four checks pass. | Native Seatbelt, only `npm install -g @anthropic-ai/sandbox-runtime`. Run commands as `srt -c "<command>"`: a quoted string without `-c` is taken as one program name and fails with "No such file or directory". |
-| Linux dev VM | **To test.** Needs the `bubblewrap` package (not `bwa`, an unrelated tool the shell suggests) and unprivileged user namespaces: `bwrap --ro-bind / / --unshare-user --unshare-net true`. | Ubuntu 24.04+ may need an admin to lift an AppArmor restriction. A VM inside the company network may reach more internal hosts than the laptop, so network control matters even more there. |
+| Cloud dev workspace (Linux container in Kubernetes, Debian 12) | **Not available yet.** `socat` and `rg` present, `bwrap` absent, no sudo. User namespaces (needed by bubblewrap) to confirm with `unshare --user --map-root-user true`; usually blocked in pods. A Kubernetes service account token is mounted under `/var/run/secrets`. | The "VM" is a container: the platform is the isolation boundary. What matters there is what it reaches (internal network, mounted token, Git credentials). The command guard now blocks reads of mounted secrets (PR #11). Until bubblewrap and user namespaces are available: `FACTORY_SANDBOX=off` on this machine, recorded with that reason; sandboxed missions run from the laptop. |
 
 **Optional per machine (design for S8):** a machine-level setting `FACTORY_SANDBOX=srt|off` (the repo stays the same everywhere; allowed domains come from `commands.env`). Default `srt` where the pre-flight finds it working; `off` only as a recorded decision with a reason; the metrics and the MR state the level used; required once missions run unattended (Step 3).
 
@@ -81,4 +81,4 @@ Quarterly, a scheduled task re-scans the field (new tools, maturity changes, lic
 
 ## Changelog
 
-- 2026-10-10: first study; srt fully validated on macOS (network, reads, writes); per-machine option designed for S8.
+- 2026-10-10: first study; srt fully validated on macOS (network, reads, writes); not available in the container workspace yet; per-machine option designed for S8.
