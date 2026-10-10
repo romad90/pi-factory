@@ -35,7 +35,7 @@ A behavior change in a script needs a check in `tests/factory.test.sh`; a guard 
 
 ## Releases
 
-semantic-release runs on pushes to `develop` and `main` (`.github/workflows/release.yml`): it computes the version, tags `v<version>`, updates `CHANGELOG.md` and `.factory/VERSION`, and publishes a GitHub release. After a release on `main`, the same workflow merges `main` back into `develop` (`chore: sync develop with main [skip ci]`), so there is no sync PR to open by hand. If the two branches conflict, the step fails and says so: open a `main` → `develop` PR and resolve it.
+semantic-release runs on pushes to `develop` and `main` (`.github/workflows/release.yml`): it computes the version, tags `v<version>`, updates `CHANGELOG.md` and `.factory/VERSION`, and publishes a GitHub release. After a release on `main`, the same workflow merges `main` back into `develop` (`chore: sync develop with main`), so there is no sync PR to open by hand. Release and sync commits carry no CI skip marker: one of them is often the head of the next `develop` → `main` PR, and a marker there would skip its required checks forever. The release job skips its own commits by subject. If the two branches conflict, the step fails and says so: open a `main` → `develop` PR and resolve it.
 
 It pushes with the `RELEASE_TOKEN` secret (a fine-grained token of a repo admin on the ruleset's bypass list), so it works on protected branches. Write `docs/releases/<version>.md` for releases with user-facing changes.
 
