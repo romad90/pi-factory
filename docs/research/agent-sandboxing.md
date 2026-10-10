@@ -54,7 +54,7 @@ Prompt injection is never prevented, only contained; the isolation level decides
 
 | Machine | Result | Notes |
 |---|---|---|
-| macOS laptop (2026-10-10) | **Works.** Allowed domain goes through the srt proxy; other domains get `403` with `X-Proxy-Error: blocked-by-allowlist`; `~/.ssh` reads denied (`Operation not permitted`); writes in the allowed folder work. Write outside the allowed folder: to confirm. | Native Seatbelt, only `npm install -g @anthropic-ai/sandbox-runtime`. Run commands as `srt -c "<command>"`: a quoted string without `-c` is taken as one program name and fails with "No such file or directory". |
+| macOS laptop (2026-10-10) | **Works.** Allowed domain goes through the srt proxy; other domains get `403` with `X-Proxy-Error: blocked-by-allowlist`; `~/.ssh` reads denied (`Operation not permitted`); writes in the allowed folder work; writes outside it (home folder) denied (`Operation not permitted`). All four checks pass. | Native Seatbelt, only `npm install -g @anthropic-ai/sandbox-runtime`. Run commands as `srt -c "<command>"`: a quoted string without `-c` is taken as one program name and fails with "No such file or directory". |
 | Linux dev VM | **To test.** Needs the `bubblewrap` package (not `bwa`, an unrelated tool the shell suggests) and unprivileged user namespaces: `bwrap --ro-bind / / --unshare-user --unshare-net true`. | Ubuntu 24.04+ may need an admin to lift an AppArmor restriction. A VM inside the company network may reach more internal hosts than the laptop, so network control matters even more there. |
 
 **Optional per machine (design for S8):** a machine-level setting `FACTORY_SANDBOX=srt|off` (the repo stays the same everywhere; allowed domains come from `commands.env`). Default `srt` where the pre-flight finds it working; `off` only as a recorded decision with a reason; the metrics and the MR state the level used; required once missions run unattended (Step 3).
@@ -81,4 +81,4 @@ Quarterly, a scheduled task re-scans the field (new tools, maturity changes, lic
 
 ## Changelog
 
-- 2026-10-10: first study; srt validated on macOS; per-machine option designed for S8.
+- 2026-10-10: first study; srt fully validated on macOS (network, reads, writes); per-machine option designed for S8.
