@@ -32,7 +32,10 @@ module.exports = {
     ["@semantic-release/exec", { prepareCmd: "printf '%s\\n' '${nextRelease.version}' > .factory/VERSION" }],
     ["@semantic-release/git", {
       assets: ["CHANGELOG.md", ".factory/VERSION"],
-      message: "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}",
+      // No skip marker: it would also skip the required checks of the next
+      // develop → main PR, whose head is this commit. The release workflow skips
+      // its own commits by subject instead.
+      message: "chore(release): ${nextRelease.version}\n\n${nextRelease.notes}",
     }],
     "@semantic-release/github",
   ],
