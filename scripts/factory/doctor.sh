@@ -33,12 +33,19 @@ if [ "${1:-}" = "--quick" ]; then
         process.exit(check({ tool: "bash", input: { command: "git push" }, cwd: process.cwd() }) ? 0 : 1); });' 2>/dev/null; then
     ok "command guard present and blocking (trust the project in Pi so it loads)"
   else bad "command guard missing or broken (.pi/extensions/factory-guard.ts, scripts/factory/guard-rules.mjs)"; fi
+  if git check-ignore -q "$FACTORY_DIR/x" 2>/dev/null; then
+    bad "$FACTORY_DIR/ is git-ignored: mission state can't be committed (remove the rule from .gitignore, D3)"
+  else ok "$FACTORY_DIR/ tracked by git"; fi
   [ -f "$FACTORY_HEALTH_BASELINE" ] && ok "health baseline present" || bad "no $FACTORY_HEALTH_BASELINE (scripts/factory/health.sh baseline, then commit)"
   if [ -n "$FACTORY_GATEWAY_URL" ]; then
     if curl -sS -m 5 -o /dev/null "$FACTORY_GATEWAY_URL" 2>/dev/null; then ok "model gateway reachable"
     else bad "model gateway unreachable ($FACTORY_GATEWAY_URL): VPN or network down?"; fi
+    # Models probed against the gateway since the last model change (D59).
+    if [ "$(cat .factory/models-probe.ok 2>/dev/null)" = "$(node "$here/models-probe.mjs" --hash 2>/dev/null)" ]; then
+      ok "models probed on the gateway (served, thinking level, tool turns)"
+    else bad "models changed since the last probe: FACTORY_GATEWAY_URL=… node scripts/factory/models-probe.mjs --stamp, then commit .factory/models-probe.ok"; fi
   else
-    printf '  - gateway check skipped (set FACTORY_GATEWAY_URL in .factory/commands.env)\n'
+    printf '  - gateway checks skipped (set FACTORY_GATEWAY_URL in .factory/commands.env)\n'
   fi
   [ "$fail" -eq 0 ] && echo "PREFLIGHT: OK" || echo "PREFLIGHT: FAIL"
   exit "$fail"
@@ -66,6 +73,11 @@ echo
 bash "$here/skills-pin.sh" check-global
 echo
 node "$here/models-lint.mjs" || fail=1
+echo
+# Probe the gateway with what the factory really sends (D59). Spends a few requests.
+( . "$here/lib.sh"; load_commands
+  FACTORY_GATEWAY_URL="$FACTORY_GATEWAY_URL" FACTORY_GATEWAY_KEY_ENV="${FACTORY_GATEWAY_KEY_ENV:-}" \
+    node "$here/models-probe.mjs" --stamp ) || fail=1
 
 cat <<MSG
 

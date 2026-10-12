@@ -386,6 +386,34 @@ echo dirty >> src/tools/a.js
 if bash scripts/factory/doctor.sh --quick >"$work/pre.log" 2>&1; then fail "dirty tree must fail pre-flight"; fi
 t "pre-flight fails on a dirty tree"
 git checkout -q -- src/tools/a.js
+printf '.scratch/\n' >> .gitignore
+if bash scripts/factory/doctor.sh --quick >"$work/pre.log" 2>&1; then fail "ignored .scratch must fail pre-flight"; fi
+grep -q "git-ignored" "$work/pre.log" && t "pre-flight fails when .scratch/ is git-ignored" || fail "gitignore check" "$(cat "$work/pre.log")"
+git checkout -q -- .gitignore
+
+# Model probe against a fake gateway reproducing mission 2 (D59).
+cat > "$work/gw.mjs" <<'EOF'
+import http from "node:http";
+http.createServer((req, res) => { let b = ""; req.on("data", (c) => (b += c)); req.on("end", () => {
+  if (req.url.endsWith("/models")) { res.writeHead(200); return res.end(JSON.stringify({ data: (process.env.SERVED || "").split(",").map((id) => ({ id })) })); }
+  if (req.method !== "POST") { res.writeHead(200); return res.end("{}"); }
+  if (JSON.parse(b).model === process.env.PICKY) { res.writeHead(400); return res.end('{"message":"Unexpected role user after role tool"}'); }
+  res.writeHead(200); res.end("{}"); }); }).listen(Number(process.env.PORT), "127.0.0.1");
+EOF
+port=$((20000 + RANDOM % 20000)); ids="$(sed -n 's/^model: [^/]*\///p' .pi/agents/factory/*.md | sort -u | paste -sd, -)"
+SERVED="$ids" PICKY="$(cut -d, -f1 <<<"$ids")" PORT=$port node "$work/gw.mjs" & gw=$!; sleep 1
+export FACTORY_GATEWAY_URL="http://127.0.0.1:$port/v1" NO_PROXY="127.0.0.1,${NO_PROXY:-}" no_proxy="127.0.0.1,${no_proxy:-}"
+if node scripts/factory/models-probe.mjs --stamp >"$work/probe.log" 2>&1; then fail "probe must reject a model that refuses tool turns"; fi
+grep -q "rejects a user turn after a tool result" "$work/probe.log" && [ ! -f .factory/models-probe.ok ] \
+  && t "probe catches a model that rejects tool turns, no stamp" || fail "probe tool turn" "$(cat "$work/probe.log")"
+kill $gw; wait $gw 2>/dev/null || true
+SERVED="$ids" PICKY=none PORT=$port node "$work/gw.mjs" & gw=$!; sleep 1
+printf 'FACTORY_GATEWAY_URL="%s"\n' "$FACTORY_GATEWAY_URL" >> .factory/commands.env; git commit -qam "test: gateway"
+if bash scripts/factory/doctor.sh --quick >"$work/pre.log" 2>&1; then fail "unprobed models must fail pre-flight"; fi
+grep -q "models changed since the last probe" "$work/pre.log" && t "pre-flight requires a probe after a model change" || fail "probe stamp" "$(cat "$work/pre.log")"
+node scripts/factory/models-probe.mjs --stamp >"$work/probe.log" 2>&1 && git add .factory/models-probe.ok && git commit -qm "test: probe" \
+  && bash scripts/factory/doctor.sh --quick >"$work/pre.log" 2>&1 && t "probed models pass pre-flight" || fail "probe ok" "$(cat "$work/probe.log" "$work/pre.log")"
+kill $gw; wait $gw 2>/dev/null || true; unset FACTORY_GATEWAY_URL
 
 if [ -n "${mono:-}" ]; then
   [ "$(cat "$mono/projects/other/keep.js")" = keep ] && [ -z "$(git -C "$mono" log --format=%H -- projects/other README.md | awk 'NR > 1')" ] \

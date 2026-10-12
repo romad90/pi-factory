@@ -276,7 +276,7 @@ project_apply() {                      # <git apply args...> <patch>
 # --- commands.env (D8, D34) ---------------------------------------------------
 
 load_commands() {
-  FACTORY_LINT_CMD=""; FACTORY_TEST_CMD=""; FACTORY_EXTRA_CMD=""; FACTORY_GATEWAY_URL=""; FACTORY_HEALTH_CMD=""
+  FACTORY_LINT_CMD=""; FACTORY_TEST_CMD=""; FACTORY_EXTRA_CMD=""; FACTORY_GATEWAY_URL=""; FACTORY_HEALTH_CMD=""; FACTORY_GATEWAY_KEY_ENV="${FACTORY_GATEWAY_KEY_ENV:-}"
   # shellcheck source=/dev/null
   if [ -f .factory/commands.env ]; then . .factory/commands.env; fi
   FACTORY_LINT_CMD="${FACTORY_LINT_CMD:-}"; FACTORY_TEST_CMD="${FACTORY_TEST_CMD:-}"
