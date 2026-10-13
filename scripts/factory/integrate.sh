@@ -16,6 +16,9 @@ here="$(cd "$(dirname "$0")" && pwd)"
 feature="${1:?usage: integrate.sh <feature> <ticket> <patch-file>}"
 ticket="${2:?usage: integrate.sh <feature> <ticket> <patch-file>}"
 patch="${3:?usage: integrate.sh <feature> <ticket> <patch-file>}"
+# D60: the wave returned no path; look for the patch here instead of
+# relying on the lead to run locate-patch.sh first.
+if [ "$patch" = null ]; then patch="$(bash "$here/locate-patch.sh" "$feature" "$ticket" 2>/dev/null || true)"; fi
 dir="$(mission_dir "$feature")"
 [ -f "$dir/issues/$ticket.md" ] || die "unknown ticket $ticket in $dir/issues"
 [ -s "$patch" ] || die "patch $patch is missing or empty: record it with scripts/factory/record-no-patch.sh $feature $ticket"
