@@ -42,6 +42,8 @@ scripts/factory/install-pi-config.sh     # worktree hook (hides instrument/), co
 
 Under a small shared quota (about 10 requests per window), set `parallel.concurrency: 1` in `~/.pi/agent/extensions/subagent/config.json` and `FACTORY_MAX_PARALLEL=1` in `.factory/commands.env` (or exported). The retry block in `.pi/settings.json` (6 × 5 s) absorbs short 429 bursts. When the provider stops a worker anyway, the lead runs `record-no-patch.sh <mission> <ticket> --provider "<error>"`: no round is lost, the mission pauses, and `/factory <mission>` resumes it once the limit resets.
 
+After any model change, probe the gateway once: `doctor.sh` (full) runs `models-probe.mjs --stamp`, then commit `.factory/models-probe.ok`. It needs `FACTORY_GATEWAY_URL` (OpenAI-compatible base, e.g. `https://host/v1`) in `.factory/commands.env` and the key in the variable named by `FACTORY_GATEWAY_KEY_ENV` (default `OPENAI_API_KEY`). The pre-flight refuses to start a mission whose models changed since the last probe.
+
 ## 3. Once per machine (your models)
 
 | File | Set |
