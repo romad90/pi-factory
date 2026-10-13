@@ -33,6 +33,7 @@ Most of the human time lost in this mission came from here. None of it was visib
 | 16 | Ticket writer put every assertion on the enabler ticket | Harness ticket "covered" all 30 assertions | Enablers cover only what they make true | P2 | roadmap F |
 | 17 | Literal values pinned at contract time are costly | Second contract round: 28 min, 2.6M tokens | Contract fixes the assertion shape; workers record values by running the code | P2 | cheat sheet |
 | 18 | Ponytail persona turns itself back on in every new session | Footer `ponytail: FULL` after each `/new` | Install it off in factory projects | P3 | roadmap |
+| 28 | Ticket writer made a check-only ticket with no `## Blocked by` | Ticket 10 "verify `src/` unchanged, unmocked calls fail" was buildable before any test existed, and asked for no patch | G3 refuses a ticket that changes no file; final checks (no change in `src/`) belong to validate, not to a ticket | P2 | roadmap F |
 
 ## State and git
 
