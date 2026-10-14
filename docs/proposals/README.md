@@ -11,6 +11,7 @@ Status: **draft** (open for discussion) · **accepted** (in the roadmap) · **re
 | P3 | [Maintenance lane: discover, confirm, freeze, refactor](P3-maintenance-lane.md) | draft | P1 |
 | P4 | [Director and triggers](P4-director.md) | draft | P1, P2 |
 | P5 | [Continuous improvement: observe, decide, improve, prove](P5-continuous-improvement.md) | draft | P3, P4 |
+| P6 | [Control room: a hosted factory, a dashboard, events from operations](P6-control-room.md) | draft | P2, P4, P5 |
 
 ## Why these four, in this order
 
@@ -23,4 +24,4 @@ Mission 2 ([retro](../retros/mission-02.md)) spent about four hours of human tim
 
 P1 and P2 are prerequisites, not features: they make the factory dependable. P3 and P4 are where the return is.
 
-P5 came after: it answers how the codebase gets better over time once the factory can change it safely (P3) and run on its own (P4).
+P5 came after: it answers how the codebase gets better over time once the factory can change it safely (P3) and run on its own (P4). P6 puts the whole factory where a team can watch it, and plugs in operations: alerts from an SRE agent and labeled issues become missions.
