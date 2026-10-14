@@ -37,6 +37,10 @@ if [ "${1:-}" = "--quick" ]; then
     bad "$FACTORY_DIR/ is git-ignored: mission state can't be committed (remove the rule from .gitignore, D3)"
   else ok "$FACTORY_DIR/ tracked by git"; fi
   [ -f "$FACTORY_HEALTH_BASELINE" ] && ok "health baseline present" || bad "no $FACTORY_HEALTH_BASELINE (scripts/factory/health.sh baseline, then commit)"
+  if [ -n "$FACTORY_LINT_CMD" ]; then
+    [ -f "$FACTORY_LINT_BASELINE" ] && ok "lint baseline present (only new lint errors fail, D62)" \
+      || printf '  - no %s: every existing lint error fails integration (scripts/factory/health.sh baseline, then commit)\n' "$FACTORY_LINT_BASELINE"
+  fi
   if [ -n "$FACTORY_GATEWAY_URL" ]; then
     if curl -sS -m 5 -o /dev/null "$FACTORY_GATEWAY_URL" 2>/dev/null; then ok "model gateway reachable"
     else bad "model gateway unreachable ($FACTORY_GATEWAY_URL): VPN or network down?"; fi

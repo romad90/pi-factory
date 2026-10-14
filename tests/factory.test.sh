@@ -6,7 +6,7 @@
 # Usage: bash tests/factory.test.sh        (needs bash, git, node)
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
-work="$(mktemp -d)"; trap 'rm -rf "$work"' EXIT
+work="$(mktemp -d)"; [ -n "${KEEP:-}" ] || trap 'rm -rf "$work"' EXIT
 export FACTORY_NOTIFY=0 GIT_AUTHOR_NAME=test GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=t@t
 export GIT_CONFIG_GLOBAL="$work/gitconfig"; printf '[commit]\n\tgpgsign = false\n[init]\n\tdefaultBranch = main\n' > "$GIT_CONFIG_GLOBAL"
 
@@ -121,6 +121,39 @@ pg_blocks "patch guard: a test renamed away" 'diff --git a/tests/a.test.js b/src
 pg_blocks "patch guard: a new symbolic link" 'diff --git a/src/l b/src/l\nnew file mode 120000\n--- /dev/null\n+++ b/src/l\n@@ -0,0 +1 @@\n+../instrument\n\\ No newline at end of file\n'
 printf 'diff --git a/tests/a.test.js b/tests/b.test.js\nsimilarity index 100%%\nrename from tests/a.test.js\nrename to tests/b.test.js\n' > "$work/pg.patch"
 bash scripts/factory/patch-guard.sh "$work/pg.patch" >/dev/null && t "patch guard: moving a test file is fine" || fail "test move" "$(bash scripts/factory/patch-guard.sh "$work/pg.patch")"
+
+echo "Frozen paths (D61)"
+mkdir -p .scratch/maint/issues .scratch/frz
+printf '# Maint\n**Intent:** maintenance\n\n## Validation contract\n\n### VAL-M-001: as today\n**Kind:** code\n' > .scratch/maint/spec.md
+for n in 01-doc 02-tests 03-more; do printf '# %s\n## Covers: enabler\nhousekeeping\n' "$n" > .scratch/maint/issues/$n.md; done
+git add .scratch; git commit -q -m "test: maintenance mission"
+src_patch='diff --git a/src/tools/a.js b/src/tools/a.js\n--- a/src/tools/a.js\n+++ b/src/tools/a.js\n@@ -1 +1 @@\n-export const a = 1;\n+export const a = 2;\n'
+printf '%b' "$src_patch" > "$work/fz.patch"
+if bash scripts/factory/patch-guard.sh "$work/fz.patch" --mission maint >"$work/pg.log"; then fail "maintenance must freeze src/" "$(cat "$work/pg.log")"; fi
+grep -q '^BLOCKED frozen: src/tools/a.js' "$work/pg.log" && t "maintenance mission: src/ is frozen by default" || fail "frozen src" "$(cat "$work/pg.log")"
+bash scripts/factory/patch-guard.sh "$work/fz.patch" >/dev/null && t "without a mission, the same patch is clean" || fail "frozen leaks without mission"
+printf 'diff --git a/src/tools/a.test.js b/src/tools/a.test.js\nnew file mode 100644\n--- /dev/null\n+++ b/src/tools/a.test.js\n@@ -0,0 +1 @@\n+it("a", () => {});\n' > "$work/fz.patch"
+bash scripts/factory/patch-guard.sh "$work/fz.patch" --mission maint >/dev/null && t "frozen: a characterization test next to the code is allowed" || fail "frozen test" "$(bash scripts/factory/patch-guard.sh "$work/fz.patch" --mission maint)"
+printf '# Frz\n**Intent:** maintenance\n\n## Frozen paths\n- `deploy/` — infra, owned elsewhere\n- *.lock\n\n## Validation contract\n' > .scratch/frz/spec.md
+[ "$(bash -c '. scripts/factory/lib.sh; frozen_paths .scratch/frz/spec.md' | paste -sd' ' -)" = 'deploy/ *.lock' ] && t "frozen: the spec section replaces the default (prefix and glob)" || fail "frozen parse"
+printf '%b' "$src_patch" > "$work/fz.patch"
+bash scripts/factory/patch-guard.sh "$work/fz.patch" --mission frz >/dev/null && t "frozen: src/ is free when the section doesn't list it" || fail "frozen section"
+pg_frozen() { printf 'diff --git a/%s b/%s\nnew file mode 100644\n--- /dev/null\n+++ b/%s\n@@ -0,0 +1 @@\n+x\n' "$1" "$1" "$1" > "$work/fz.patch"
+  if bash scripts/factory/patch-guard.sh "$work/fz.patch" --mission frz >/dev/null; then fail "frozen: $1 must be refused"; fi; t "frozen: $1 is refused ($2)"; }
+pg_frozen deploy/values.yaml prefix; pg_frozen yarn.lock glob
+printf '# Frz\n**Intent:** maintenance\n\n## Frozen paths\n- none\n' > .scratch/frz/spec.md
+printf '%b' "$src_patch" > "$work/fz.patch"
+bash scripts/factory/patch-guard.sh "$work/fz.patch" --mission frz >/dev/null && t "frozen: '- none' unfreezes a maintenance mission" || fail "frozen none"
+rm -rf .scratch/frz
+cmds0="$(git rev-parse HEAD)"; printf 'FACTORY_LINT_CMD="true"\nFACTORY_TEST_CMD="true"\n' > .factory/commands.env; git commit -qam "test: commands"
+if bash scripts/factory/integrate.sh maint 01-doc "$work/fz.patch" >"$work/int.log" 2>&1; then fail "integration must refuse a frozen path" "$(cat "$work/int.log")"; fi
+[ "$(bash -c '. scripts/factory/lib.sh; verdict_field .scratch/maint/verdicts/01-doc-code.md Brief')" = patch-guard ] \
+  && grep -q 'frozen: src/tools/a.js' .scratch/maint/verdicts/01-doc-code.md && [ "$(cat src/tools/a.js)" = 'export const a = 1;' ] \
+  && t "integrate refuses a frozen change before applying it (a failed round with the reason)" || fail "integrate frozen" "$(cat "$work/int.log")"
+bash scripts/factory/brief.sh worker maint 01-doc > "$work/brief.txt"
+grep -qF 'tests under them are allowed): `src/`.' "$work/brief.txt" && grep -qF 'lint: `true`' "$work/brief.txt" \
+  && t "the worker brief carries the frozen paths and the lint command" || fail "brief" "$(cat "$work/brief.txt")"
+git checkout -q "$cmds0" -- .factory/commands.env; git commit -qm "test: reset commands"
 
 echo "Mission: planning"
 m=.scratch/demo
@@ -385,6 +418,55 @@ printf '// eslint-disable-next-line\n' >> README.md; git commit -q -am "fix: hus
 if bash scripts/factory/fix.sh check lint-hush >"$work/fix.log" 2>&1; then fail "silenced check must be blocked in the fix lane"; fi
 grep -q 'BLOCKED silence' "$work/fix.log" && t "patch guard applies to human fixes too (silenced check)" || fail "fix guard" "$(cat "$work/fix.log")"
 git revert --no-edit HEAD >/dev/null
+
+echo "Lint baseline (D62) and reset (D63)"
+# Fake linter: "BAD" in a tracked .js file is an error, reported with an absolute path.
+printf '%s\n' 'st=0' \
+  'while IFS= read -r f; do n=0' \
+  '  while IFS= read -r l; do n=$((n + 1)); case "$l" in *BAD*) echo "$PWD/$f:$n:1: error Unexpected BAD [no-bad]"; st=1 ;; esac; done < "$f"' \
+  "done < <(git ls-files -- '*.js'); echo '1 problem'; exit \$st" > "$work/lint.sh"
+echo '// BAD legacy' > src/legacy.js
+printf 'FACTORY_LINT_CMD="bash %s"\nFACTORY_TEST_CMD="true"\n' "'$work/lint.sh'" > .factory/commands.env
+git add -A; git commit -qm "test: legacy lint error"
+keys="$(printf '%s\n' "$PWD/src/x.ts" '  3:5  error  Unexpected any  @typescript-eslint/no-explicit-any' '  9:1  warning  Unused  no-unused-vars' '' '✖ 2 problems (1 error, 1 warning)' "src/y.ts(12,7): error TS2322: Type 'a' is not assignable." \
+  | node scripts/factory/lint-keys.mjs "$PWD" | paste -sd'|' -)"
+[ "$keys" = "src/x.ts: Unexpected any @typescript-eslint/no-explicit-any|src/y.ts: error TS2322: Type 'a' is not assignable." ] \
+  && t "lint keys: eslint stylish and tsc output, warnings and summaries ignored" || fail "lint keys" "$keys"
+ok_patch() { printf 'diff --git a/tests/%s b/tests/%s\nnew file mode 100644\n--- /dev/null\n+++ b/tests/%s\n@@ -0,0 +1 @@\n+%s\n' "$1" "$1" "$1" "$2" > "$work/$1.patch"; }
+ok_patch ok.test.js 'it("ok", () => {});'
+if bash scripts/factory/integrate.sh maint 02-tests "$work/ok.test.js.patch" >"$work/int.log" 2>&1; then fail "without a baseline, a legacy lint error fails" "$(cat "$work/int.log")"; fi
+grep -q 'no .factory/lint-baseline.txt' .scratch/maint/logs/02-tests-integrate.log && t "no lint baseline: legacy errors fail, and the log says why" || fail "no baseline" "$(cat .scratch/maint/logs/02-tests-integrate.log)"
+bash scripts/factory/health.sh baseline >"$work/hb.log" 2>&1 && [ "$(cat .factory/lint-baseline.txt)" = 'src/legacy.js: error Unexpected BAD [no-bad]' ] \
+  && t "health.sh baseline records the lint errors (relative path, no line numbers)" || fail "lint baseline" "$(cat "$work/hb.log" .factory/lint-baseline.txt)"
+printf '// header\n// BAD legacy\n' > src/legacy.js; git add -A; git commit -qm "test: baseline + shifted legacy line"
+bash scripts/factory/integrate.sh maint 02-tests "$work/ok.test.js.patch" >"$work/int.log" 2>&1 && [ -f .scratch/maint/state/02-tests.integrated ] \
+  && grep -q 'only errors already in' .scratch/maint/logs/02-tests-integrate.log \
+  && t "only baseline errors (on a moved line): integration passes" || fail "baseline pass" "$(cat "$work/int.log" .scratch/maint/logs/02-tests-integrate.log)"
+ok_patch bad.test.js '// BAD new'
+if bash scripts/factory/integrate.sh maint 03-more "$work/bad.test.js.patch" >"$work/int.log" 2>&1; then fail "a new lint error must fail" "$(cat "$work/int.log")"; fi
+grep -q 'New lint errors (fix them, never silence them): tests/bad.test.js: error Unexpected BAD' .scratch/maint/verdicts/03-more-code.md && [ ! -e tests/bad.test.js ] \
+  && t "a new lint error fails integration; the verdict names it" || fail "new lint" "$(cat .scratch/maint/verdicts/03-more-code.md)"
+bash scripts/factory/health.sh check maint >"$work/health.log" 2>&1 || true; grep -q 'lint_errors_new | 0 | 0 | same' .scratch/maint/health/report.md \
+  && t "health check: no new lint error against the baseline" || fail "health lint row" "$(cat "$work/health.log")"
+bash scripts/factory/fix.sh start lint-legacy "touch legacy" >/dev/null
+echo '// tweak' >> README.md; git commit -qam "fix: readme tweak"
+bash scripts/factory/fix.sh check lint-legacy >"$work/fix.log" 2>&1 && grep -q '✓ lint' "$work/fix.log" && t "fix lane: legacy lint errors don't fail a human fix" || fail "fix lint" "$(cat "$work/fix.log")"
+bash scripts/factory/doctor.sh --quick > "$work/pre.log" 2>&1 || true
+grep -q 'lint baseline present' "$work/pre.log" && t "pre-flight reports the lint baseline" || fail "doctor lint baseline" "$(cat "$work/pre.log")"
+
+[ -f .scratch/maint/verdicts/03-more-code.r1.md ] && bash scripts/factory/reset-ticket.sh maint 03-more "rebuild after lint fix" >"$work/reset.log" \
+  && [ -z "$(ls .scratch/maint/verdicts/03-more-code* 2>/dev/null)" ] && [ -z "$(git status --porcelain -- .scratch)" ] \
+  && [ "$(git log -1 --format=%s)" = 'chore(maint): reset 03-more' ] && grep -q $'03-more\treset\t.*rebuild after lint fix' .scratch/maint/decisions.tsv \
+  && [ -z "$(bash -c '. scripts/factory/lib.sh; verdict_round .scratch/maint/verdicts/03-more-code.md')" ] \
+  && t "reset-ticket: verdict and round copies gone, logged, one commit" || fail "reset 03" "$(cat "$work/reset.log"; ls .scratch/maint/verdicts)"
+bash scripts/factory/reset-ticket.sh maint 02-tests >/dev/null && [ ! -e .scratch/maint/state/02-tests.integrated ] \
+  && bash -c '. scripts/factory/lib.sh; compute_ticket_state maint; [[ " ${T_BUILD[*]} " == *" 02-tests "* ]]' \
+  && t "reset-ticket: an integrated ticket loses its marker and goes back to build" || fail "reset 02"
+[ "$(bash scripts/factory/reset-ticket.sh maint 02-tests)" = "Nothing to reset for 02-tests." ] && t "reset-ticket: nothing to reset is a no-op" || fail "reset noop"
+if bash scripts/factory/reset-ticket.sh maint 99-nope >/dev/null 2>&1; then fail "unknown ticket must be refused"; fi
+t "reset-ticket: an unknown ticket is refused"
+git rm -q src/legacy.js .factory/lint-baseline.txt; printf 'FACTORY_LINT_CMD="true"\nFACTORY_TEST_CMD="test -f src/tools/a.js"\n' > .factory/commands.env
+git add -A; git commit -qm "test: back to the plain commands"
 
 echo "Pre-flight"
 bash scripts/factory/doctor.sh --quick >"$work/pre.log" 2>&1 && t "pre-flight OK on a configured repo" || fail "preflight" "$(cat "$work/pre.log")"

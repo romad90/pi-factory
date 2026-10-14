@@ -6,7 +6,8 @@
 #
 # Usage:
 #   health.sh metrics             print the metrics (JSON)
-#   health.sh baseline            write .factory/health-baseline.json (after install, or to lock in an improvement)
+#   health.sh baseline            write .factory/health-baseline.json and, with FACTORY_LINT_CMD,
+#                                 .factory/lint-baseline.txt (after install, or to lock in an improvement)
 #   health.sh check <feature>     ratchet + FACTORY_HEALTH_CMD → .scratch/<feature>/health/report.md
 #
 # Metrics (source files = FACTORY_CODE_RE, minus FACTORY_EXCLUDE_RE):
@@ -89,6 +90,13 @@ case "$cmd" in
     mkdir -p "$(dirname "$FACTORY_HEALTH_BASELINE")"
     measure "$details" | to_json > "$FACTORY_HEALTH_BASELINE"
     echo "Baseline written: $FACTORY_HEALTH_BASELINE $(cat "$FACTORY_HEALTH_BASELINE")"
+    # D62: the lint errors the code has today; integration fails only on new ones.
+    load_commands
+    if [ -n "$FACTORY_LINT_CMD" ]; then
+      bash -c "$FACTORY_LINT_CMD" > "$details" 2>&1 || true
+      lint_keys "$details" > "$FACTORY_LINT_BASELINE"
+      echo "Lint baseline written: $FACTORY_LINT_BASELINE ($(wc -l < "$FACTORY_LINT_BASELINE" | tr -d ' ') errors)"
+    fi
     ;;
 
   check)
@@ -105,6 +113,12 @@ case "$cmd" in
       else status="same"; fi
       rows+="| $metric | $base | $value | $status |"$'\n'
     done < <(measure "$details")
+    if [ -n "$FACTORY_LINT_CMD" ] && [ -f "$FACTORY_LINT_BASELINE" ]; then
+      lint_out="$dir/health/lint.log"; bash -c "$FACTORY_LINT_CMD" > "$lint_out" 2>&1 || true
+      new_lint="$(lint_new_errors "$lint_out" | grep -c . || true)"
+      if [ "$new_lint" -gt 0 ]; then status="WORSE"; fail=1; else status="same"; fi
+      rows+="| lint_errors_new | 0 | $new_lint | $status |"$'\n'
+    fi
     tool="not configured (FACTORY_HEALTH_CMD)"
     if [ -n "${FACTORY_HEALTH_CMD:-}" ]; then
       if bash -c "$FACTORY_HEALTH_CMD" > "$dir/health/tool.log" 2>&1; then tool="PASS ($FACTORY_HEALTH_CMD)"
