@@ -10,6 +10,7 @@ Status: **draft** (open for discussion) · **accepted** (in the roadmap) · **re
 | P2 | [The lead becomes a script](P2-scripted-lead.md) | draft | — |
 | P3 | [Maintenance lane: discover, confirm, freeze, refactor](P3-maintenance-lane.md) | draft | P1 |
 | P4 | [Director and triggers](P4-director.md) | draft | P1, P2 |
+| P5 | [Continuous improvement: observe, decide, improve, prove](P5-continuous-improvement.md) | draft | P3, P4 |
 
 ## Why these four, in this order
 
@@ -21,3 +22,5 @@ Mission 2 ([retro](../retros/mission-02.md)) spent about four hours of human tim
 4. **Missions should start without a person typing `/factory`.** That is the goal in [INTENT.md](../INTENT.md): maintenance running in the background. It needs 1 and 2 to hold first (P4).
 
 P1 and P2 are prerequisites, not features: they make the factory dependable. P3 and P4 are where the return is.
+
+P5 came after: it answers how the codebase gets better over time once the factory can change it safely (P3) and run on its own (P4).
