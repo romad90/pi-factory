@@ -214,9 +214,15 @@ bash scripts/factory/workflow.sh build-wave demo >"$work/wf.log"
 wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
 grep -q '"agent": "factory-worker-heavy"' "$wf" && t "round 2 routes to the heavy worker" || fail "heavy routing"
 
-echo 'export const hello = () => "hello";' > src/tools/hello.js
-git add -N src/tools/hello.js; git diff -- src > "$work/01.patch"; git rm -q --cached src/tools/hello.js; rm src/tools/hello.js
-bash scripts/factory/integrate.sh demo 01-hello "$work/01.patch" >"$work/int.log" 2>&1 || fail "integrate 01" "$(cat "$work/int.log")"
+# The wave returned no patch path: the work is in the worker's worktree,
+# which pi-subagents keeps on a pi-subagents/<ticket>-… branch (D60).
+sleep 1
+wt="$work/wt-01"; git worktree add -q -b pi-subagents/01-hello-abc123-s0-t0 "$wt" HEAD
+wt_project="$wt/$(git rev-parse --show-prefix)"
+echo 'export const hello = () => "hello";' > "$wt_project/src/tools/hello.js"
+bash scripts/factory/integrate.sh demo 01-hello null >"$work/int.log" 2>&1 || fail "integrate 01 from the worktree" "$(cat "$work/int.log")"
+t "null patch is rebuilt from the worker's worktree"
+git worktree remove --force "$wt"; git branch -q -D pi-subagents/01-hello-abc123-s0-t0
 c1="$(cat $m/state/01-hello.integrated)"
 grep -q '^feat(demo): 01-hello' <<<"$(git log -1 --skip=1 --format=%s)" && t "integration commit is a Conventional Commit" || fail "integration message: $(git log -3 --format=%s)"
 expect_step review "integrated ticket waits for review"
