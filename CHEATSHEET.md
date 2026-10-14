@@ -138,7 +138,7 @@ The codebase is the fuel that brings value to customers, so every mission must l
 | Layer | When | What it stops |
 |---|---|---|
 | **Command guard** (`.pi/extensions/factory-guard.ts`) | Live, on every tool call of the lead and agents | push, force, `--no-verify`, history rewrites, `sudo`, recursive deletes of `/ ~ .. .git`, cluster/cloud/secret-store changes, uploads and remote shells, reading credentials (home folder, `.env`, secrets mounted in a container such as a Kubernetes service account token), publishing, merging, writing to the factory, CI or hooks, any route to `instrument/` from a worker |
-| **Patch guard** (`patch-guard.sh`) | Every worker patch, every fix-lane change | changes to the instrument, the factory, CI or hooks; deleted, skipped or focused tests; silenced checks (`eslint-disable`, `@ts-ignore`, `noqa`, …); anything that looks like a secret |
+| **Patch guard** (`patch-guard.sh`) | Every worker patch, every fix-lane change | changes to the instrument, the factory, CI or hooks; deleted, skipped or focused tests; silenced checks (`eslint-disable`, `@ts-ignore`, `noqa`, …); anything that looks like a secret; paths the contract freezes (`## Frozen paths`, or `src/` for a maintenance mission; tests there stay allowed) |
 | **CI gate** | Every MR | all of G1–G5, lanes, instrument rule |
 
 A blocked agent stops and asks; it never looks for another way. Blocks are logged in `.pi-subagents/guard.log`, and patch-guard blocks count as failed rounds in the metrics. The guard loads only once the project is trusted in Pi; the patch guard holds either way. Working on the factory itself in Pi: start Pi with `FACTORY_GUARD=off` (maintainers only, never in a target repo).
@@ -164,6 +164,8 @@ A blocked agent stops and asks; it never looks for another way. Blocks are logge
 | `scripts/factory/health.sh metrics` | today's health metrics for the repo |
 | `scripts/factory/readiness.sh` | what the repo still lacks for Step 2 |
 | `scripts/factory/skills-pin.sh verify\|check-global` | skills drifted or shadowed? |
+| `scripts/factory/reset-ticket.sh <f> <ticket> [reason]` | rebuild a ticket from round 1 (verdict, round copies and integration marker removed, one commit) |
+| `scripts/factory/health.sh baseline` | after setting `FACTORY_LINT_CMD`: records today's lint errors, so only new ones fail |
 
 ## 11. Gates and lanes
 
@@ -180,7 +182,9 @@ A blocked agent stops and asks; it never looks for another way. Blocks are logge
 |---|---|---|
 | `PREFLIGHT: FAIL … gateway unreachable` | VPN or network | reconnect, `/factory <f>` |
 | "blocked by the factory guard" | an agent tried something on the deny-list | read what it needed; if legitimate, you do it by hand (or through the fix lane) |
-| `patch blocked` in a verdict | worker touched CI, a test or the factory | recorded as a round; the next build sees the reason |
+| `patch blocked` in a verdict | worker touched CI, a test, the factory or a frozen path | recorded as a round; the next build sees the reason |
+| Integration fails on lint in code nobody touched | no lint baseline | `scripts/factory/health.sh baseline`, commit `.factory/lint-baseline.txt` |
+| Lint baseline misses errors | the lint's output format isn't recognized | prefer a one-line format (`eslint -f unix`, `tsc --pretty false`), or set `FACTORY_LINT_ERROR_RE` |
 | `STEP: health-fix` after a refactor | a metric got worse | fix tickets, or a justified new baseline committed by you |
 | Gate: "no explanation for: …" | steward skipped a changed file | rerun the steward (`workflow.sh steward`) |
 | Red band "workflow: true needs one fenced block" | lead pasted a script | playbook passes `WORKFLOW_FILE` paths; if it persists, update the factory |
