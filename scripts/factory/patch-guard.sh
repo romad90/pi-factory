@@ -3,12 +3,16 @@
 # Runs on every worker patch in integrate.sh and on fix-lane diffs. Whatever
 # an agent did in its worktree, nothing below lands in the repo.
 #
-# Usage: scripts/factory/patch-guard.sh <patch-file> [--human]
-#   --human  fix lane (a person made the change): protected paths are allowed
-#            (they may be the point of the fix), every other rule applies.
+# Usage: scripts/factory/patch-guard.sh <patch-file> [--human] [--mission <feature>]
+#   --human    fix lane (a person made the change): protected paths are allowed
+#              (they may be the point of the fix), every other rule applies.
+#   --mission  also refuse the mission's frozen paths (D61); test files under
+#              them stay allowed (characterization tests live next to code).
 # Exit: 0 clean, 1 blocked (reasons on stdout, one per line).
 #
 # Blocks:
+#   frozen   paths the mission's contract freezes (## Frozen paths, or src/
+#            for Intent: maintenance)
 #   paths    instrument/, the factory itself (.factory/ scripts/factory/ .pi/),
 #            CI and hooks (.gitlab-ci.yml .github/ .husky/ .pre-commit-config.yaml
 #            lefthook.yml .git/)
@@ -22,8 +26,18 @@ here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib.sh
 . "$here/lib.sh"
 
-patch="${1:?usage: patch-guard.sh <patch-file> [--human]}"
-human=0; [ "${2:-}" = "--human" ] && human=1
+usage="usage: patch-guard.sh <patch-file> [--human] [--mission <feature>]"
+patch="${1:?$usage}"; shift
+human=0; frozen=""; mission=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --human) human=1 ;;
+    --mission) mission="${2:?$usage}"; shift
+               frozen="$(frozen_paths "$(mission_dir "$mission")/spec.md")" ;;
+    *) die "$usage" ;;
+  esac
+  shift
+done
 [ -f "$patch" ] || die "no patch at $patch"
 
 reasons=()
@@ -42,6 +56,8 @@ check_path() {                          # <path>
     block "paths: $f is in the instrument, hidden from workers (D21)"
   elif [ "$human" -eq 0 ] && [[ "$f" =~ $protected ]]; then
     block "paths: $f belongs to the factory, CI or hooks; agents never change them (a human does, through the fix lane)"
+  elif [ -n "$frozen" ] && ! is_test_file "$f" && is_frozen "$f" "$frozen"; then
+    block "frozen: $f is frozen by the contract of $mission (## Frozen paths in spec.md); change tests or docs only, or ask for an amendment"
   fi
 }
 while IFS=$'\x1f' read -r st old new mode; do

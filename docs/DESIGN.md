@@ -1,6 +1,6 @@
 # How the factory works, and why
 
-This is the readable version of the design: one page per idea, what it does and the reason behind it. The [ADR](adr/ADR-001-agentic-factory.md) holds every decision in order (D1–D60) with its history; this guide groups them by concept and links back. For what to type, see the [cheat sheet](../CHEATSHEET.md).
+This is the readable version of the design: one page per idea, what it does and the reason behind it. The [ADR](adr/ADR-001-agentic-factory.md) holds every decision in order (D1–D63) with its history; this guide groups them by concept and links back. For what to type, see the [cheat sheet](../CHEATSHEET.md).
 
 ---
 
@@ -132,6 +132,9 @@ The factory builds and maintains bots, APIs, front ends and batch jobs, in any l
 | A provider error is not a round (D58) | Escalation measures the code, not the gateway. A 429 that counts as a round escalates tickets nobody wrote; pausing keeps the rounds for real failures. |
 | Probe the gateway, not only the config (D59) | A config can be valid and still fail on the gateway: refused model, thinking level, message order, quota. Two small requests per model find it in seconds, before a wave spends rounds. |
 | The worktree is the patch of last resort (D60) | A run that changed files must never count as "no patch". When the wave returns no path, `integrate.sh` rebuilds the patch from the worker's worktree instead of trusting the lead to look for it. |
+| A contract can freeze paths (D61) | A maintenance mission must not change the code it describes. Prose didn't stop a worker; the patch guard does, before anything is applied. Tests next to the code stay allowed. |
+| Lint fails only on new errors (D62) | Legacy code fails the team lint, and a worker that can't pass it ends up silencing checks. A baseline of today's errors keeps the bar where it is without asking anyone to fix what the mission must not touch. |
+| A ticket is reset by a script (D63) | A ticket's state lives in three places; a reset that misses one rebuilds at the wrong round. |
 | A monorepo folder is its own project (D56) | Many teams keep each domain in a folder with its own CI. Installing at the root would impose the factory on every team; scoping every diff, patch, gate and CI job to the folder keeps the pilot to your project, and the guards prove nothing leaks to a sibling. |
 | Skills pinned by checksum (D36), models linted (D31) | "Use version X" and "judges on another family" must be checkable, not conventions. |
 

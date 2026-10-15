@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Deterministic gate between a worker and its reviewer (D34):
-# apply the worker's patch, run lint, tests and the extra check, commit only
-# if green. Reviewers therefore only ever review committed, green code.
+# apply the worker's patch, run lint (new errors only, D62), tests and the
+# extra check, commit only if green. Reviewers therefore only ever review committed, green code.
 #
 # Usage: scripts/factory/integrate.sh <feature> <ticket> <patch-file>
 #   The patch path comes from the build wave's result ("patch" field), or
@@ -43,7 +43,7 @@ fi
 
 # D51: nothing unsafe lands, whatever the agent did in its worktree. A block
 # is a failed round with the reasons, so the next build sees them.
-if ! guard_out="$(bash "$here/patch-guard.sh" "$patch")"; then
+if ! guard_out="$(bash "$here/patch-guard.sh" "$patch" --mission "$feature")"; then
   write_fail_verdict "$feature" "$ticket" patch-guard \
     "The patch was blocked by the patch guard: $(printf '%s' "$guard_out" | tr '\n' ';' | sed 's/;$//')"
   bash "$here/checkpoint.sh" "$feature" >/dev/null
@@ -72,8 +72,17 @@ run_check() {                # <label> <command>
   bash -c "$2" >>"$log" 2>&1
 }
 
+lint_fail=""
+check_lint() {                # D62: only errors new against the baseline fail
+  [ -n "$FACTORY_LINT_CMD" ] || { echo "  - lint: not configured (.factory/commands.env)" | tee -a "$log"; return 0; }
+  echo "  - lint: $FACTORY_LINT_CMD (new errors only, vs $FACTORY_LINT_BASELINE)" | tee -a "$log"
+  local out rc=0; out="$(mktemp)"; run_lint "$out" 2>/dev/null || rc=1
+  [ "$rc" -eq 0 ] || lint_fail="$(sed -n '/^lint: new errors/,$p' "$out" | sed -n '2,6p' | sed 's/^ *//' | paste -sd ';' -)"
+  cat "$out" >> "$log"; rm -f "$out"; return "$rc"
+}
+
 echo "Integrating $ticket on $(git rev-parse --short HEAD)"
-if run_check lint "$FACTORY_LINT_CMD" && run_check tests "$FACTORY_TEST_CMD" \
+if check_lint && run_check tests "$FACTORY_TEST_CMD" \
    && run_check extra "$FACTORY_EXTRA_CMD"; then
   type="feat"; [[ "$ticket" == *-fix-* ]] && type="fix"
   git commit -q -m "${FACTORY_COMMIT_TYPE:-$type}($feature): $ticket" \
@@ -85,7 +94,7 @@ else
   project_apply -R --index "$patch"
   # The failure is a round like any review FAIL, so escalation is automatic (D38).
   write_fail_verdict "$feature" "$ticket" integrate \
-    "Lint, tests or the extra check failed when integrating the worker's patch. Log: $log"
+    "Lint, tests or the extra check failed when integrating the worker's patch. Log: $log${lint_fail:+. New lint errors (fix them, never silence them): $lint_fail}"
   bash "$here/checkpoint.sh" "$feature" >/dev/null
   echo "  ✗ checks failed; patch reverted. Recorded in $dir/verdicts/$ticket-code.md (log: $log)"
   exit 1

@@ -8,6 +8,16 @@ The spec itself starts with an intent line, used by `metrics.sh` (D26):
 **Intent:** feature | maintenance | bugfix | exploration
 ```
 
+A spec may freeze paths the mission must not change (D61). The patch guard refuses worker changes there before integration; test files under them stay allowed. A maintenance mission without this section freezes `src/`; write `- none` to freeze nothing.
+
+```markdown
+## Frozen paths
+- `src/` — current behavior is the reference
+- *.lock
+```
+
+`dir/` freezes everything under it; anything else is a glob (`*` crosses folders). Changing the list is a contract amendment.
+
 ```markdown
 ## Validation contract
 **Contract approved:** 2026-10-06

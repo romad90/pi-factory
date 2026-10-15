@@ -74,7 +74,9 @@ case "$cmd" in
     for pair in "lint|$FACTORY_LINT_CMD" "tests|$FACTORY_TEST_CMD" "extra|$FACTORY_EXTRA_CMD"; do
       label="${pair%%|*}"; c="${pair#*|}"
       [ -n "$c" ] || { echo "  - $label: not configured"; continue; }
-      if bash -c "$c" > "$dir/$label.log" 2>&1; then echo "  ✓ $label"
+      if [ "$label" = lint ]; then ok() { run_lint "$dir/lint.log" 2>/dev/null; }   # D62: new errors only
+      else ok() { bash -c "$c" > "$dir/$label.log" 2>&1; }; fi
+      if ok; then echo "  ✓ $label"
       else echo "  ✗ $label (log: $dir/$label.log)"; bash "$here/checkpoint.sh" --light "$slug" >/dev/null; exit 1; fi
     done
     bash "$here/checkpoint.sh" --light "$slug" >/dev/null

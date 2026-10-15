@@ -47,6 +47,35 @@ contract_ids() {
     }' "$1"
 }
 
+# Frozen paths (D61): what a mission must not change, from the spec's
+# "## Frozen paths" section, one "- <path>" per line ("dir/" = everything
+# under it, else a glob; "- none" = nothing). Without the section, a
+# maintenance mission freezes FACTORY_FROZEN_MAINTENANCE (default src/):
+# current behavior is the reference, so only tests and docs may move.
+FACTORY_FROZEN_MAINTENANCE="${FACTORY_FROZEN_MAINTENANCE:-src/}"
+frozen_paths() {                       # <spec> → one pattern per line
+  [ -f "$1" ] || return 0
+  if grep -q '^## Frozen paths' "$1"; then
+    awk '/^## Frozen paths/ { in_f = 1; next }
+         in_f && /^## /     { exit }
+         in_f && /^[-*][ \t]+/ { sub(/^[-*][ \t]+/, ""); gsub(/`/, ""); sub(/[ \t]+(—|-).*$/, "")
+                              if ($1 != "" && tolower($1) != "none") print $1 }' "$1"
+  elif [ "$(verdict_field "$1" Intent)" = maintenance ]; then
+    printf '%s\n' $FACTORY_FROZEN_MAINTENANCE
+  fi
+}
+is_frozen() {                          # <path> <patterns (newline-separated)>
+  local p
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    p="${p#./}"
+    if [[ "$p" == */ ]]; then [[ "$1" == "$p"* ]] && return 0; continue; fi
+    # shellcheck disable=SC2053 # the pattern is a glob on purpose
+    [[ "$1" == $p ]] && return 0
+  done <<<"$2"
+  return 1
+}
+
 # --- tickets (issues/NN-slug.md) --------------------------------------------
 
 ticket_name() { basename "$1" .md; }
@@ -284,6 +313,38 @@ load_commands() {
   FACTORY_HEALTH_CMD="${FACTORY_HEALTH_CMD:-}"
 }
 
+# --- lint against the baseline (D62) -------------------------------------------
+# Legacy code often fails the team lint. The baseline, written by
+# `health.sh baseline`, keeps the errors the code had then (one key per error,
+# see lint-keys.mjs); a run passes when it adds none, whatever was there before.
+FACTORY_LINT_BASELINE="${FACTORY_LINT_BASELINE:-.factory/lint-baseline.txt}"
+
+lint_keys() {                          # <lint output file> → sorted keys
+  node "$FACTORY_SCRIPTS/lint-keys.mjs" "$PWD" < "$1" | LC_ALL=C sort
+}
+
+# lint_new_errors <lint output file>: prints the errors not in the baseline.
+lint_new_errors() {
+  local base; base="$(mktemp)"
+  if [ -f "$FACTORY_LINT_BASELINE" ]; then LC_ALL=C sort "$FACTORY_LINT_BASELINE" > "$base"; fi
+  LC_ALL=C comm -23 <(lint_keys "$1") "$base"
+  rm -f "$base"
+}
+
+# run_lint <output file>: 0 when FACTORY_LINT_CMD passes, or fails only on
+# errors the baseline already has. A failing run with no recognizable error
+# (a crash, a config error) fails: nothing proves it is old.
+run_lint() {
+  local out="$1" new
+  bash -c "$FACTORY_LINT_CMD" > "$out" 2>&1 && return 0
+  [ -f "$FACTORY_LINT_BASELINE" ] || { echo "lint failed and there is no $FACTORY_LINT_BASELINE (health.sh baseline writes it)" >> "$out"; return 1; }
+  [ -n "$(lint_keys "$out")" ] || { echo "lint failed without a recognizable error line (FACTORY_LINT_ERROR_RE)" >> "$out"; return 1; }
+  new="$(lint_new_errors "$out")"
+  if [ -z "$new" ]; then echo "lint: only errors already in $FACTORY_LINT_BASELINE; passing (D62)" >> "$out"; return 0; fi
+  { echo "lint: new errors (not in $FACTORY_LINT_BASELINE):"; printf '  %s\n' "$new"; } | tee -a "$out" >&2
+  return 1
+}
+
 # --- humans: decisions, notifications (D43, D45) --------------------------------
 
 # decision_log <feature> <ticket|-> <kind> <question> <answer> [scope]
@@ -345,6 +406,7 @@ changed_code_files() {                 # <base> <commit>
     [ -n "$f" ] || continue
     is_code_file "$f" && ! is_test_file "$f" && echo "$f"
   done < <(git diff --relative --name-only --diff-filter=ACMR "$1" "$2" -- . ":(exclude)${FACTORY_DIR}")
+  return 0     # the last file being a test must not fail the caller under set -e
 }
 
 # --- ticket state (D33, D34) --------------------------------------------------
