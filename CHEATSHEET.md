@@ -33,7 +33,41 @@ You keep the decisions that define value and risk; the factory does everything t
 
 **Still manual, and planned:** opening the draft MR and reading red CI (needs a GitLab token, roadmap F13); a drift check of spec ↔ code before `/pr` (C10).
 
-## 2. Once per laptop
+## 2. Which lane for which problem
+
+The goal is not more code, faster: it is the day correction and maintenance run in the background and the team spends its time elsewhere (INTENT.md in the factory repo). Each lane removes one kind of human work. Pick the lane by the problem, not by the size of the change. The read-only prompts are installed in `docs/factory/prompts/` (in the factory repo: `docs/prompts/`); proposals are in the factory repo, `docs/proposals/`.
+
+| Problem | Lane | Start with | You get | Status |
+|---|---|---|---|---|
+| New behavior to build | **Feature mission** | `/grill-with-docs`, `/to-spec` (`**Intent:** feature`), `/factory <f>` | contract, tickets, tested and reviewed code, MR | available |
+| Legacy code nobody dares to change | **Maintenance mission** (characterization) | spec with `**Intent:** maintenance`, `/factory <f>` | tests that pin today's behavior, bugs included; glossary and docs. `src/` is frozen (D61) | available; a lane of its own is planned (proposal P3) |
+| A small, contained fix | **Fix lane** | `/factory-fix <slug> start "<what>"` | one reviewed commit, at most 80 lines, no behavior path touched | available |
+| A change made by hand needs a second pair of eyes | **Light review** | `/factory-light <slug> <base>` | a verdict from another model family, checked by the MR gate | available |
+| You don't know where a repo is weak | **Audit and gaps** (read-only) | the `audit-gaps.md` prompt, with any agent | findings with evidence, the characterization test and acceptance criteria for each, questions | prompt available; becomes the discovery phase of proposal P3 |
+| Secrets or personal data could leak | **Security audit** (read-only) | gitleaks or trufflehog first, then the `security-audit.md` prompt | leaks with evidence (never the value), secrets to rotate | prompt available; scanners in the gates planned (proposal P7) |
+| "Done", but does the service start? | **Launch gate** (G6) | `FACTORY_BUILD_CMD`, `FACTORY_LAUNCH_CMD` | build, boot and smoke in a sandbox before `/pr` | planned (proposal P7) |
+| The code erodes slowly | **Continuous improvement** | the strategist, between missions | draft MRs for one improvement at a time, never merged by the factory | planned (proposal P5) |
+| An alert in production | **Incident lane** | a labeled issue (`factory:incident`) | a test that reproduces it, a fix, a draft MR; deploying stays human | planned (proposal P6) |
+| The same change across many repos | **Cross-repo** | one plan, one mission per repo | one MR per repo | planned (proposal P4) |
+
+### The legacy chain
+
+Legacy code is where most of the work is, and where a fix most easily breaks something else. The lanes chain in a fixed order:
+
+```text
+audit and gaps  →  you triage  →  characterization  →  fix missions  →  launch gate
+  (read-only)      (decisions)    (freeze behavior)    (red, then green)  (it runs)
+```
+
+1. **Audit and gaps** finds the problems and proves each one with `file:line`. It changes nothing.
+2. **You triage.** Check three or four findings by hand, answer the questions, set aside what is intentional. Only CONFIRMED findings, or findings you checked, go further. A PROBABLE finding turned into a ticket sends workers after a problem that may not exist.
+3. **Characterization** freezes today's behavior in tests, defects included. Without it, a fix can break another mode and nobody sees it.
+4. **Fix missions** take the confirmed findings as spec (`/to-spec`, then the usual contract and tickets). Each fix starts with a test that fails on today's code and passes after. The characterization test that pinned the defect turns red on purpose: update it in the same MR, and say so.
+5. **Launch gate** proves the fixed service still builds and starts.
+
+The audit report is input for the spec, not a replacement for it: the contract and its approval (G1) still decide what "done" means.
+
+## 3. Once per laptop
 
 ```bash
 pi install npm:pi-subagents@0.76.1       # remove @tintinweb/pi-subagents if present
@@ -44,7 +78,7 @@ Under a small shared quota (about 10 requests per window), set `parallel.concurr
 
 After any model change, probe the gateway once: `doctor.sh` (full) runs `models-probe.mjs --stamp`, then commit `.factory/models-probe.ok`. It needs `FACTORY_GATEWAY_URL` (OpenAI-compatible base, e.g. `https://host/v1`) in `.factory/commands.env` and the key in the variable named by `FACTORY_GATEWAY_KEY_ENV` (default `OPENAI_API_KEY`). The pre-flight refuses to start a mission whose models changed since the last probe.
 
-## 3. Once per machine (your models)
+## 4. Once per machine (your models)
 
 | File | Set |
 |---|---|
@@ -65,7 +99,7 @@ After any model change, probe the gateway once: `doctor.sh` (full) runs `models-
 | Lead repeats itself ("20.20.20…") | Esc, new session, `/factory <feature>`. Use a steady model for the lead (medium thinking is enough) |
 | Verdict names a model you don't use | Harmless since v1.0: `collect.sh` writes the configured model |
 
-## 4. Once per target repo
+## 5. Once per target repo
 
 ```bash
 scripts/factory/install-into.sh "/path/to/repo" [--pack api|batch]...   # quotes matter with spaces or &
@@ -82,7 +116,7 @@ Rate limits: the install adds Pi's retry to `.pi/settings.json` (`"retry": { "en
 6. `/setup-matt-pocock-skills`: choose the local markdown tracker in `.scratch/`.
 7. `scripts/factory/doctor.sh` green, then in Pi: `/subagents-doctor`, `/subagents-models` (9 `factory-*` agents).
 
-## 5. A mission
+## 6. A mission
 
 | # | You | Factory |
 |---|---|---|
@@ -100,7 +134,7 @@ Rate limits: the install adds Pi's retry to `.pi/settings.json` (`"retry": { "en
 
 Keep specs to roughly 12 stories or fewer; split anything bigger into two missions.
 
-## 6. STEP codes
+## 7. STEP codes
 
 | STEP | Who | Means | Do |
 |---|---|---|---|
@@ -126,14 +160,14 @@ Keep specs to roughly 12 stories or fewer; split anything bigger into two missio
 | `steward` | lead | no steward verdict for the current code | code steward → `collect.sh` |
 | `pr` | you | all gates green | `/pr`, MR, `/retro` |
 
-## 7. The quality bar (G5)
+## 8. The quality bar (G5)
 
 The codebase is the fuel that brings value to customers, so every mission must leave it **safe, understandable by any human, battle-tested and predictable**. Two layers:
 
 - **Measured (no model):** `health.sh check` compares duplication, large files, deep nesting, debt markers and skipped tests to `.factory/health-baseline.json`. A mission may improve them, never make them worse. Your repo tool (`FACTORY_HEALTH_CMD`) must pass too. A justified exception: a human runs `scripts/factory/health.sh baseline` and commits it with the reason.
 - **Judged:** the code steward (fresh, on another family than the workers) reads the whole mission diff against `docs/agents/quality-bar.md`. Every `QB-` item gets evidence or a label, and every changed source file gets a three-sentence explanation. A file it can't explain fails the gate: a human wouldn't understand it either.
 
-## 8. Safety: what agents can never do
+## 9. Safety: what agents can never do
 
 | Layer | When | What it stops |
 |---|---|---|
@@ -143,7 +177,7 @@ The codebase is the fuel that brings value to customers, so every mission must l
 
 A blocked agent stops and asks; it never looks for another way. Blocks are logged in `.pi-subagents/guard.log`, and patch-guard blocks count as failed rounds in the metrics. The guard loads only once the project is trusted in Pi; the patch guard holds either way. Working on the factory itself in Pi: start Pi with `FACTORY_GUARD=off` (maintainers only, never in a target repo).
 
-## 9. Small changes: the fix lane
+## 10. Small changes: the fix lane
 
 ```text
 /factory-fix <slug> start "<what>"   [--mission <f>]
@@ -153,7 +187,7 @@ A blocked agent stops and asks; it never looks for another way. Blocks are logge
 
 `check` blocks anything that touches behavior paths or `instrument/`, changes more than 80 lines (`FACTORY_FIX_MAX_LINES`), or fails the patch guard (skips, silenced checks, secrets, deleted tests). Otherwise it runs lint, tests and the extra check, then one fresh reviewer from another family. The verdict lands in `.scratch/light/<slug>/verdicts/code.md`, and the MR gate checks it.
 
-## 10. Commands you may run yourself
+## 11. Commands you may run yourself
 
 | Command | When |
 |---|---|
@@ -167,7 +201,7 @@ A blocked agent stops and asks; it never looks for another way. Blocks are logge
 | `scripts/factory/reset-ticket.sh <f> <ticket> [reason]` | rebuild a ticket from round 1 (verdict, round copies and integration marker removed, one commit) |
 | `scripts/factory/health.sh baseline` | after setting `FACTORY_LINT_CMD`: records today's lint errors, so only new ones fail |
 
-## 11. Gates and lanes
+## 12. Gates and lanes
 
 - **G1** critique present, approved by a human.
 - **G2** every assertion covered, every ticket justified; tests configured.
@@ -176,7 +210,7 @@ A blocked agent stops and asks; it never looks for another way. Blocks are logge
 - **G5** health report PASS (ratchet + repo tool), steward PASS, recorded, generated brief, every bar item proven or accepted, every changed source file explained, and no source change since.
 - **Lanes (MR):** behavior paths touched → a mission must be in the MR. Otherwise a light review is needed. Fix-lane reviews are checked either way. Changing or deleting an instrument case needs `**Amended:**` or `**Withdrawn:**` in the same MR. The `factory:bypass` label skips the gates, visibly.
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 | Symptom | Cause | Fix |
 |---|---|---|
@@ -197,7 +231,7 @@ A blocked agent stops and asks; it never looks for another way. Blocks are logge
 | `not a git repo` from install | unquoted path with spaces or `&` | `cd` into it, pass `"$PWD"` |
 | Lead context above 70% | long mission | it pauses itself; `/factory <f>` in a new session |
 
-## 13. Where things live
+## 14. Where things live
 
 ```
 .scratch/<f>/spec.md                 spec + validation contract (+ approval, accepted-unverified lines)
