@@ -1,6 +1,6 @@
 # How the factory works, and why
 
-This is the readable version of the design: one page per idea, what it does and the reason behind it. The [ADR](adr/ADR-001-agentic-factory.md) holds every decision in order (D1–D63) with its history; this guide groups them by concept and links back. For what to type, see the [cheat sheet](../CHEATSHEET.md).
+This is the readable version of the design: one page per idea, what it does and the reason behind it. The [ADR](adr/ADR-001-agentic-factory.md) holds every decision in order (D1–D64) with its history; this guide groups them by concept and links back. For what to type, see the [cheat sheet](../CHEATSHEET.md).
 
 ---
 
@@ -110,7 +110,8 @@ The factory builds and maintains bots, APIs, front ends and batch jobs, in any l
 
 | File | Holds | Read by |
 |---|---|---|
-| `AGENTS.md` | your company's engineering taste, for everything | every agent |
+| `AGENTS.md` | your company's engineering taste, for everything; the factory only adds a pointer (D64) | every agent |
+| `docs/agents/factory.md` | the rules every factory role shares; owned by the factory, replaced on upgrade (D64) | every factory role, through its brief |
 | `docs/agents/quality-bar.md` | the code health bar | the steward (G5) |
 | `packs/<name>/` → `contract-checklist-<name>.md`, `quality-bar-<name>.md` | practices for a shape of software (`api`, `batch`) | the contract author and critic (G1), the steward (G5) |
 
@@ -135,6 +136,7 @@ The factory builds and maintains bots, APIs, front ends and batch jobs, in any l
 | A contract can freeze paths (D61) | A maintenance mission must not change the code it describes. Prose didn't stop a worker; the patch guard does, before anything is applied. Tests next to the code stay allowed. |
 | Lint fails only on new errors (D62) | Legacy code fails the team lint, and a worker that can't pass it ends up silencing checks. A baseline of today's errors keeps the bar where it is without asking anyone to fix what the mission must not touch. |
 | A ticket is reset by a script (D63) | A ticket's state lives in three places; a reset that misses one rebuilds at the wrong round. |
+| AGENTS.md stays yours (D64) | It is in every agent's context, so each line is paid on every call; the factory's rules live in `docs/agents/factory.md` and the briefs name it. |
 | A monorepo folder is its own project (D56) | Many teams keep each domain in a folder with its own CI. Installing at the root would impose the factory on every team; scoping every diff, patch, gate and CI job to the folder keeps the pilot to your project, and the guards prove nothing leaks to a sibling. |
 | Skills pinned by checksum (D36), models linted (D31) | "Use version X" and "judges on another family" must be checkable, not conventions. |
 

@@ -37,6 +37,10 @@ bash "$root/scripts/factory/install-into.sh" "$repo" --pack api --pack batch >"$
 [ -z "$(git status --porcelain)" ] && grep -q '^chore(factory): install' <<<"$(git log -1 --format=%s)" && t "install is one commit" || fail "install commit"
 [ -f .factory/ci/factory.gitlab-ci.yml ] && [ -f docs/factory/CHEATSHEET.md ] && t "CI template and cheat sheet installed" || fail "CI template"
 [ -f docs/factory/prompts/audit-gaps.md ] && [ -f docs/factory/prompts/security-audit.md ] && t "read-only prompts installed" || fail "prompts"
+[ -f docs/agents/factory.md ] && grep -q 'docs/agents/factory.md' AGENTS.md && ! grep -q 'END OF BRIEF' AGENTS.md \
+  && t "AGENTS.md gets a pointer, the factory rules live in docs/agents/factory.md" || fail "AGENTS.md pointer" "$(cat AGENTS.md)"
+bash scripts/factory/brief.sh worker probe 01 HEAD | grep -q '^Read: docs/agents/factory.md' && ! bash scripts/factory/brief.sh worker probe 01 HEAD | grep -q 'AGENTS.md' \
+  && t "briefs name the factory rules, not AGENTS.md (already in context)" || fail "brief read list"
 [ -f docs/agents/contract-checklist-api.md ] && [ -f docs/agents/quality-bar-batch.md ] && [ ! -f docs/agents/contract-checklist-bots.md ] \
   && t "only the requested practice packs are installed" || fail "packs" "$(ls docs/agents)"
 bad_fm="$(node -e '
@@ -82,7 +86,10 @@ bash "$root/scripts/factory/install-into.sh" "$repo2/sub" >"$work/install3.log" 
 mkdir -p "$repo2/kid"; echo k > "$repo2/kid/k.js"
 bash "$root/scripts/factory/install-into.sh" "$repo2/sub" --no-branch >/dev/null 2>&1
 [ "$(grep -c '^## Monorepo project' "$repo2/sub/AGENTS.md")" = 1 ] && t "monorepo: the 'repo root = project folder' note is written once" || fail "monorepo note twice"
+printf '# Team\n\n## Agentic factory\n\nold factory rules\n' > "$repo2/kid/AGENTS.md"
 bash "$root/scripts/factory/install-into.sh" "$repo2/kid" --no-branch --ci child >"$work/install4.log" 2>&1 || fail "child install" "$(cat "$work/install4.log")"
+grep -q "old factory rules" "$repo2/kid/AGENTS.md" && ! grep -q "docs/agents/factory.md" "$repo2/kid/AGENTS.md" && grep -q "older install" "$work/install4.log" \
+  && t "an old full factory section is left alone, with a note to replace it" || fail "old AGENTS section" "$(cat "$repo2/kid/AGENTS.md")"
 ci="$repo2/kid/.factory/ci/factory.gitlab-ci.yml"
 [ "$(grep -c 'parent_pipeline" && \$FACTORY_MR_TARGET$' "$ci")" = 4 ] && ! grep -q 'merge_request_event' "$ci" && grep -q 'strategy: depend' "$ci" \
   && grep -q 'FACTORY_MR_LABELS' "$root/scripts/factory/gate.sh" \

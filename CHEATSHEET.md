@@ -243,6 +243,7 @@ A blocked agent stops and asks; it never looks for another way. Blocks are logge
 .scratch/<f>/state/                  integration markers, open question, tickets pending, PAUSED.md
 .scratch/<f>/workflows/              every workflow that ran (audit)
 .scratch/light/<slug>/               fix lane: request, blast radius, verdict
+docs/agents/factory.md               rules every factory role shares (factory-owned; AGENTS.md only points to it)
 docs/agents/quality-bar.md           the bar G5 judges against (repo-owned)
 docs/agents/*-<pack>.md              practice pack checklists and bar items (repo-owned)
 .factory/health-baseline.json        the ratchet (repo-owned)
