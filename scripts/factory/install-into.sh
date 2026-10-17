@@ -111,6 +111,8 @@ put .pi/extensions/factory-guard.ts template
 mkdir -p "$dst/docs/factory"
 cp "$src/docs/adr/ADR-001-agentic-factory.md" "$dst/docs/factory/ADR-001-agentic-factory.md"
 cp "$src/CHEATSHEET.md" "$dst/docs/factory/CHEATSHEET.md"
+mkdir -p "$dst/docs/factory/prompts"
+cp "$src"/docs/prompts/*.md "$dst/docs/factory/prompts/"
 
 # Repo-owned: created once, then yours.
 put .factory/commands.env repo
