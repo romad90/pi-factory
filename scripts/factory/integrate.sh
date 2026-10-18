@@ -14,6 +14,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 . "$here/lib.sh"
 
 feature="${1:?usage: integrate.sh <feature> <ticket> <patch-file>}"
+require_mission "$feature"
 ticket="${2:?usage: integrate.sh <feature> <ticket> <patch-file>}"
 patch="${3:?usage: integrate.sh <feature> <ticket> <patch-file>}"
 # D60: the wave returned no path; look for the patch here instead of
