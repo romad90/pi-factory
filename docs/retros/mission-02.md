@@ -45,6 +45,8 @@ Most of the human time lost in this mission came from here. None of it was visib
 | 37 | A decision left uncommitted blocked the next wave | `worktree isolation requires a clean git working tree` after `human.sh decide` | `human.sh decide` commits its own entry | P2 | roadmap |
 | 38 | A second coding agent worked in the mission's checkout | Told to work in a copy, it switched branches in the real folder and changed `src/`; the build stopped on a dirty tree | One task, one worktree; the agent's workspace is that worktree; pre-flight checks the branch is the mission's | P1 | roadmap, cheat sheet |
 | 39 | Factory rules in AGENTS.md cost every call, and one contradicted maintenance | ~420 words appended to AGENTS.md, read by every role and named again in every brief; "expected values come from the Then line" made the first harness assert values the code never produced | Rules in `docs/agents/factory.md`, a pointer in AGENTS.md, intent-aware expected values | P1 | D64 |
+| 40 | `/factory` started a pre-flight on a misspelled mission name | `bridge-chactaterize`; the lead ran doctor on a mission that doesn't exist | Refuse an unknown mission, suggest the closest | P3 | P8 |
+| 41 | A worker's question waited all night | Asked at 01:31 (missing dependencies again), answered at 08:55; the answer was a rule already decided | Dependencies in the worktree; settled questions answered by a resolver | P1 | P8 |
 
 ## State and git
 

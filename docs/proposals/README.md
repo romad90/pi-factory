@@ -13,6 +13,7 @@ Status: **draft** (open for discussion) · **accepted** (in the roadmap) · **re
 | P5 | [Continuous improvement: observe, decide, improve, prove](P5-continuous-improvement.md) | draft | P3, P4 |
 | P6 | [Control room: a hosted factory, a dashboard, events from operations](P6-control-room.md) | draft | P2, P4, P5 |
 | P7 | [Launch gate: done when the service runs, in a sandbox, secure by design](P7-launch-gate.md) | draft | — |
+| P8 | [Hands-off mission: the human decides, the factory does the rest](P8-hands-off-mission.md) | draft | P2 for the last step |
 
 ## Why these four, in this order
 
@@ -28,5 +29,7 @@ P1 and P2 are prerequisites, not features: they make the factory dependable. P3 
 P5 came after: it answers how the codebase gets better over time once the factory can change it safely (P3) and run on its own (P4). P6 puts the whole factory where a team can watch it, and plugs in operations: alerts from an SRE agent and labeled issues become missions.
 
 P7 changes what "done" means: a mission ends when the service builds and boots with its real configuration, in a sandbox, not when the tests pass.
+
+P8 comes from counting what the human did in mission 2: most of it was plumbing, rules the worker didn't have and hand repairs, not decisions. Its target is at most five human interventions per mission, and it comes first.
 
 Smaller ideas seen in other tools, not yet proposals, are collected in [ideas to borrow](ideas.md).
