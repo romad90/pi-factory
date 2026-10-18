@@ -169,7 +169,7 @@ last_fixed="$(grep -n 'last self-check line' "$work/brief.txt" | cut -d: -f1)"
 [ -n "$first_var" ] && [ "$first_var" -gt "$last_fixed" ] && t "the worker brief puts the ticket and commit last (shared cache prefix)" \
   || fail "brief order" "$(cat "$work/brief.txt")"
 r="$(bash scripts/factory/resolve.sh maint 01-doc 'Can I export the helper from src/tools/a.js so the test can call it?' || true)"
-[ "${r%%$'\t'*}" = frozen ] && grep -q 'src/ is frozen' <<<"$r" && t "resolver: changing a frozen path is refused by the contract's rule (D70)" || fail "resolver frozen" "$r"
+[ "${r%%$'\t'*}" = frozen ] && grep -q "changes src/ is refused" <<<"$r" && t "resolver: changing a frozen path is refused by the contract's rule (D70)" || fail "resolver frozen" "$r"
 r="$(bash scripts/factory/resolve.sh maint 01-doc 'The contract says 3 retries but the code does 5. Which one?' || true)"
 [ -z "$r" ] && t "resolver: a contract question always goes to the human" || fail "resolver contract" "$r"
 git checkout -q "$cmds0" -- .factory/commands.env; git commit -qm "test: reset commands"
@@ -363,11 +363,13 @@ grep -q '^AUTO-ANSWERED (dependencies)' "$work/ask.log" && [ ! -f $m/state/open-
   && grep -q $'02-count\tauto\tShould I install vitest.*\tfactory (dependencies)\tunreviewed$' $m/decisions.tsv \
   && t "resolver: a dependency question is answered by the rule, logged as auto" || fail "resolver deps" "$(cat "$work/ask.log"; tail -2 $m/decisions.tsv)"
 expect_step build "an auto-answer lets the ticket rebuild"
+ask 'Should I simplify by skipping failing tests? Options: 1) refine mocks 2) skip faulty tests using it.skip/describe.skip'
+grep -q '^AUTO-ANSWERED (silence)' "$work/ask.log" && t "resolver: skipping failing tests is refused, however it is worded" || fail "resolver skip" "$(cat "$work/ask.log")"
 ask 'Can I add an eslint-disable comment for this line?'
 grep -q '^AUTO-ANSWERED (silence)' "$work/ask.log" && t "resolver: silencing a check is refused by the rule" || fail "resolver silence" "$(cat "$work/ask.log")"
 ask 'Should I install vitest as a dev dependency? A) yes B) no'
 grep -q '^ASKED' "$work/ask.log" && t "resolver: the same question after an auto-answer goes to the human" || fail "resolver repeat" "$(cat "$work/ask.log")"
-grep -q '^Question 4 on 02-count' $m/state/open-question.md && t "the fourth question on a ticket suggests shrinking or resetting it" || fail "question count" "$(cat $m/state/open-question.md)"
+grep -q '^Question 5 on 02-count' $m/state/open-question.md && t "a later question on a ticket suggests shrinking or resetting it" || fail "question count" "$(cat $m/state/open-question.md)"
 bash scripts/factory/human.sh decide demo --stdin >/dev/null <<<'B, vitest is already there'
 grep -q $'02-count\tdecide\tShould I install vitest as a dev dependency? A) yes B) no\tB, vitest' $m/decisions.tsv \
   && t "decide reads only the question, not the hint" || fail "decide question" "$(tail -1 $m/decisions.tsv)"
