@@ -393,14 +393,14 @@ run_lint() {
 
 # --- humans: decisions, notifications (D43, D45) --------------------------------
 
-# decision_log <feature> <ticket|-> <kind> <question> <answer> [scope]
+# decision_log <feature> <ticket|-> <kind> <question> <answer> [scope] [who]
 # One row per human decision in .scratch/<feature>/decisions.tsv. Status
 # starts "unreviewed": only a human promotes a row into the spec or an ADR.
 decision_log() {
   local f t who
   f="$(mission_dir "$1")/decisions.tsv"; mkdir -p "$(dirname "$f")"
   [ -f "$f" ] || printf 'date\tticket\tkind\tquestion\tanswer\tscope\twho\tstatus\n' > "$f"
-  who="$(git config user.name 2>/dev/null || echo human)"
+  who="${7:-$(git config user.name 2>/dev/null || echo human)}"
   t() { printf '%s' "$1" | tr '\t\n' '  '; }
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\tunreviewed\n' "$(date +%F)" "$(t "$2")" "$(t "$3")" \
     "$(t "$4")" "$(t "$5")" "$(t "${6:-ticket}")" "$(t "$who")" >> "$f"

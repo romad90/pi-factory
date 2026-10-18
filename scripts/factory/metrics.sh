@@ -57,8 +57,11 @@ if [ -f "$dir/verdicts/health.md" ]; then
 fi
 guard=0
 for h in "$dir"/verdicts/*-code.r*.md; do [ "$(verdict_field "$h" Brief)" = patch-guard ] && guard=$((guard + 1)); done
-decisions=0
-[ -f "$dir/decisions.tsv" ] && decisions=$(( $(wc -l < "$dir/decisions.tsv") - 1 ))
+decisions=0; auto=0
+if [ -f "$dir/decisions.tsv" ]; then      # P8: human interventions vs questions the resolver settled (D70)
+  auto="$(awk -F'\t' 'NR > 1 && $3 == "auto"' "$dir/decisions.tsv" | wc -l | tr -d ' ')"
+  decisions=$(( $(wc -l < "$dir/decisions.tsv") - 1 - auto ))
+fi
 models_list=""
 [ ${#models[@]} -gt 0 ] && models_list="$(printf '%s\n' "${models[@]}" | sort -u | paste -sd, - | sed 's/,/, /g')"
 
@@ -88,7 +91,8 @@ cat <<EOF
 | Code health: ratchet and repo tool (G5) | $health |
 | Code steward, quality bar items (G5) | $steward |
 | Patches blocked by the patch guard | $guard |
-| Human decisions logged | $decisions |
+| Human decisions logged (target: 5 or fewer, P8) | $decisions |
+| Questions answered by the resolver (auto, unreviewed until a human reads them) | $auto |
 | Cycle time (first → last mission commit) | $cycle |
 | Tokens reported in verdicts | $( [ "$tokens" -gt 0 ] && echo "$tokens" || echo "not reported" ) |
 | Models used (configured, from collect.sh) | ${models_list:--} |

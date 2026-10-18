@@ -168,6 +168,10 @@ first_var="$(grep -nE '01-doc|[0-9a-f]{40}' "$work/brief.txt" | head -1 | cut -d
 last_fixed="$(grep -n 'last self-check line' "$work/brief.txt" | cut -d: -f1)"
 [ -n "$first_var" ] && [ "$first_var" -gt "$last_fixed" ] && t "the worker brief puts the ticket and commit last (shared cache prefix)" \
   || fail "brief order" "$(cat "$work/brief.txt")"
+r="$(bash scripts/factory/resolve.sh maint 01-doc 'Can I export the helper from src/tools/a.js so the test can call it?' || true)"
+[ "${r%%$'\t'*}" = frozen ] && grep -q 'src/ is frozen' <<<"$r" && t "resolver: changing a frozen path is refused by the contract's rule (D70)" || fail "resolver frozen" "$r"
+r="$(bash scripts/factory/resolve.sh maint 01-doc 'The contract says 3 retries but the code does 5. Which one?' || true)"
+[ -z "$r" ] && t "resolver: a contract question always goes to the human" || fail "resolver contract" "$r"
 git checkout -q "$cmds0" -- .factory/commands.env; git commit -qm "test: reset commands"
 
 echo "Mission: planning"
@@ -342,6 +346,7 @@ bash scripts/factory/human.sh ask demo 02-count --stdin >/dev/null <<'Q'
 Delete old counts in production? A) yes B) no
 Q
 expect_step decide "open question stops the mission"
+grep -q 'irreversib\|production' <<<"$(cat $m/state/open-question.md)" && t "a production question is never auto-answered" || fail "resolver let a production question through"
 # D68: the text goes through a quoted heredoc: backticks, $ and quotes stay text.
 bash scripts/factory/human.sh decide demo --stdin >/dev/null <<'A'
 B, keep data: `rm` is irreversible, "$HOME" stays text
@@ -350,6 +355,26 @@ grep -q $'02-count\tdecide\tDelete old counts' $m/decisions.tsv && t "/factory-d
 grep -qF 'B, keep data: `rm` is irreversible, "$HOME" stays text' $m/decisions.tsv && t "/factory-decide keeps backticks, quotes and \$ as text (--stdin)" || fail "decide quoting" "$(cat $m/decisions.tsv)"
 [ -z "$(git status --porcelain -- $m)" ] && t "a decision is committed with the mission state" || fail "decision not committed" "$(git status --short)"
 expect_step build "answered, ticket 02 builds"
+
+# D70: settled questions are answered without the human.
+ask() { bash scripts/factory/human.sh ask demo 02-count --stdin > "$work/ask.log" <<<"$1"; }
+ask 'Should I install vitest as a dev dependency? A) yes B) no'
+grep -q '^AUTO-ANSWERED (dependencies)' "$work/ask.log" && [ ! -f $m/state/open-question.md ] \
+  && grep -q $'02-count\tauto\tShould I install vitest.*\tfactory (dependencies)\tunreviewed$' $m/decisions.tsv \
+  && t "resolver: a dependency question is answered by the rule, logged as auto" || fail "resolver deps" "$(cat "$work/ask.log"; tail -2 $m/decisions.tsv)"
+expect_step build "an auto-answer lets the ticket rebuild"
+ask 'Can I add an eslint-disable comment for this line?'
+grep -q '^AUTO-ANSWERED (silence)' "$work/ask.log" && t "resolver: silencing a check is refused by the rule" || fail "resolver silence" "$(cat "$work/ask.log")"
+ask 'Should I install vitest as a dev dependency? A) yes B) no'
+grep -q '^ASKED' "$work/ask.log" && t "resolver: the same question after an auto-answer goes to the human" || fail "resolver repeat" "$(cat "$work/ask.log")"
+grep -q '^Question 4 on 02-count' $m/state/open-question.md && t "the fourth question on a ticket suggests shrinking or resetting it" || fail "question count" "$(cat $m/state/open-question.md)"
+bash scripts/factory/human.sh decide demo --stdin >/dev/null <<<'B, vitest is already there'
+grep -q $'02-count\tdecide\tShould I install vitest as a dev dependency? A) yes B) no\tB, vitest' $m/decisions.tsv \
+  && t "decide reads only the question, not the hint" || fail "decide question" "$(tail -1 $m/decisions.tsv)"
+printf 'Keep the old count format? A) yes B) no\n' > "$work/q"
+bash scripts/factory/human.sh ask demo 01-hello --stdin < "$work/q" >/dev/null; bash scripts/factory/human.sh decide demo --stdin >/dev/null <<<'A'
+bash scripts/factory/human.sh ask demo 02-count --stdin < "$work/q" > "$work/ask.log"
+grep -q '^AUTO-ANSWERED (earlier): A (the human' "$work/ask.log" && t "resolver: a question the human already answered gets that answer" || fail "resolver earlier" "$(cat "$work/ask.log")"
 bash scripts/factory/workflow.sh build-wave demo >"$work/wf.log"
 wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
 grep -q '"agent": "factory-worker-heavy"' "$wf" && t "a Size: L ticket goes straight to the heavy worker" || fail "size routing" "$(cat "$wf")"
