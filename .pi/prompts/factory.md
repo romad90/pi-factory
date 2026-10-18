@@ -25,7 +25,8 @@ Loop:
 3. Repeat from 1 until a stop.
 
 Rules:
-- Pass workflows only by their `WORKFLOW_FILE` path. Never paste or retype a script, and never write a task, summary or opinion for a subagent.
+- Pass workflows only by their `WORKFLOW_FILE` path, with exactly `{ workflow, context: "fresh", async: false }`. Never name an agent, never paste or retype a script, never write a task, summary or opinion for a subagent. The guard blocks any other subagent call (D71).
+- After a failed subagent call, never read, delete or regenerate files to investigate: stop and show the error.
 - Always `context: "fresh"`. Never fork your conversation into a subagent.
 - The scripts commit mission state themselves. Never commit, amend or revert anything by hand.
 - If a script exits non-zero (except integrate.sh, whose failure is recorded), stop and show its output.
