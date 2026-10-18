@@ -299,6 +299,12 @@ c1="$(cat $m/state/01-hello.integrated)"
 grep -q '^feat(demo): 01-hello' <<<"$(git log -1 --skip=1 --format=%s)" && t "integration commit is a Conventional Commit" || fail "integration message: $(git log -3 --format=%s)"
 expect_step review "integrated ticket waits for review"
 
+# D69: a verdict without a Result line goes back to review once, it is not a round.
+printf '# Verdict: 01-hello\n**Commit:** %s\n\nLooks fine to me.\n' "$c1" > $m/verdicts/01-hello-code.md
+bash scripts/factory/collect.sh demo > "$work/collect.log"
+grep -q 'sent back to review' "$work/collect.log" && [ ! -f $m/verdicts/01-hello-code.md ] && [ ! -f $m/verdicts/01-hello-code.r3.md ] \
+  && t "a verdict without a Result line is sent back to review, not counted as a round" || fail "invalid verdict" "$(cat "$work/collect.log"; ls $m/verdicts)"
+expect_step review "the slipped verdict's ticket is reviewed again"
 bid="$(brief reviewer demo 01-hello "$c1")"
 cat > $m/verdicts/01-hello-code.md <<V
 # Verdict: 01-hello — round 1
@@ -316,12 +322,33 @@ grep -q '^# Verdict: 01-hello — round 3$' $m/verdicts/01-hello-code.md && t "c
 grep -q '^\*\*Model:\*\* gw/judge-1 (configured for factory-reviewer)' $m/verdicts/01-hello-code.md && t "model is the configured one, not 'gpt-4o'" || fail "model rewrite"
 bash scripts/factory/collect.sh demo >/dev/null
 [ ! -f $m/verdicts/01-hello-code.r4.md ] && t "collect.sh is idempotent" || fail "collect idempotent"
+[ ! -f $m/state/01-hello.sent-back ] && [ ! -f $m/state/01-hello.invalid-verdict.md ] && t "a valid verdict clears the send-back" || fail "send-back cleared" "$(ls $m/state)"
+
+# D67: a misspelled mission or a switched branch stops before any step.
+out="$(bash scripts/factory/next.sh dmeo 2>&1 || true)"
+[ "$(head -1 <<<"$out")" = "STEP: blocked" ] && grep -q "Did you mean 'demo'" <<<"$out" && [ ! -d .scratch/dmeo ] \
+  && t "a misspelled mission is refused with the closest name" || fail "mission typo" "$out"
+bash scripts/factory/doctor.sh --quick dmeo > "$work/pf.log" 2>&1 && fail "pre-flight must refuse a misspelled mission" "$(cat "$work/pf.log")"
+grep -q "Did you mean 'demo'" "$work/pf.log" && t "pre-flight refuses a misspelled mission" || fail "pre-flight typo" "$(cat "$work/pf.log")"
+orig="$(git branch --show-current)"
+git switch -q -c elsewhere "$(git log -1 --format=%H -- "$m")^"
+out="$(bash scripts/factory/next.sh demo 2>&1 || true)"
+[ "$(head -1 <<<"$out")" = "STEP: blocked" ] && grep -q "is on branch '$orig'" <<<"$out" \
+  && t "a checkout switched to another branch is refused, with the mission's branch" || fail "wrong branch" "$out"
+git switch -q "$orig"; git branch -q -D elsewhere
 
 # Ticket 02 asks a decision.
-bash scripts/factory/human.sh ask demo 02-count "Delete old counts in production? A) yes B) no" >/dev/null
+bash scripts/factory/human.sh ask demo 02-count --stdin >/dev/null <<'Q'
+Delete old counts in production? A) yes B) no
+Q
 expect_step decide "open question stops the mission"
-bash scripts/factory/human.sh decide demo B "keep data, irreversible" >/dev/null
+# D68: the text goes through a quoted heredoc: backticks, $ and quotes stay text.
+bash scripts/factory/human.sh decide demo --stdin >/dev/null <<'A'
+B, keep data: `rm` is irreversible, "$HOME" stays text
+A
 grep -q $'02-count\tdecide\tDelete old counts' $m/decisions.tsv && t "/factory-decide logs question and answer" || fail "decide log" "$(cat $m/decisions.tsv)"
+grep -qF 'B, keep data: `rm` is irreversible, "$HOME" stays text' $m/decisions.tsv && t "/factory-decide keeps backticks, quotes and \$ as text (--stdin)" || fail "decide quoting" "$(cat $m/decisions.tsv)"
+[ -z "$(git status --porcelain -- $m)" ] && t "a decision is committed with the mission state" || fail "decision not committed" "$(git status --short)"
 expect_step build "answered, ticket 02 builds"
 bash scripts/factory/workflow.sh build-wave demo >"$work/wf.log"
 wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"

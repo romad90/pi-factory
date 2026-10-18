@@ -7,7 +7,11 @@
 #   human.sh approve           <feature> [note]        G1: the contract
 #   human.sh approve           <feature> tickets       the tickets the ticket writer proposed
 #   human.sh ask               <feature> <ticket|-> <question>      (lead, when relaying)
+#   human.sh ask               <feature> <ticket|-> --stdin < question
 #   human.sh decide            <feature> <answer> [why...]
+#   human.sh decide            <feature> --stdin < answer-and-why
+# --stdin reads the text verbatim (D68): the lead passes it in a quoted
+# heredoc, so backticks, $ and quotes in a question or answer stay text.
 #   human.sh amend             <feature> <change...>
 #   human.sh accept-unverified <feature> <VAL-…,VAL-…|ALL> <why...>
 set -euo pipefail
@@ -21,6 +25,12 @@ shift 2
 dir="$(mission_dir "$feature")"; spec="$dir/spec.md"
 [ -f "$spec" ] || die "no spec at $spec"
 q="$dir/state/open-question.md"
+
+# The text argument(s), or stdin with --stdin; newlines become spaces.
+text_arg() {                           # <args...>
+  if [ "${1:-}" = --stdin ]; then tr '\n' ' ' | sed 's/  */ /g; s/^ //; s/ $//'
+  else printf '%s' "$*"; fi
+}
 
 # Insert or replace a "**Label:** value" line right under the contract heading.
 set_contract_line() {                  # <label> <value>
@@ -55,15 +65,18 @@ case "$cmd" in
 
   ask)
     ticket="${1:?usage: human.sh ask <feature> <ticket|-> <question>}"; shift
-    [ $# -gt 0 ] || die "usage: human.sh ask <feature> <ticket|-> <question>"
+    question="$(text_arg "$@")"
+    [ -n "$question" ] || die "usage: human.sh ask <feature> <ticket|-> <question> (or --stdin)"
     mkdir -p "$dir/state"
-    printf '**Ticket:** %s\n**Asked:** %s\n\n%s\n' "$ticket" "$(date '+%F %H:%M')" "$*" > "$q"
-    notify "Factory: $feature needs a decision" "$*"
-    echo "Question recorded in $q. Answer with: /factory-decide $feature <answer> <why>"
+    printf '**Ticket:** %s\n**Asked:** %s\n\n%s\n' "$ticket" "$(date '+%F %H:%M')" "$question" > "$q"
+    notify "Factory: $feature needs a decision" "$question"
+    echo "Question recorded in $q. Answer with: /factory-decide $feature <your answer, and why>"
     ;;
 
   decide)
-    answer="${1:?usage: human.sh decide <feature> <answer> [why...]}"; shift
+    if [ "${1:-}" = --stdin ]; then answer="$(text_arg --stdin)"; set --
+    else answer="${1:-}"; shift || true; fi
+    [ -n "$answer" ] || die "usage: human.sh decide <feature> <answer> [why...] (or --stdin)"
     ticket="-"; question="(no recorded question)"
     if [ -f "$q" ]; then
       ticket="$(verdict_field "$q" Ticket)"

@@ -40,7 +40,19 @@ dir="$(mission_dir "$feature")"
 echo "Verdicts: $feature"
 shopt -s nullglob
 for v in "$dir"/verdicts/*-code.md; do
+  # D69: a new verdict without a PASS/FAIL Result line is the reviewer's
+  # format slip, not a finding. Sent back to review once instead of counting
+  # as a failed round; a second slip on the same ticket counts.
+  ticket="$(basename "$v" -code.md)"; sent="$dir/state/$ticket.sent-back"
+  n="$(verdict_history_count "$v")"
+  if [ -n "$(ticket_marker "$feature" "$ticket")" ] && ! [[ "$(verdict_field "$v" Result)" =~ ^(PASS|FAIL)$ ]] \
+     && { [ "$n" -eq 0 ] || ! cmp -s "$v" "${v%.md}.r$n.md"; } && [ ! -f "$sent" ]; then
+    mkdir -p "$dir/state"; mv "$v" "$dir/state/$ticket.invalid-verdict.md"; echo "$n" > "$sent"
+    printf '  %-40s sent back to review: no **Result:** PASS or FAIL line (kept in state/%s.invalid-verdict.md)\n' "$(basename "$v")" "$ticket"
+    continue
+  fi
   record_verdict "$v" factory-reviewer; summary "$v"
+  [[ "$(verdict_field "$v" Result)" =~ ^(PASS|FAIL)$ ]] && rm -f "$sent" "$dir/state/$ticket.invalid-verdict.md"
 done
 if [ -f "$dir/verdicts/behavior.md" ]; then
   record_verdict "$dir/verdicts/behavior.md" factory-validator; summary "$dir/verdicts/behavior.md"
