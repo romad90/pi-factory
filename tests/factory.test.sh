@@ -363,6 +363,8 @@ grep -q '^AUTO-ANSWERED (dependencies)' "$work/ask.log" && [ ! -f $m/state/open-
   && grep -q $'02-count\tauto\tShould I install vitest.*\tfactory (dependencies)\tunreviewed$' $m/decisions.tsv \
   && t "resolver: a dependency question is answered by the rule, logged as auto" || fail "resolver deps" "$(cat "$work/ask.log"; tail -2 $m/decisions.tsv)"
 expect_step build "an auto-answer lets the ticket rebuild"
+ask 'Should I simplify by skipping failing tests? Options: 1) refine mocks 2) skip faulty tests using it.skip/describe.skip'
+grep -q '^AUTO-ANSWERED (silence)' "$work/ask.log" && t "resolver: skipping failing tests is refused, however it is worded" || fail "resolver skip" "$(cat "$work/ask.log")"
 ask 'Can I add an eslint-disable comment for this line?'
 grep -q '^AUTO-ANSWERED (silence)' "$work/ask.log" && t "resolver: silencing a check is refused by the rule" || fail "resolver silence" "$(cat "$work/ask.log")"
 ask 'Should I install vitest as a dev dependency? A) yes B) no'

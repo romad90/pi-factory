@@ -41,7 +41,7 @@ if [ -f "$dir/decisions.tsv" ]; then
 fi
 
 # 2. Silencing a check.
-if has 'eslint-disable|ts-ignore|ts-nocheck|ts-expect-error|noqa|nolint|type: ignore|\.skip\(|\.only\(|skip (the|this|these|a) tests?|disable (the |this |a )?(lint|rule|check|test)|--no-verify'; then
+if has 'eslint-disable|ts-ignore|ts-nocheck|ts-expect-error|noqa|nolint|type: ignore|\.(skip|only)([^a-z]|$)|skip(ping)? (the |this |these |a )?(failing |faulty |broken )?tests?|disable (the |this |a )?(lint|rule|check|test)|--no-verify'; then
   answer silence "No. Checks are never silenced: the patch guard refuses it. Fix the code; your brief lists how to fix common lint errors."
 fi
 
