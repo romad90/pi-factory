@@ -20,7 +20,7 @@ if [ "${1:-}" = "resume" ]; then
 fi
 
 feature="${1:?usage: pause.sh <feature> [reason] | pause.sh resume <feature>}"; shift
-dir="$(mission_dir "$feature")"; [ -d "$dir" ] || die "no mission at $dir"
+require_mission "$feature"; dir="$(mission_dir "$feature")"
 mkdir -p "$dir/state"; p="$dir/state/PAUSED.md"
 {
   printf '# Paused: %s\n**When:** %s\n**HEAD:** %s\n**Reason:** %s\n\n' \

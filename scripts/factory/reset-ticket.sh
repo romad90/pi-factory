@@ -11,6 +11,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 . "$here/lib.sh"
 
 feature="${1:?usage: reset-ticket.sh <mission> <ticket> [reason]}"
+require_mission "$feature"
 ticket="${2:?usage: reset-ticket.sh <mission> <ticket> [reason]}"
 ticket="${ticket%.md}"
 dir="$(mission_dir "$feature")"

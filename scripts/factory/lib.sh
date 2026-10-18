@@ -346,6 +346,15 @@ mission_guard() {
   return 0
 }
 
+# require_mission <feature>: dies unless the mission exists here; a
+# misspelled name gets the closest existing one (D67).
+require_mission() {
+  local why
+  [ -f "$(mission_dir "$1")/spec.md" ] && return 0
+  why="$(mission_guard "$1")" || die "$why"
+  die "no mission '$1' in $FACTORY_DIR/ (no $(mission_dir "$1")/spec.md)"
+}
+
 # --- what the worktree hook adds (D65) ------------------------------------------
 # Dependency links and .env.factory exist only in a worker's worktree. They
 # never belong in a patch, and a link escapes a "node_modules/" ignore rule

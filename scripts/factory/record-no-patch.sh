@@ -16,6 +16,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 . "$here/lib.sh"
 
 feature="${1:?usage: record-no-patch.sh <feature> <ticket> [note | --provider <error>]}"
+require_mission "$feature"
 ticket="${2:?usage: record-no-patch.sh <feature> <ticket> [note | --provider <error>]}"
 dir="$(mission_dir "$feature")"
 [ -f "$dir/issues/$ticket.md" ] || die "unknown ticket $ticket in $dir/issues"
