@@ -40,6 +40,8 @@ Most of the human time lost in this mission came from here. None of it was visib
 | 32 | Workers don't know which lint the factory runs | The team lint fails on legacy `src/`; workers asked twice, then silenced checks (`eslint-disable`, `@ts-ignore`) three rounds in a row | Lint compares against the health baseline (only new errors fail); the worker brief carries `FACTORY_LINT_CMD` and how to fix common lint errors in tests | P1 | D62 (#33) |
 | 33 | A worker changed frozen code and it was integrated | A docs ticket moved a `return` out of a `finally` in `src/`; review caught it after integration, a revert was needed | Frozen paths in the contract (`src/` for maintenance); the patch guard refuses them before integration | P1 | D61 (#33) |
 | 34 | The lead announces an action and ends its turn | `mistral-medium`, thinking off: "I'll start by running the doctor", then stop | Scripted lead (P2); meanwhile one nudge | P2 | known |
+| 40 | `/factory` started a pre-flight on a misspelled mission name | `bridge-chactaterize`; the lead ran doctor on a mission that doesn't exist | Refuse an unknown mission, suggest the closest | P3 | P8 |
+| 41 | A worker's question waited all night | Asked at 01:31 (missing dependencies again), answered at 08:55; the answer was a rule already decided | Dependencies in the worktree; settled questions answered by a resolver | P1 | P8 |
 
 ## State and git
 
