@@ -369,7 +369,7 @@ ask 'Can I add an eslint-disable comment for this line?'
 grep -q '^AUTO-ANSWERED (silence)' "$work/ask.log" && t "resolver: silencing a check is refused by the rule" || fail "resolver silence" "$(cat "$work/ask.log")"
 ask 'Should I install vitest as a dev dependency? A) yes B) no'
 grep -q '^ASKED' "$work/ask.log" && t "resolver: the same question after an auto-answer goes to the human" || fail "resolver repeat" "$(cat "$work/ask.log")"
-grep -q '^Question 4 on 02-count' $m/state/open-question.md && t "the fourth question on a ticket suggests shrinking or resetting it" || fail "question count" "$(cat $m/state/open-question.md)"
+grep -q '^Question 5 on 02-count' $m/state/open-question.md && t "a later question on a ticket suggests shrinking or resetting it" || fail "question count" "$(cat $m/state/open-question.md)"
 bash scripts/factory/human.sh decide demo --stdin >/dev/null <<<'B, vitest is already there'
 grep -q $'02-count\tdecide\tShould I install vitest as a dev dependency? A) yes B) no\tB, vitest' $m/decisions.tsv \
   && t "decide reads only the question, not the hint" || fail "decide question" "$(tail -1 $m/decisions.tsv)"
