@@ -169,7 +169,7 @@ last_fixed="$(grep -n 'last self-check line' "$work/brief.txt" | cut -d: -f1)"
 [ -n "$first_var" ] && [ "$first_var" -gt "$last_fixed" ] && t "the worker brief puts the ticket and commit last (shared cache prefix)" \
   || fail "brief order" "$(cat "$work/brief.txt")"
 r="$(bash scripts/factory/resolve.sh maint 01-doc 'Can I export the helper from src/tools/a.js so the test can call it?' || true)"
-[ "${r%%$'\t'*}" = frozen ] && grep -q 'src/ is frozen' <<<"$r" && t "resolver: changing a frozen path is refused by the contract's rule (D70)" || fail "resolver frozen" "$r"
+[ "${r%%$'\t'*}" = frozen ] && grep -q "changes src/ is refused" <<<"$r" && t "resolver: changing a frozen path is refused by the contract's rule (D70)" || fail "resolver frozen" "$r"
 r="$(bash scripts/factory/resolve.sh maint 01-doc 'The contract says 3 retries but the code does 5. Which one?' || true)"
 [ -z "$r" ] && t "resolver: a contract question always goes to the human" || fail "resolver contract" "$r"
 git checkout -q "$cmds0" -- .factory/commands.env; git commit -qm "test: reset commands"

@@ -51,6 +51,7 @@ Most of the human time lost in this mission came from here. None of it was visib
 | 43 | The lead deleted mission files to "fix" the error | `rm -f .scratch/…/workflows/20261018-1830*.js`, then read `workflow.sh` | `rm` under `.scratch/` is blocked; the prompt says stop after a failed call | P1 | ✅ D71 |
 | 44 | The lead's model has 5 requests per minute | 429s in bursts on `mistral-medium`; scripts finish in 0.2 s, so the lead outruns its quota | More requests per minute for the lead, or the scripted lead (P2) | P2 | gateway |
 | 45 | Worker worktrees are never removed | About 45 `pi-worktree-*` folders and `pi-subagents/*` branches after one mission | Remove a ticket's worktrees once its patch is integrated | P3 | roadmap |
+| 46 | An auto-answer said "No" to a question with three options | Options 1 and 2 changed `src/`, option 3 (`vi.doMock` in the test) did not; "No. src/ is frozen" read as refusing all three | The frozen rule refuses only the options that change a frozen path and leaves test-only options open | P2 | ✅ D70 |
 
 ## State and git
 

@@ -61,7 +61,7 @@ if [ -n "$frozen" ] && has '(^|[^a-z])(modify|modifying|change|changing|edit|edi
   while IFS= read -r p; do
     [ -n "$p" ] || continue
     if grep -qF -- "${p%\*}" <<<"$question"; then
-      answer frozen "No. $p is frozen by the contract of $feature: the patch guard refuses any change there except test files. Test through the code's public behavior (mock one level lower if needed). If the ticket can't be done that way, stop without a patch and say why."
+      answer frozen "Any option that changes $p is refused: $p is frozen by the contract of $feature, and the patch guard refuses any change there except test files. Options that only change tests stay open: pick the one that tests the code's public behavior (mock one level lower if needed). If none can, stop without a patch and say why."
     fi
   done <<<"$frozen"
 fi
