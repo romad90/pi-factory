@@ -13,7 +13,7 @@ Status: **draft** (open for discussion) · **accepted** (in the roadmap) · **re
 | P5 | [Continuous improvement: observe, decide, improve, prove](P5-continuous-improvement.md) | draft | P3, P4 |
 | P6 | [Control room: a hosted factory, a dashboard, events from operations](P6-control-room.md) | draft | P2, P4, P5 |
 | P7 | [Launch gate: done when the service runs, in a sandbox, secure by design](P7-launch-gate.md) | draft | — |
-| P8 | [Hands-off mission: the human decides, the factory does the rest](P8-hands-off-mission.md) | draft | P2 for the last step |
+| P8 | [Hands-off mission: the human decides, the factory does the rest](P8-hands-off-mission.md) | steps 1–3 done | P2 for the last step |
 
 ## Why these four, in this order
 

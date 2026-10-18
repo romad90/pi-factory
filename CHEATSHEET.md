@@ -126,7 +126,7 @@ Rate limits: the install adds Pi's retry to `.pi/settings.json` (`"retry": { "en
 | 4 | | ticket writer proposes tickets |
 | 5 | Read `issues/` (edit, split, delete freely), then `/factory-approve <f> tickets` | coverage check |
 | 6 | | build waves, integration, reviews, validation |
-| 7 | Answer when notified: `/factory-decide <f> <answer> "<why>"` | logged in `decisions.tsv`, read by every role |
+| 7 | Answer when notified: `/factory-decide <f> <your answer, and why>` (any text: quotes and backticks are safe) | logged in `decisions.tsv`, read by every role. Questions a rule or an earlier answer settles never reach you: logged as `auto` |
 | 8 | At `STEP: unverified`: prove it, or `/factory-accept-unverified <f> <ids\|ALL> "<why>"` | listed as Known limits |
 | 9 | Approve fix tickets when behavior or health finds something | fixes built, re-validated |
 | 10 | | health ratchet, then code steward (G5) |
@@ -150,7 +150,7 @@ Keep specs to roughly 12 stories or fewer; split anything bigger into two missio
 | `build` | lead | tickets ready | build wave → integrate each patch |
 | `review` | lead | integrated tickets | review wave → `collect.sh` |
 | `escalate` | you | 3 failed rounds | usually: split the ticket, amend the contract, or rethink the design |
-| `blocked` | you | `## Blocked by` can't resolve | check for cycles |
+| `blocked` | you | `## Blocked by` can't resolve, a misspelled mission, or the checkout is on another branch | check for cycles; use the name it suggests; `git switch` to the branch it names |
 | `validate` | lead | all tickets pass, or fixes built since a failing verdict | validator → `collect.sh` |
 | `behavior-fix` | lead | behavior FAIL with findings | ticket writer drafts one fix ticket per finding |
 | `behavior-stale` | lead | behavior paths changed after validation | re-validates |
@@ -199,6 +199,8 @@ A blocked agent stops and asks; it never looks for another way. Blocks are logge
 | `scripts/factory/readiness.sh` | what the repo still lacks for Step 2 |
 | `scripts/factory/skills-pin.sh verify\|check-global` | skills drifted or shadowed? |
 | `scripts/factory/reset-ticket.sh <f> <ticket> [reason]` | rebuild a ticket from round 1 (verdict, round copies and integration marker removed, one commit) |
+| `scripts/factory/self-check.sh <f>` | from a worker's worktree: the checks integration will run (workers run it themselves) |
+| `scripts/factory/resolve.sh <f> <ticket> "<question>"` | would this question be auto-answered, and by which rule? |
 | `scripts/factory/health.sh baseline` | after setting `FACTORY_LINT_CMD`: records today's lint errors, so only new ones fail |
 
 ## 12. Gates and lanes
@@ -230,6 +232,11 @@ A blocked agent stops and asks; it never looks for another way. Blocks are logge
 | 429 rate limit | shared quota | concurrency 1, `FACTORY_MAX_PARALLEL=1` |
 | `not a git repo` from install | unquoted path with spaces or `&` | `cd` into it, pass `"$PWD"` |
 | Lead context above 70% | long mission | it pauses itself; `/factory <f>` in a new session |
+| `STEP: blocked` … "Did you mean" | misspelled mission name | `/factory <the suggested name>` |
+| `STEP: blocked` … "is on branch" | the checkout was switched (by you or another agent) | stash foreign changes, `git switch <that branch>`. Other agents work in their own worktree, never in the mission's checkout |
+| A worker asks to install a dependency | dependencies not installed in the checkout | install them in the checkout once (`npm ci`); workers get a link (D65). Or set `FACTORY_DEPS_CMD` |
+| An `auto` answer in `decisions.tsv` is wrong | a rule matched a question it shouldn't have | change the row's answer, or `/factory-decide` when the worker asks again (a repeat always reaches you) |
+| "sent back to review" in `collect.sh` | the reviewer's verdict had no `**Result:**` line | nothing: reviewed again once, not counted as a round |
 
 ## 14. Where things live
 
