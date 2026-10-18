@@ -34,7 +34,8 @@ ci=.gitlab-ci.yml
 
 section "Context"
 check "AGENTS.md exists" "write the general AGENTS.md" test -f AGENTS.md
-check "AGENTS.md has the factory section" "paste AGENTS.factory.md into it" has_line '^## Agentic factory' AGENTS.md
+check "AGENTS.md points to the factory rules" "add the pointer from AGENTS.factory.md" has_line 'docs/agents/factory.md' AGENTS.md
+check "factory rules installed" "run install-into.sh" test -f docs/agents/factory.md
 check "GLOSSARY.md exists" "run /grill-with-docs or /domain-modeling" test -f GLOSSARY.md
 check "no leftover CONTEXT.md" "rename CONTEXT.md to GLOSSARY.md (v1.3)" test ! -f CONTEXT.md
 

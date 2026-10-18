@@ -104,7 +104,7 @@ if (mode === "child") {
 }
 fs.writeFileSync(to, y);
 NODE
-for f in contract-format.md verdict-format.md bot-harness.md ticket-format.md; do
+for f in factory.md contract-format.md verdict-format.md bot-harness.md ticket-format.md; do
   put "docs/agents/$f" template
 done
 put .pi/extensions/factory-guard.ts template
@@ -159,13 +159,17 @@ for line in "instrument/results/" ".env.factory" ".pi-subagents/"; do
   grep -qxF "$line" "$dst/.gitignore" || { printf '%s\n' "$line" >> "$dst/.gitignore"; note ".gitignore += $line"; }
 done
 
-# AGENTS.md: append the factory section once.
+# AGENTS.md stays yours and general: the factory adds a two-line pointer to
+# docs/agents/factory.md, never its rules (D64). AGENTS.md is in every agent's
+# context, so every line here is paid on every call.
 touch "$dst/AGENTS.md"
-if grep -q '^## Agentic factory' "$dst/AGENTS.md"; then
-  note "AGENTS.md already has the factory section (left as is)"
+if grep -q 'docs/agents/factory.md' "$dst/AGENTS.md"; then
+  :
+elif grep -q '^## Agentic factory' "$dst/AGENTS.md"; then
+  note "AGENTS.md still holds the full factory section from an older install: replace it with the pointer in AGENTS.factory.md (the rules now live in docs/agents/factory.md; every agent call saves the section)"
 else
   { echo; sed '/^<!--/,/-->$/d' "$src/AGENTS.factory.md"; } >> "$dst/AGENTS.md"
-  note "AGENTS.md += factory section"
+  note "AGENTS.md += pointer to docs/agents/factory.md"
 fi
 # Monorepo (D56): skills and docs say "repo root"; here that is this folder.
 if [ -n "$prefix" ] && ! grep -q '^## Monorepo project' "$dst/AGENTS.md"; then
