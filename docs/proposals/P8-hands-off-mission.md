@@ -1,6 +1,6 @@
 # P8. Hands-off mission: the human decides, the factory does the rest
 
-**Status:** draft · **Effort:** M · **Depends on:** nothing to start; P2 for the last step
+**Status:** steps 1–3 done (D65–D70), step 4 partly (metrics count human and auto decisions apart) · **Effort:** M · **Depends on:** nothing to start; P2 for the last step
 
 ## Problem
 
@@ -73,11 +73,11 @@ The last source of drift: the LLM lead announces an action and stops, misspells 
 
 ## Plan
 
-1. Dependencies in the worktree hook; `locate-patch.sh` excludes them. **S**
-2. Self-check in the worker brief and a `self-check.sh` it runs (commands + patch guard on its diff). **S**
-3. Self-repairing mechanics (step 3 table), one test each. **S**
-4. Resolver in `human.sh ask`; `auto` decisions; batched questions. **M**
-5. Intervention count in `metrics.sh`; morning summary; notifications. **S**
+1. ✅ Dependencies in the worktree hook; `locate-patch.sh` excludes them. **S** (D65)
+2. ✅ Self-check in the worker brief and a `self-check.sh` it runs (commands + patch guard on its diff). **S** (D66)
+3. ✅ Self-repairing mechanics (step 3 table), one test each. **S** (D67–D69)
+4. ✅ Resolver in `human.sh ask`; `auto` decisions. Batched questions: not yet. **M** (D70)
+5. Intervention count in `metrics.sh` (human and auto apart: ✅); morning summary; notifications. **S**
 6. Scripted lead: P2. **M**
 
 ## Open questions

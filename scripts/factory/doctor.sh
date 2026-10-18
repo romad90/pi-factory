@@ -3,7 +3,9 @@
 # CI covers the repo itself (skills pin, models, gates); this covers the laptop.
 #
 # Usage: scripts/factory/doctor.sh            full check (after install, model changes)
-#        scripts/factory/doctor.sh --quick    pre-flight before every /factory run (D46)
+#        scripts/factory/doctor.sh --quick [mission]
+#                                             pre-flight before every /factory run (D46);
+#                                             with a mission, also its name and branch (D67)
 set -uo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 want_pkg="pi-subagents@0.76.1"
@@ -22,6 +24,9 @@ if [ "${1:-}" = "--quick" ]; then
   git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ -d .factory ] \
     && ok "at the project root${prefix:+ (monorepo: $prefix)}" || bad "run from the project root (the folder with .factory/)"
   command -v node >/dev/null && ok "node" || bad "node not on PATH"
+  if [ -n "${2:-}" ]; then
+    if why="$(mission_guard "$2")"; then ok "mission $2 on branch $(git branch --show-current)"; else bad "$why"; fi
+  fi
   load_commands
   [ -n "$FACTORY_TEST_CMD" ] && ok "tests configured" || bad "FACTORY_TEST_CMD empty in .factory/commands.env"
   dirty="$(git status --porcelain --untracked-files=no -- . ":(exclude)${FACTORY_DIR}" 2>/dev/null)"

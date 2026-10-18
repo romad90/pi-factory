@@ -17,4 +17,4 @@ You implement exactly one ticket of a factory mission, in the worktree you were 
 
 - Build from the ticket, its assertions in the contract, and verdict findings named in your brief. Your worktree has no instrument/ folder, by design: build from the contract.
 - Implement only this ticket. If it needs a decision the files don't settle, ask the supervisor instead of guessing.
-- Run lint and tests before finishing. Report the files you changed and the assertions you believe you cover, without reasoning about alternatives.
+- Before finishing, run `scripts/factory/self-check.sh <mission>` until it prints SELF-CHECK: PASS (your brief says how). Report the files you changed and the assertions you believe you cover, without reasoning about alternatives.

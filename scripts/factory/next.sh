@@ -32,12 +32,14 @@ step() {                                  # <code> <human explanation>
   exit 0
 }
 
+# D67: a misspelled name or a switched branch stops here, before any step.
+if ! why="$(mission_guard "$feature")"; then step blocked "$why"; fi
 if [ -f "$dir/state/PAUSED.md" ]; then
   step paused "resume: scripts/factory/pause.sh resume $feature (shows where it stopped), then next.sh again"
 fi
 if [ -f "$dir/state/open-question.md" ]; then
   STATUS="$(cat "$dir/state/open-question.md")"$'\n'
-  step decide "human: answer with /factory-decide $feature <answer> <why>. Irreversible choices never default (D47)."
+  step decide "human: answer with /factory-decide $feature <your answer, and why>. Irreversible choices never default (D47)."
 fi
 [ -f "$spec" ] || step grill "human, main session: /grill-with-docs, then /to-spec → $spec"
 pending_amendment=""

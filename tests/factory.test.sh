@@ -159,8 +159,19 @@ if bash scripts/factory/integrate.sh maint 01-doc "$work/fz.patch" >"$work/int.l
   && grep -q 'frozen: src/tools/a.js' .scratch/maint/verdicts/01-doc-code.md && [ "$(cat src/tools/a.js)" = 'export const a = 1;' ] \
   && t "integrate refuses a frozen change before applying it (a failed round with the reason)" || fail "integrate frozen" "$(cat "$work/int.log")"
 bash scripts/factory/brief.sh worker maint 01-doc > "$work/brief.txt"
-grep -qF 'tests under them are allowed): `src/`.' "$work/brief.txt" && grep -qF 'lint: `true`' "$work/brief.txt" \
-  && t "the worker brief carries the frozen paths and the lint command" || fail "brief" "$(cat "$work/brief.txt")"
+grep -qF 'tests under them are allowed): `src/`.' "$work/brief.txt" && grep -qF 'lint (`true`' "$work/brief.txt" \
+  && grep -qF 'scripts/factory/self-check.sh maint' "$work/brief.txt" \
+  && t "the worker brief carries the frozen paths, the lint command and the self-check" || fail "brief" "$(cat "$work/brief.txt")"
+# Cache: what changes per ticket (ticket, commit) comes after the fixed instructions,
+# so every worker of a mission shares the same prompt prefix.
+first_var="$(grep -nE '01-doc|[0-9a-f]{40}' "$work/brief.txt" | head -1 | cut -d: -f1)"
+last_fixed="$(grep -n 'last self-check line' "$work/brief.txt" | cut -d: -f1)"
+[ -n "$first_var" ] && [ "$first_var" -gt "$last_fixed" ] && t "the worker brief puts the ticket and commit last (shared cache prefix)" \
+  || fail "brief order" "$(cat "$work/brief.txt")"
+r="$(bash scripts/factory/resolve.sh maint 01-doc 'Can I export the helper from src/tools/a.js so the test can call it?' || true)"
+[ "${r%%$'\t'*}" = frozen ] && grep -q 'src/ is frozen' <<<"$r" && t "resolver: changing a frozen path is refused by the contract's rule (D70)" || fail "resolver frozen" "$r"
+r="$(bash scripts/factory/resolve.sh maint 01-doc 'The contract says 3 retries but the code does 5. Which one?' || true)"
+[ -z "$r" ] && t "resolver: a contract question always goes to the human" || fail "resolver contract" "$r"
 git checkout -q "$cmds0" -- .factory/commands.env; git commit -qm "test: reset commands"
 
 echo "Mission: planning"
@@ -261,13 +272,43 @@ sleep 1
 wt="$work/wt-01"; git worktree add -q -b pi-subagents/01-hello-abc123-s0-t0 "$wt" HEAD
 wt_project="$wt/$(git rev-parse --show-prefix)"
 echo 'export const hello = () => "hello";' > "$wt_project/src/tools/hello.js"
+# D65: the hook gives the worker the installed dependencies, and they never reach the patch.
+mkdir -p node_modules/fake-dep; echo 'module.exports = 1;' > node_modules/fake-dep/index.js
+printf '{"repoRoot":"%s","worktreePath":"%s","index":0}' "$(git rev-parse --show-toplevel)" "$wt" \
+  | FACTORY_PROJECT_PREFIX="$(git rev-parse --show-prefix)" node scripts/factory/worktree-hook.mjs > "$work/hook.json" \
+  || fail "worktree hook runs" "$(cat "$work/hook.json")"
+[ -L "$wt_project/node_modules" ] && [ -f "$wt_project/node_modules/fake-dep/index.js" ] \
+  && grep -q 'node_modules' "$work/hook.json" && t "the worktree hook links the installed dependencies (D65)" \
+  || fail "dependency link" "$(ls -la "$wt_project"; cat "$work/hook.json")"
+# D66: the worker runs integration's checks itself before handing over.
+sc() { (cd "$wt_project" && bash scripts/factory/self-check.sh demo) > "$work/sc.log" 2>&1; }
+sc && grep -q '^SELF-CHECK: PASS' "$work/sc.log" && t "self-check passes in the worktree, dependency link left out of the guarded change" \
+  || fail "self-check pass" "$(cat "$work/sc.log")"
+git -C "$wt" diff --cached --quiet && t "self-check leaves the worker's index alone" || fail "self-check staged files" "$(git -C "$wt" status --short)"
+cp "$wt_project/src/tools/hello.js" "$work/hello.bak"; echo '// eslint-disable-next-line no-console' >> "$wt_project/src/tools/hello.js"
+if sc; then fail "self-check must refuse a silenced check" "$(cat "$work/sc.log")"; fi
+grep -q '^SELF-CHECK: FAIL guard' "$work/sc.log" && grep -q 'silence' "$work/sc.log" && t "self-check runs the patch guard: a silenced check fails before handover" \
+  || fail "self-check guard" "$(cat "$work/sc.log")"
+cp "$work/hello.bak" "$wt_project/src/tools/hello.js"; mv "$wt_project/src/tools/a.js" "$work/a.js.bak"
+if sc; then fail "self-check must fail on red tests" "$(cat "$work/sc.log")"; fi
+grep -q '^SELF-CHECK: FAIL tests' "$work/sc.log" && t "self-check fails on red tests, with the end of their output" || fail "self-check tests" "$(cat "$work/sc.log")"
+mv "$work/a.js.bak" "$wt_project/src/tools/a.js"
 bash scripts/factory/integrate.sh demo 01-hello null >"$work/int.log" 2>&1 || fail "integrate 01 from the worktree" "$(cat "$work/int.log")"
 t "null patch is rebuilt from the worker's worktree"
+! git show --stat HEAD~1 | grep -q 'node_modules\|\.env\.factory' && t "the rebuilt patch leaves out the dependency link and .env.factory" \
+  || fail "dependency link in the patch" "$(git show --stat HEAD~1)"
+rm -rf node_modules
 git worktree remove --force "$wt"; git branch -q -D pi-subagents/01-hello-abc123-s0-t0
 c1="$(cat $m/state/01-hello.integrated)"
 grep -q '^feat(demo): 01-hello' <<<"$(git log -1 --skip=1 --format=%s)" && t "integration commit is a Conventional Commit" || fail "integration message: $(git log -3 --format=%s)"
 expect_step review "integrated ticket waits for review"
 
+# D69: a verdict without a Result line goes back to review once, it is not a round.
+printf '# Verdict: 01-hello\n**Commit:** %s\n\nLooks fine to me.\n' "$c1" > $m/verdicts/01-hello-code.md
+bash scripts/factory/collect.sh demo > "$work/collect.log"
+grep -q 'sent back to review' "$work/collect.log" && [ ! -f $m/verdicts/01-hello-code.md ] && [ ! -f $m/verdicts/01-hello-code.r3.md ] \
+  && t "a verdict without a Result line is sent back to review, not counted as a round" || fail "invalid verdict" "$(cat "$work/collect.log"; ls $m/verdicts)"
+expect_step review "the slipped verdict's ticket is reviewed again"
 bid="$(brief reviewer demo 01-hello "$c1")"
 cat > $m/verdicts/01-hello-code.md <<V
 # Verdict: 01-hello — round 1
@@ -285,13 +326,55 @@ grep -q '^# Verdict: 01-hello — round 3$' $m/verdicts/01-hello-code.md && t "c
 grep -q '^\*\*Model:\*\* gw/judge-1 (configured for factory-reviewer)' $m/verdicts/01-hello-code.md && t "model is the configured one, not 'gpt-4o'" || fail "model rewrite"
 bash scripts/factory/collect.sh demo >/dev/null
 [ ! -f $m/verdicts/01-hello-code.r4.md ] && t "collect.sh is idempotent" || fail "collect idempotent"
+[ ! -f $m/state/01-hello.sent-back ] && [ ! -f $m/state/01-hello.invalid-verdict.md ] && t "a valid verdict clears the send-back" || fail "send-back cleared" "$(ls $m/state)"
+
+# D67: a misspelled mission or a switched branch stops before any step.
+out="$(bash scripts/factory/next.sh dmeo 2>&1 || true)"
+[ "$(head -1 <<<"$out")" = "STEP: blocked" ] && grep -q "Did you mean 'demo'" <<<"$out" && [ ! -d .scratch/dmeo ] \
+  && t "a misspelled mission is refused with the closest name" || fail "mission typo" "$out"
+bash scripts/factory/doctor.sh --quick dmeo > "$work/pf.log" 2>&1 && fail "pre-flight must refuse a misspelled mission" "$(cat "$work/pf.log")"
+grep -q "Did you mean 'demo'" "$work/pf.log" && t "pre-flight refuses a misspelled mission" || fail "pre-flight typo" "$(cat "$work/pf.log")"
+orig="$(git branch --show-current)"
+git switch -q -c elsewhere "$(git log -1 --format=%H -- "$m")^"
+out="$(bash scripts/factory/next.sh demo 2>&1 || true)"
+[ "$(head -1 <<<"$out")" = "STEP: blocked" ] && grep -q "is on branch '$orig'" <<<"$out" \
+  && t "a checkout switched to another branch is refused, with the mission's branch" || fail "wrong branch" "$out"
+git switch -q "$orig"; git branch -q -D elsewhere
 
 # Ticket 02 asks a decision.
-bash scripts/factory/human.sh ask demo 02-count "Delete old counts in production? A) yes B) no" >/dev/null
+bash scripts/factory/human.sh ask demo 02-count --stdin >/dev/null <<'Q'
+Delete old counts in production? A) yes B) no
+Q
 expect_step decide "open question stops the mission"
-bash scripts/factory/human.sh decide demo B "keep data, irreversible" >/dev/null
+grep -q 'irreversib\|production' <<<"$(cat $m/state/open-question.md)" && t "a production question is never auto-answered" || fail "resolver let a production question through"
+# D68: the text goes through a quoted heredoc: backticks, $ and quotes stay text.
+bash scripts/factory/human.sh decide demo --stdin >/dev/null <<'A'
+B, keep data: `rm` is irreversible, "$HOME" stays text
+A
 grep -q $'02-count\tdecide\tDelete old counts' $m/decisions.tsv && t "/factory-decide logs question and answer" || fail "decide log" "$(cat $m/decisions.tsv)"
+grep -qF 'B, keep data: `rm` is irreversible, "$HOME" stays text' $m/decisions.tsv && t "/factory-decide keeps backticks, quotes and \$ as text (--stdin)" || fail "decide quoting" "$(cat $m/decisions.tsv)"
+[ -z "$(git status --porcelain -- $m)" ] && t "a decision is committed with the mission state" || fail "decision not committed" "$(git status --short)"
 expect_step build "answered, ticket 02 builds"
+
+# D70: settled questions are answered without the human.
+ask() { bash scripts/factory/human.sh ask demo 02-count --stdin > "$work/ask.log" <<<"$1"; }
+ask 'Should I install vitest as a dev dependency? A) yes B) no'
+grep -q '^AUTO-ANSWERED (dependencies)' "$work/ask.log" && [ ! -f $m/state/open-question.md ] \
+  && grep -q $'02-count\tauto\tShould I install vitest.*\tfactory (dependencies)\tunreviewed$' $m/decisions.tsv \
+  && t "resolver: a dependency question is answered by the rule, logged as auto" || fail "resolver deps" "$(cat "$work/ask.log"; tail -2 $m/decisions.tsv)"
+expect_step build "an auto-answer lets the ticket rebuild"
+ask 'Can I add an eslint-disable comment for this line?'
+grep -q '^AUTO-ANSWERED (silence)' "$work/ask.log" && t "resolver: silencing a check is refused by the rule" || fail "resolver silence" "$(cat "$work/ask.log")"
+ask 'Should I install vitest as a dev dependency? A) yes B) no'
+grep -q '^ASKED' "$work/ask.log" && t "resolver: the same question after an auto-answer goes to the human" || fail "resolver repeat" "$(cat "$work/ask.log")"
+grep -q '^Question 4 on 02-count' $m/state/open-question.md && t "the fourth question on a ticket suggests shrinking or resetting it" || fail "question count" "$(cat $m/state/open-question.md)"
+bash scripts/factory/human.sh decide demo --stdin >/dev/null <<<'B, vitest is already there'
+grep -q $'02-count\tdecide\tShould I install vitest as a dev dependency? A) yes B) no\tB, vitest' $m/decisions.tsv \
+  && t "decide reads only the question, not the hint" || fail "decide question" "$(tail -1 $m/decisions.tsv)"
+printf 'Keep the old count format? A) yes B) no\n' > "$work/q"
+bash scripts/factory/human.sh ask demo 01-hello --stdin < "$work/q" >/dev/null; bash scripts/factory/human.sh decide demo --stdin >/dev/null <<<'A'
+bash scripts/factory/human.sh ask demo 02-count --stdin < "$work/q" > "$work/ask.log"
+grep -q '^AUTO-ANSWERED (earlier): A (the human' "$work/ask.log" && t "resolver: a question the human already answered gets that answer" || fail "resolver earlier" "$(cat "$work/ask.log")"
 bash scripts/factory/workflow.sh build-wave demo >"$work/wf.log"
 wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
 grep -q '"agent": "factory-worker-heavy"' "$wf" && t "a Size: L ticket goes straight to the heavy worker" || fail "size routing" "$(cat "$wf")"

@@ -1,6 +1,6 @@
 # How the factory works, and why
 
-This is the readable version of the design: one page per idea, what it does and the reason behind it. The [ADR](adr/ADR-001-agentic-factory.md) holds every decision in order (D1–D64) with its history; this guide groups them by concept and links back. For what to type, see the [cheat sheet](../CHEATSHEET.md).
+This is the readable version of the design: one page per idea, what it does and the reason behind it. The [ADR](adr/ADR-001-agentic-factory.md) holds every decision in order (D1–D70) with its history; this guide groups them by concept and links back. For what to type, see the [cheat sheet](../CHEATSHEET.md).
 
 ---
 
@@ -137,6 +137,12 @@ The factory builds and maintains bots, APIs, front ends and batch jobs, in any l
 | Lint fails only on new errors (D62) | Legacy code fails the team lint, and a worker that can't pass it ends up silencing checks. A baseline of today's errors keeps the bar where it is without asking anyone to fix what the mission must not touch. |
 | A ticket is reset by a script (D63) | A ticket's state lives in three places; a reset that misses one rebuilds at the wrong round. |
 | AGENTS.md stays yours (D64) | It is in every agent's context, so each line is paid on every call; the factory's rules live in `docs/agents/factory.md` and the briefs name it. |
+| Dependencies in every worktree (D65) | A worker that can't run the tests can't check its work, and asks a question at 1 a.m. that a link answers. |
+| Workers self-check (D66) | A failed integration costs a whole round; the same failure seen by the worker costs a few turns. The ticket and commit go last in the brief so workers share a cached prompt prefix. |
+| Right mission, right branch (D67) | A typo or another agent's branch switch should stop the run before it spends anything. |
+| Human text never goes through the shell (D68) | Backticks in an answer ran as commands. A quoted heredoc keeps any text as text. |
+| A format slip is not a round (D69) | Escalation measures the code, not the reviewer's formatting. |
+| Settled questions answered by a script (D70) | The human's time goes to real decisions. Only exact rules and earlier answers, never production, data, secrets or the contract; every auto-answer is logged and counted. |
 | A monorepo folder is its own project (D56) | Many teams keep each domain in a folder with its own CI. Installing at the root would impose the factory on every team; scoping every diff, patch, gate and CI job to the folder keeps the pilot to your project, and the guards prove nothing leaks to a sibling. |
 | Skills pinned by checksum (D36), models linted (D31) | "Use version X" and "judges on another family" must be checkable, not conventions. |
 

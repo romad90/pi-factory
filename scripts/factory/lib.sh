@@ -313,6 +313,52 @@ load_commands() {
   FACTORY_HEALTH_CMD="${FACTORY_HEALTH_CMD:-}"
 }
 
+# --- the right mission, on the right branch (D67) --------------------------------
+# mission_guard <feature>: prints why the factory must not run this mission
+# here and returns 1; silent and 0 when it may. Catches a misspelled name (it
+# would start a new mission) and a checkout switched to another branch (by a
+# person or another agent) while the mission's state lives elsewhere.
+mission_guard() {
+  local feature="$1" dir latest branch near
+  dir="$(mission_dir "$feature")"
+  if [ ! -d "$dir" ]; then
+    near="$(ls -d "$FACTORY_DIR"/*/ 2>/dev/null | sed "s|^$FACTORY_DIR/||; s|/$||" | grep -vx light \
+      | node -e '
+        const want = process.argv[1], names = require("fs").readFileSync(0, "utf8").split("\n").filter(Boolean);
+        const d = (a, b) => { const m = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+          for (let j = 1; j <= b.length; j++) m[0][j] = j;
+          for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
+            m[i][j] = Math.min(m[i-1][j] + 1, m[i][j-1] + 1, m[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+          return m[a.length][b.length]; };
+        const best = names.map((n) => [d(want.toLowerCase(), n.toLowerCase()), n]).sort((x, y) => x[0] - y[0])[0];
+        if (best && best[0] <= Math.max(3, Math.floor(want.length / 4))) console.log(best[1]);' "$feature" 2>/dev/null || true)"
+    if [ -n "$near" ]; then
+      echo "no mission '$feature' in $FACTORY_DIR/. Did you mean '$near'? (a new mission with this name: mkdir -p $dir, then run again)"
+      return 1
+    fi
+  fi
+  latest="$(git log --exclude='pi-subagents/*' --branches -1 --format=%H -- "$dir" 2>/dev/null || true)"
+  if [ -n "$latest" ] && ! git merge-base --is-ancestor "$latest" HEAD 2>/dev/null; then
+    branch="$(git branch --contains "$latest" --format='%(refname:short)' 2>/dev/null | grep -v '^pi-subagents/' | head -1)"
+    echo "the latest state of mission '$feature' ($(git rev-parse --short "$latest")) is on branch '${branch:-?}', not on '$(git branch --show-current)'. Switch back (git switch ${branch:-<branch>}); if another agent switched it, stash its changes first"
+    return 1
+  fi
+  return 0
+}
+
+# --- what the worktree hook adds (D65) ------------------------------------------
+# Dependency links and .env.factory exist only in a worker's worktree. They
+# never belong in a patch, and a link escapes a "node_modules/" ignore rule
+# (that pattern matches directories, a link is a file). Pathspecs to exclude
+# them; call after load_commands.
+hook_excludes() {
+  local n
+  printf '%s\n' ':(exclude,glob)**/.env.factory'
+  for n in ${FACTORY_DEPS_LINKS:-node_modules .venv}; do
+    printf '%s\n' ":(exclude,glob)**/$n" ":(exclude,glob)**/$n/**"
+  done
+}
+
 # --- lint against the baseline (D62) -------------------------------------------
 # Legacy code often fails the team lint. The baseline, written by
 # `health.sh baseline`, keeps the errors the code had then (one key per error,
@@ -347,14 +393,14 @@ run_lint() {
 
 # --- humans: decisions, notifications (D43, D45) --------------------------------
 
-# decision_log <feature> <ticket|-> <kind> <question> <answer> [scope]
+# decision_log <feature> <ticket|-> <kind> <question> <answer> [scope] [who]
 # One row per human decision in .scratch/<feature>/decisions.tsv. Status
 # starts "unreviewed": only a human promotes a row into the spec or an ADR.
 decision_log() {
   local f t who
   f="$(mission_dir "$1")/decisions.tsv"; mkdir -p "$(dirname "$f")"
   [ -f "$f" ] || printf 'date\tticket\tkind\tquestion\tanswer\tscope\twho\tstatus\n' > "$f"
-  who="$(git config user.name 2>/dev/null || echo human)"
+  who="${7:-$(git config user.name 2>/dev/null || echo human)}"
   t() { printf '%s' "$1" | tr '\t\n' '  '; }
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\tunreviewed\n' "$(date +%F)" "$(t "$2")" "$(t "$3")" \
     "$(t "$4")" "$(t "$5")" "$(t "${6:-ticket}")" "$(t "$who")" >> "$f"

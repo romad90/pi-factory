@@ -427,6 +427,18 @@ Steps: **1 Assisted** (one agent, you hold the context), **2 Parallel** (~10 age
 
 **Toward Step 3 (later, from the laptop):** the pieces are now in the same package: nested delegation, durable missions and schedules, the supervisor channel, Herdr integration. Triggered work (ticket → mission) waits until Step 2 is declared.
 
+
+**D65. Every worker worktree has the installed dependencies.** A fresh worktree has no `node_modules`: in mission 2 workers asked to install, installed by hand, or wrote tests they couldn't run (retro 35, 41). The worktree hook now links the checkout's dependency folders (`FACTORY_DEPS_LINKS`, default `node_modules .venv`; the project's and the repo root's in a monorepo), or runs `FACTORY_DEPS_CMD` when a team prefers an isolated install. Links are declared synthetic, and `locate-patch.sh` leaves them out: a link escapes a `node_modules/` ignore rule, and the patch guard refuses links. Sharing one install is safe because no patch may change `package.json` or a lock file.
+
+**D66. A worker checks its own work before handing it over.** Integration ran the checks; workers found out a round later, and a round replays a whole worker run. `self-check.sh <mission>` runs what integration runs, from the worktree: the patch guard on the change (through a temporary index, so the worker's own index is untouched and the hidden instrument is not a deletion), lint against the baseline, tests and the extra check. The brief asks for `SELF-CHECK: PASS` before handover. The brief also puts the ticket and the commit last: every worker of a mission then sends the same prompt prefix, which a provider's prompt cache can reuse.
+
+**D67. The right mission, on the right branch.** `/factory <typo>` started a pre-flight on a mission that didn't exist, and another agent switched the checkout's branch mid-mission (retro 38, 40). `next.sh` and `doctor.sh --quick <mission>` now refuse a missing mission whose name is close to an existing one, with the closest name, and refuse a checkout whose `HEAD` doesn't contain the mission's latest state on any local branch, naming that branch. No state is stored: the check reads git.
+
+**D68. Human text never goes through the shell.** The lead built `human.sh decide <m> "<answer>" "<why>"`; backticks inside double quotes ran as commands, and the split between answer and why was guessed. `human.sh ask` and `decide` take `--stdin`, and the prompts pass the text in a quoted heredoc. The answer and the why are one field: the split had never been used.
+
+**D69. A format slip is not a failed round.** A verdict without a `**Result:** PASS|FAIL` line was counted as a failed round and fixed by hand. `collect.sh` now moves it to `state/<ticket>.invalid-verdict.md` and the ticket goes back to review, once; a second slip on the same ticket counts.
+
+**D70. Settled questions are answered without the human.** Most of mission 2's questions had an answer already: a factory rule, or the human's answer to the same question earlier. `resolve.sh` answers those, by exact rules only: dependencies, silencing a check, changing the checks, changing a frozen path, and a question asked before word for word. Anything about production, data, secrets or the contract always goes to the human. Auto-answers are logged as `auto` in `decisions.tsv` (unreviewed) and counted apart in `metrics.sh`; the same question after an auto-answer goes to the human, and from the third question on a ticket the question suggests shrinking or resetting it.
 ---
 
 ## 11. Path to Step 2
