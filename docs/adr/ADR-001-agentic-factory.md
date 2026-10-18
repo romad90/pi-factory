@@ -439,6 +439,8 @@ Steps: **1 Assisted** (one agent, you hold the context), **2 Parallel** (~10 age
 **D69. A format slip is not a failed round.** A verdict without a `**Result:** PASS|FAIL` line was counted as a failed round and fixed by hand. `collect.sh` now moves it to `state/<ticket>.invalid-verdict.md` and the ticket goes back to review, once; a second slip on the same ticket counts.
 
 **D70. Settled questions are answered without the human.** Most of mission 2's questions had an answer already: a factory rule, or the human's answer to the same question earlier. `resolve.sh` answers those, by exact rules only: dependencies, silencing a check, changing the checks, changing a frozen path, and a question asked before word for word. Anything about production, data, secrets or the contract always goes to the human. Auto-answers are logged as `auto` in `decisions.tsv` (unreviewed) and counted apart in `metrics.sh`; the same question after an auto-answer goes to the human, and from the third question on a ticket the question suggests shrinking or resetting it.
+
+**D71. The lead can only start agents from a workflow file.** On resuming mission 2, the lead called an agent directly instead of passing the `WORKFLOW_FILE` (pi-subagents failed with "Cannot read properties of undefined (reading 'slice')"), retried three times, deleted the generated workflow files and started reading the factory's scripts. The command guard now refuses any `subagent` call that is not `{ workflow: "<.scratch/…/*.js>", context, async }` (status and list actions stay allowed), and any `rm` under `.scratch/`: workflow files and verdicts are the mission's record, and the scripts change them. The rule is enforced by a script, not by the model reading its prompt.
 ---
 
 ## 11. Path to Step 2

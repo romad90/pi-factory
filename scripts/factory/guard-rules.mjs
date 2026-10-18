@@ -47,7 +47,15 @@ const BASH_RULES = [
   ["publish", /\b(gh|glab)\s+(pr|mr)\s+merge\b|\bgh\s+release\s+create\b|\bglab\s+release\s+create\b/, "merging or releasing"],
   // The guard itself
   ["guard", /FACTORY_GUARD\s*=/, "changing the guard"],
+  // Mission records: scripts write them, nobody deletes them (D71)
+  ["records", /\brm\b[^;&|]*\.scratch\//, "deleting mission files in .scratch/ (they are the record; the scripts change them)"],
 ];
+
+// D71: in a factory project, agents start only from a workflow file that
+// workflow.sh generated: subagent({ workflow: "<WORKFLOW_FILE>", ... }). A
+// direct call (agent, tasks, chain, an inline script) is the lead improvising.
+const WORKFLOW_FILE = /(^|\/)\.scratch\/.+\.js$/;
+const SUBAGENT_ALLOWED = new Set(["workflow", "context", "async", "action", "id", "runId"]);
 
 // Paths no agent writes or edits.
 const PROTECTED_WRITE = /^(\.git\/|\.factory\/|scripts\/factory\/|\.pi\/|\.github\/|\.gitlab-ci\.yml$|\.husky\/|\.pre-commit-config\.yaml$|lefthook\.yml$)/;
@@ -79,6 +87,12 @@ function hidesInstrument(cwd) {
 
 export function check({ tool, input = {}, cwd = process.cwd() }) {
   if (process.env.FACTORY_GUARD === "off") return null;
+  if (tool === "subagent") {
+    if (input.action !== undefined || !projectRoot(cwd)) return null;   // status, list: harmless
+    const extra = Object.keys(input).filter((k) => !SUBAGENT_ALLOWED.has(k));
+    if (typeof input.workflow === "string" && WORKFLOW_FILE.test(input.workflow) && !extra.length) return null;
+    return { rule: "lead", reason: `factory agents start only from a generated workflow file: subagent({ workflow: "<the WORKFLOW_FILE path workflow.sh printed>", context: "fresh", async: false })${extra.length ? `, without ${extra.join(", ")}` : ""}: blocked by the factory guard` };
+  }
   if (tool === "bash") {
     const cmd = String(input.command ?? "");
     for (const [rule, re, reason] of BASH_RULES) {

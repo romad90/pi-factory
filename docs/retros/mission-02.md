@@ -47,6 +47,10 @@ Most of the human time lost in this mission came from here. None of it was visib
 | 39 | Factory rules in AGENTS.md cost every call, and one contradicted maintenance | ~420 words appended to AGENTS.md, read by every role and named again in every brief; "expected values come from the Then line" made the first harness assert values the code never produced | Rules in `docs/agents/factory.md`, a pointer in AGENTS.md, intent-aware expected values | P1 | D64 |
 | 40 | `/factory` started a pre-flight on a misspelled mission name | `bridge-chactaterize`; the lead ran doctor on a mission that doesn't exist | Refuse an unknown mission, suggest the closest | P3 | ✅ D67 |
 | 41 | A worker's question waited all night | Asked at 01:31 (missing dependencies again), answered at 08:55; the answer was a rule already decided | Dependencies in the worktree; settled questions answered by a resolver | P1 | ✅ D65, D70 |
+| 42 | The lead called an agent directly on resume | After the factory upgrade, a fresh lead session sent a single-agent call ("▸ worker") instead of the `WORKFLOW_FILE`; pi-subagents failed with `reading 'slice'`, three times | The guard refuses any subagent call but a workflow file (D71) | P1 | ✅ D71 |
+| 43 | The lead deleted mission files to "fix" the error | `rm -f .scratch/…/workflows/20261018-1830*.js`, then read `workflow.sh` | `rm` under `.scratch/` is blocked; the prompt says stop after a failed call | P1 | ✅ D71 |
+| 44 | The lead's model has 5 requests per minute | 429s in bursts on `mistral-medium`; scripts finish in 0.2 s, so the lead outruns its quota | More requests per minute for the lead, or the scripted lead (P2) | P2 | gateway |
+| 45 | Worker worktrees are never removed | About 45 `pi-worktree-*` folders and `pi-subagents/*` branches after one mission | Remove a ticket's worktrees once its patch is integrated | P3 | roadmap |
 
 ## State and git
 

@@ -70,3 +70,26 @@ test("keeps the wall and protected paths in a monorepo project (D56)", () => {
   assert.ok(check({ tool: "edit", input: { path: "../scripts/factory/gate.sh" }, cwd: join(mainProject, "src") }), "factory paths are relative to the project");
   assert.equal(check({ tool: "edit", input: { path: "scripts/factory/x.js" }, cwd: join(mainProject, "src") }), null, "src/scripts/factory is ordinary code");
 });
+
+test("D71: agents start only from a generated workflow file", () => {
+  const sub = (input) => check({ tool: "subagent", input, cwd: main });
+  const wf = "./.scratch/demo/workflows/20261018-183000-build-wave.js";
+  assert.equal(sub({ workflow: wf, context: "fresh", async: false }), null);
+  assert.equal(sub({ action: "status", id: "abc" }), null);
+  for (const input of [
+    { agent: "worker", task: "build 05" },
+    { agent: "factory-worker", task: "x", worktree: true },
+    { tasks: [{ agent: "factory-worker", task: "x" }] },
+    { chain: [{ agent: "factory-reviewer", task: "x" }] },
+    { workflow: true, context: "fresh" },
+    { workflow: "const r = await runs.run('x', {});" },
+    { workflow: wf, context: "fresh", agent: "worker" },
+  ]) assert.equal(sub(input)?.rule, "lead", `should block: ${JSON.stringify(input)}`);
+});
+
+test("D71: mission records are not deleted by hand", () => {
+  for (const cmd of ["rm -f ./.scratch/m/workflows/x.js", "rm .scratch/m/verdicts/01-code.md && ls", "cd x; rm -rf .scratch/m"])
+    assert.equal(bash(cmd)?.rule, "records", `should block: ${cmd}`);
+  for (const cmd of ["scripts/factory/reset-ticket.sh m 05-x reason", "rm -f /tmp/x.patch", "ls .scratch/m"])
+    assert.equal(bash(cmd), null, `should allow: ${cmd}`);
+});
