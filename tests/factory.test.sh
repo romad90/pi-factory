@@ -159,8 +159,15 @@ if bash scripts/factory/integrate.sh maint 01-doc "$work/fz.patch" >"$work/int.l
   && grep -q 'frozen: src/tools/a.js' .scratch/maint/verdicts/01-doc-code.md && [ "$(cat src/tools/a.js)" = 'export const a = 1;' ] \
   && t "integrate refuses a frozen change before applying it (a failed round with the reason)" || fail "integrate frozen" "$(cat "$work/int.log")"
 bash scripts/factory/brief.sh worker maint 01-doc > "$work/brief.txt"
-grep -qF 'tests under them are allowed): `src/`.' "$work/brief.txt" && grep -qF 'lint: `true`' "$work/brief.txt" \
-  && t "the worker brief carries the frozen paths and the lint command" || fail "brief" "$(cat "$work/brief.txt")"
+grep -qF 'tests under them are allowed): `src/`.' "$work/brief.txt" && grep -qF 'lint (`true`' "$work/brief.txt" \
+  && grep -qF 'scripts/factory/self-check.sh maint' "$work/brief.txt" \
+  && t "the worker brief carries the frozen paths, the lint command and the self-check" || fail "brief" "$(cat "$work/brief.txt")"
+# Cache: what changes per ticket (ticket, commit) comes after the fixed instructions,
+# so every worker of a mission shares the same prompt prefix.
+first_var="$(grep -nE '01-doc|[0-9a-f]{40}' "$work/brief.txt" | head -1 | cut -d: -f1)"
+last_fixed="$(grep -n 'last self-check line' "$work/brief.txt" | cut -d: -f1)"
+[ -n "$first_var" ] && [ "$first_var" -gt "$last_fixed" ] && t "the worker brief puts the ticket and commit last (shared cache prefix)" \
+  || fail "brief order" "$(cat "$work/brief.txt")"
 git checkout -q "$cmds0" -- .factory/commands.env; git commit -qm "test: reset commands"
 
 echo "Mission: planning"
@@ -261,8 +268,32 @@ sleep 1
 wt="$work/wt-01"; git worktree add -q -b pi-subagents/01-hello-abc123-s0-t0 "$wt" HEAD
 wt_project="$wt/$(git rev-parse --show-prefix)"
 echo 'export const hello = () => "hello";' > "$wt_project/src/tools/hello.js"
+# D65: the hook gives the worker the installed dependencies, and they never reach the patch.
+mkdir -p node_modules/fake-dep; echo 'module.exports = 1;' > node_modules/fake-dep/index.js
+printf '{"repoRoot":"%s","worktreePath":"%s","index":0}' "$(git rev-parse --show-toplevel)" "$wt" \
+  | FACTORY_PROJECT_PREFIX="$(git rev-parse --show-prefix)" node scripts/factory/worktree-hook.mjs > "$work/hook.json" \
+  || fail "worktree hook runs" "$(cat "$work/hook.json")"
+[ -L "$wt_project/node_modules" ] && [ -f "$wt_project/node_modules/fake-dep/index.js" ] \
+  && grep -q 'node_modules' "$work/hook.json" && t "the worktree hook links the installed dependencies (D65)" \
+  || fail "dependency link" "$(ls -la "$wt_project"; cat "$work/hook.json")"
+# D66: the worker runs integration's checks itself before handing over.
+sc() { (cd "$wt_project" && bash scripts/factory/self-check.sh demo) > "$work/sc.log" 2>&1; }
+sc && grep -q '^SELF-CHECK: PASS' "$work/sc.log" && t "self-check passes in the worktree, dependency link left out of the guarded change" \
+  || fail "self-check pass" "$(cat "$work/sc.log")"
+git -C "$wt" diff --cached --quiet && t "self-check leaves the worker's index alone" || fail "self-check staged files" "$(git -C "$wt" status --short)"
+cp "$wt_project/src/tools/hello.js" "$work/hello.bak"; echo '// eslint-disable-next-line no-console' >> "$wt_project/src/tools/hello.js"
+if sc; then fail "self-check must refuse a silenced check" "$(cat "$work/sc.log")"; fi
+grep -q '^SELF-CHECK: FAIL guard' "$work/sc.log" && grep -q 'silence' "$work/sc.log" && t "self-check runs the patch guard: a silenced check fails before handover" \
+  || fail "self-check guard" "$(cat "$work/sc.log")"
+cp "$work/hello.bak" "$wt_project/src/tools/hello.js"; mv "$wt_project/src/tools/a.js" "$work/a.js.bak"
+if sc; then fail "self-check must fail on red tests" "$(cat "$work/sc.log")"; fi
+grep -q '^SELF-CHECK: FAIL tests' "$work/sc.log" && t "self-check fails on red tests, with the end of their output" || fail "self-check tests" "$(cat "$work/sc.log")"
+mv "$work/a.js.bak" "$wt_project/src/tools/a.js"
 bash scripts/factory/integrate.sh demo 01-hello null >"$work/int.log" 2>&1 || fail "integrate 01 from the worktree" "$(cat "$work/int.log")"
 t "null patch is rebuilt from the worker's worktree"
+! git show --stat HEAD~1 | grep -q 'node_modules\|\.env\.factory' && t "the rebuilt patch leaves out the dependency link and .env.factory" \
+  || fail "dependency link in the patch" "$(git show --stat HEAD~1)"
+rm -rf node_modules
 git worktree remove --force "$wt"; git branch -q -D pi-subagents/01-hello-abc123-s0-t0
 c1="$(cat $m/state/01-hello.integrated)"
 grep -q '^feat(demo): 01-hello' <<<"$(git log -1 --skip=1 --format=%s)" && t "integration commit is a Conventional Commit" || fail "integration message: $(git log -3 --format=%s)"

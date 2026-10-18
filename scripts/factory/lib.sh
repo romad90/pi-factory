@@ -313,6 +313,19 @@ load_commands() {
   FACTORY_HEALTH_CMD="${FACTORY_HEALTH_CMD:-}"
 }
 
+# --- what the worktree hook adds (D65) ------------------------------------------
+# Dependency links and .env.factory exist only in a worker's worktree. They
+# never belong in a patch, and a link escapes a "node_modules/" ignore rule
+# (that pattern matches directories, a link is a file). Pathspecs to exclude
+# them; call after load_commands.
+hook_excludes() {
+  local n
+  printf '%s\n' ':(exclude,glob)**/.env.factory'
+  for n in ${FACTORY_DEPS_LINKS:-node_modules .venv}; do
+    printf '%s\n' ":(exclude,glob)**/$n" ":(exclude,glob)**/$n/**"
+  done
+}
+
 # --- lint against the baseline (D62) -------------------------------------------
 # Legacy code often fails the team lint. The baseline, written by
 # `health.sh baseline`, keeps the errors the code had then (one key per error,

@@ -4,7 +4,8 @@
 # workflow file, whose path or neighbouring manifest names the ticket.
 # Then falls back to the worker's worktree: pi-subagents keeps one per run
 # on a branch named pi-subagents/<ticket>-…, and rebuilds the patch from
-# the newest one created after the wave (D60).
+# the newest one created after the wave (D60). What the worktree hook added
+# (dependency links, .env.factory) is left out of that patch (D65).
 #
 # Usage: scripts/factory/locate-patch.sh <feature> <ticket>
 # Prints the patch path, or exits 1 (then: record-no-patch.sh).
@@ -40,7 +41,9 @@ if [ -z "$found" ]; then
   if [ -n "$wt" ]; then
     base="$(git merge-base "$(git -C "$wt" rev-parse HEAD)" HEAD)"
     out="${TMPDIR:-/tmp}/pi-factory-$feature-$ticket.patch"
-    git -C "$wt" add -A
+    load_commands
+    skip=(); while IFS= read -r x; do skip+=("$x"); done < <(hook_excludes)
+    git -C "$wt" add -A -- . "${skip[@]}"
     git -C "$wt" diff --cached --binary "$base" > "$out"
     [ -s "$out" ] && found="$out"
   fi
