@@ -302,6 +302,30 @@ project_apply() {                      # <git apply args...> <patch>
   else git apply "$@"; fi
 }
 
+# --- draft patches (D73) -------------------------------------------------------
+# A worker's latest self-checked change, kept in the git folder all worktrees
+# share: never committed, and it outlives the worker's worktree.
+draft_patch() {                        # <feature> <ticket>
+  local common; common="$(git rev-parse --git-common-dir)"
+  case "$common" in /*) ;; *) common="$PWD/$common" ;; esac
+  printf '%s/pi-factory/drafts/%s/%s.patch\n' "$common" "$1" "$2"
+}
+
+# The ticket a worker's worktree is for, from its pi-subagents/<ticket>-…
+# branch; the longest ticket name wins. Exits 1 outside a worker worktree.
+worker_ticket() {                      # <feature>
+  local branch t name best=""
+  branch="$(git branch --show-current 2>/dev/null)"
+  [[ "$branch" == pi-subagents/* ]] || return 1
+  for t in "$(mission_dir "$1")"/issues/*.md; do
+    [ -f "$t" ] || continue
+    name="$(basename "$t" .md)"
+    [[ "$branch" == "pi-subagents/$name-"* ]] && [ ${#name} -gt ${#best} ] && best="$name"
+  done
+  [ -n "$best" ] || return 1
+  printf '%s\n' "$best"
+}
+
 # --- commands.env (D8, D34) ---------------------------------------------------
 
 load_commands() {

@@ -6,6 +6,8 @@
 # on a branch named pi-subagents/<ticket>-…, and rebuilds the patch from
 # the newest one created after the wave (D60). What the worktree hook added
 # (dependency links, .env.factory) is left out of that patch (D65).
+# Last, the draft the worker's own self-check saved (D73), which survives
+# the worktree's removal.
 #
 # Usage: scripts/factory/locate-patch.sh <feature> <ticket>
 # Prints the patch path, or exits 1 (then: record-no-patch.sh).
@@ -48,6 +50,10 @@ if [ -z "$found" ]; then
     git -C "$wt" diff --cached --binary "$base" > "$out"
     [ -s "$out" ] && found="$out"
   fi
+fi
+if [ -z "$found" ]; then
+  draft="$(draft_patch "$feature" "$ticket")"
+  [ -s "$draft" ] && [ "$draft" -nt "$since" ] && found="$draft"
 fi
 [ -n "$found" ] || { echo "no patch found for $ticket after $(basename "$since")" >&2; exit 1; }
 echo "$found"

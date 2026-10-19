@@ -63,6 +63,12 @@ if ! project_apply --check --index "$patch" 2>/dev/null; then
   fi
 fi
 project_apply --3way --index "$patch"
+# The patch is already in this branch (a wave salvaged after its ticket was
+# integrated, or the same change landed another way): nothing to check or commit.
+if git diff --cached --quiet HEAD -- .; then
+  echo "  = the patch changes nothing on $(git rev-parse --short HEAD): its change is already in this branch. Nothing integrated, no round recorded."
+  exit 3
+fi
 
 mkdir -p "$dir/logs" "$dir/state"
 log="$dir/logs/$ticket-integrate.log"
@@ -90,6 +96,7 @@ if check_lint && run_check tests "$FACTORY_TEST_CMD" \
     -m "Integrated by the factory after lint and tests passed." -- . ":(exclude)${FACTORY_DIR}"
   git rev-parse HEAD > "$dir/state/$ticket.integrated"
   bash "$here/checkpoint.sh" "$feature" >/dev/null
+  rm -f "$(draft_patch "$feature" "$ticket")"   # D73: the draft is spent
   echo "  ✓ committed $(git rev-parse --short "$(cat "$dir/state/$ticket.integrated")"); ready for review"
 else
   project_apply -R --index "$patch"

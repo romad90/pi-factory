@@ -9,6 +9,9 @@
 #   2. lint, failing only on errors new against the baseline (D62);
 #   3. tests; 4. the extra check (.factory/commands.env).
 # Changes nothing: the change is read through a temporary index.
+# Each run also saves the change as a draft patch in the repository's shared
+# git folder (D73), so a wave that times out or a worktree that pi-subagents
+# removes doesn't lose the work: locate-patch.sh falls back to it.
 #
 # Usage: scripts/factory/self-check.sh <feature>     (from the worktree)
 # Prints SELF-CHECK: PASS, or SELF-CHECK: FAIL <check> and the end of its
@@ -39,6 +42,11 @@ GIT_INDEX_FILE="$idx" git add -A -- . "${skip[@]}" ":(exclude)${FACTORY_DIR}"
 GIT_INDEX_FILE="$idx" git diff --cached --binary --relative HEAD -- . > "$tmp/change.patch"
 if [ ! -s "$tmp/change.patch" ]; then
   echo "SELF-CHECK: FAIL change"; echo "No change against HEAD: nothing to hand over."; exit 1
+fi
+# D73: the draft keeps root-relative paths, like a patch rebuilt from a worktree.
+if ticket="$(worker_ticket "$feature")"; then
+  draft="$(draft_patch "$feature" "$ticket")"; mkdir -p "$(dirname "$draft")"
+  GIT_INDEX_FILE="$idx" git diff --cached --binary HEAD -- . > "$draft.tmp" && mv "$draft.tmp" "$draft"
 fi
 bash "$here/patch-guard.sh" "$tmp/change.patch" --mission "$feature" > "$tmp/guard.out" 2>&1 || fail guard "$tmp/guard.out"
 
