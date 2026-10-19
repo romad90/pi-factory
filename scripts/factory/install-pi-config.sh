@@ -39,6 +39,10 @@ const [cfg, shim] = process.argv.slice(2);
 const c = fs.existsSync(cfg) ? JSON.parse(fs.readFileSync(cfg, "utf8")) : {};
 c.worktreeSetupHook = shim;
 c.parallel = { ...(c.parallel || {}), concurrency: (c.parallel && c.parallel.concurrency) || 4 };
+// D72: a foreground workflow (the factory's waves) stops at timeoutMs, 30 min by
+// default. A heavy worker with high thinking needs longer; its turn budget
+// (maxTurns in the agent file) is the real cap. Raised, never lowered.
+c.timeoutMs = Math.max(c.timeoutMs || 0, 7200000);
 fs.writeFileSync(cfg, JSON.stringify(c, null, 2) + "\n");
-console.log(`Updated ${cfg}: worktreeSetupHook → shim, parallel.concurrency = ${c.parallel.concurrency}`);
+console.log(`Updated ${cfg}: worktreeSetupHook → shim, parallel.concurrency = ${c.parallel.concurrency}, timeoutMs = ${c.timeoutMs} (waves)`);
 NODE
