@@ -145,6 +145,8 @@ The factory builds and maintains bots, APIs, front ends and batch jobs, in any l
 | Settled questions answered by a script (D70) | The human's time goes to real decisions. Only exact rules and earlier answers, never production, data, secrets or the contract; every auto-answer is logged and counted. |
 | The lead starts agents only from workflow files (D71) | A model told to pass a file path still improvises; a guard that refuses anything else turns a confusing crash into a clear block. |
 | Waves run up to 2 h; a timeout is salvaged (D72) | A strong model thinking hard is slow; 30 minutes cut it off mid-work. The worktree still holds the work, so integrating it costs nothing. |
+| Self-check saves a draft patch (D73) | A worktree can be removed before anyone salvages it. Saving the change at every self-check means a timeout loses at most the work since the last check. |
+| Only the `STEP:` line moves the lead (D74) | A table of statuses invites interpretation; one machine-readable line doesn't. |
 | A monorepo folder is its own project (D56) | Many teams keep each domain in a folder with its own CI. Installing at the root would impose the factory on every team; scoping every diff, patch, gate and CI job to the folder keeps the pilot to your project, and the guards prove nothing leaks to a sibling. |
 | Skills pinned by checksum (D36), models linted (D31) | "Use version X" and "judges on another family" must be checkable, not conventions. |
 

@@ -297,7 +297,17 @@ cp "$work/hello.bak" "$wt_project/src/tools/hello.js"; mv "$wt_project/src/tools
 if sc; then fail "self-check must fail on red tests" "$(cat "$work/sc.log")"; fi
 grep -q '^SELF-CHECK: FAIL tests' "$work/sc.log" && t "self-check fails on red tests, with the end of their output" || fail "self-check tests" "$(cat "$work/sc.log")"
 mv "$work/a.js.bak" "$wt_project/src/tools/a.js"
+# D73: every self-check run saves the change as a draft that outlives the worktree.
+sc || fail "self-check pass again" "$(cat "$work/sc.log")"
+draft="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/drafts/demo/01-hello.patch"
+[ -s "$draft" ] && grep -q '^+++ b/.*src/tools/hello.js' "$draft" && ! grep -q 'node_modules' "$draft" \
+  && t "self-check saves the worker's change as a draft patch in the shared git folder (D73)" || fail "draft patch" "$(ls -la "$(dirname "$draft")" 2>&1; cat "$draft" 2>&1)"
+git -C "$wt" switch -q -c not-a-worker
+[ "$(bash scripts/factory/locate-patch.sh demo 01-hello 2>/dev/null)" = "$draft" ] \
+  && t "locate-patch falls back to the draft when no worktree is left (D73)" || fail "draft fallback" "$(bash scripts/factory/locate-patch.sh demo 01-hello 2>&1)"
+git -C "$wt" switch -q pi-subagents/01-hello-abc123-s0-t0; git branch -q -D not-a-worker
 bash scripts/factory/integrate.sh demo 01-hello null >"$work/int.log" 2>&1 || fail "integrate 01 from the worktree" "$(cat "$work/int.log")"
+[ ! -e "$draft" ] && t "a successful integration removes the ticket's draft" || fail "draft left after integration"
 t "null patch is rebuilt from the worker's worktree"
 ! git show --stat HEAD~1 | grep -q 'node_modules\|\.env\.factory' && t "the rebuilt patch leaves out the dependency link and .env.factory" \
   || fail "dependency link in the patch" "$(git show --stat HEAD~1)"
@@ -394,6 +404,11 @@ echo 'export const count = (n) => n;' > src/tools/count.js
 git add -N src/tools/count.js; git diff -- src > "$work/02.patch"; git rm -q --cached src/tools/count.js; rm src/tools/count.js
 bash scripts/factory/integrate.sh demo 02-count "$work/02.patch" >/dev/null
 c2="$(cat $m/state/02-count.integrated)"
+# The same patch again: its change is already in the branch.
+head="$(git rev-parse HEAD)"; rc=0; bash scripts/factory/integrate.sh demo 02-count "$work/02.patch" >"$work/int.log" 2>&1 || rc=$?
+[ "$rc" = 3 ] && grep -q 'already in this branch' "$work/int.log" && [ "$(git rev-parse HEAD)" = "$head" ] \
+  && [ "$(cat $m/state/02-count.integrated)" = "$c2" ] && git diff --cached --quiet \
+  && t "a patch already in the branch is reported as such, nothing committed or recorded" || fail "already integrated" "rc=$rc $(cat "$work/int.log")"
 cat > $m/verdicts/02-count-code.md <<V
 # Verdict: 02-count
 **Result:** PASS
