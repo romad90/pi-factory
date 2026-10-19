@@ -7,7 +7,7 @@ Start:
 1. Run `scripts/factory/doctor.sh --quick $1`. If it prints `PREFLIGHT: FAIL`, stop and show it. Do not dispatch anything.
 
 Loop:
-1. Run `scripts/factory/next.sh $1`. Read its first line, `STEP: <code>`.
+1. Run `scripts/factory/next.sh $1`. Read its first line, `STEP: <code>`. Only that line decides what you do: the ticket table below it (ESCALATE, blocked, FAIL) is status, never a reason to stop.
 2. Act:
    - `paused`: run `scripts/factory/pause.sh resume $1`, show its output, go to 1.
    - `grill`, `approve`, `decide`, `approve-tickets`, `coverage`, `setup`, `escalate`, `blocked`, `unverified`: stop. Show the human the status and the NEXT line. These are human steps.

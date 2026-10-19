@@ -86,11 +86,15 @@ for t in "${tickets[@]}"; do
 done
 
 if [ ${#T_REVIEW[@]} -gt 0 ]; then
-  step review "scripts/factory/workflow.sh review-wave $feature (${#T_REVIEW[@]} ticket(s); fresh reviewers, other family)"
+  later=""; [ ${#T_ESCALATE[@]} -gt 0 ] && later="; ${T_ESCALATE[*]} wait for the human afterwards, run this step now"
+  step review "scripts/factory/workflow.sh review-wave $feature (${#T_REVIEW[@]} ticket(s); fresh reviewers, other family$later)"
 fi
 if [ ${#T_BUILD[@]} -gt 0 ]; then
   extra=""
   [ ${#T_BUILD[@]} -gt "$FACTORY_MAX_PARALLEL" ] && extra=", first $FACTORY_MAX_PARALLEL of ${#T_BUILD[@]}"
+  # The table may show ESCALATE or blocked tickets: they wait for the human
+  # after this step, they don't stop it.
+  [ ${#T_ESCALATE[@]} -gt 0 ] && extra+="; ${T_ESCALATE[*]} wait for the human afterwards, run this step now"
   step build "scripts/factory/workflow.sh build-wave $feature (${#T_BUILD[@]} ticket(s)$extra), then integrate.sh per patch"
 fi
 if [ ${#T_ESCALATE[@]} -gt 0 ]; then
