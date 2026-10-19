@@ -56,6 +56,31 @@ Read from their public pages in October 2026; what they claim was not verified.
 
 Skills we already use in the session and that map to lanes: code review (review lane), debugging (fix lane), deployment checklist with rollback triggers (P7), incident response and postmortem (P6 incident lane), tech debt scoring (P5 strategist), testing strategy (P3).
 
+## From Machinist (AI software factory)
+
+| Idea | What we'd build | Fits |
+|---|---|---|
+| Handoff notes between runs | A short journal each round leaves for the next | P9 step 2 |
+| No-progress detection, token log | Escalate when a round fails like the last one; `usage.tsv` per round | P9 step 3, P1 |
+| Provisioning check before spending tokens | The pre-flight proves every agent's model answers with tool calls before the first wave | `doctor.sh`, P1 |
+| Typed stage results | Every stage returns JSON: outcome, verdict (including `human_decision_needed`), findings. Scripts read fields, never prose | collect, P2 |
+| Read-only judges, enforced | `models-lint` refuses a reviewer or validator with write tools | D31, P7 least privilege |
+| Risk-gated auto-approval | A docs-only or test-only change below a size limit skips a human gate | P8 |
+| A "needs you" inbox | One list of everything waiting on the human, across missions | P8 step 4, P6 |
+
+## From afonsoft/skills (spec-driven skills, MIT)
+
+| Idea | What we'd build | Fits |
+|---|---|---|
+| Red loop before any fix | Fix rounds reproduce the failure first (`REPRO:`) | P9 step 1 |
+| Diagnostic journal, three-strike rule | Journal per ticket; clustered failures question the contract, not the code | P9 steps 2 and 4 |
+| Rationalization tables | The excuses an agent gives itself, with the right action, in the briefs | P9 step 5 |
+| Risk tiers with a checkable list | T1 = at most 3 files, no logic change, no new dependency, one `git revert`, a deterministic check: approved automatically | P8, with Machinist's risk gate |
+| Session summary on exit | Decisions, delivered, remaining, lessons, written by a script at `pause` or end of run | `pause.sh`, P8 morning summary |
+| Agent self-debug table | Known failure patterns of an agent run (loop, context bulk, 429, stale state) with the check for each | `doctor.sh`, P2 |
+
+Not taken: its orchestrator is a 575-line prompt a model follows, with state in a file the model edits, the design P2 moves away from.
+
 ## What to watch for
 
 Each of these tools keeps something we don't want to give away: the runtime (OpenCode Swarm needs OpenCode), the hosted control plane and its data (Factory, Port), or a maintainer we depend on. The test for anything we take: does it keep working if that vendor disappears tomorrow?
@@ -66,3 +91,5 @@ Each of these tools keeps something we don't want to give away: the runtime (Ope
 - [Factory](https://factory.com/), [SiliconANGLE on Factory's Droids](https://siliconangle.com/2025/09/25/factory-unleashes-droids-software-agents-50m-fresh-funding/)
 - [Port](https://www.port.io)
 - [Anthropic skills repository](https://github.com/anthropics/skills)
+- [Machinist](https://github.com/owainlewis/machinist)
+- [afonsoft/skills](https://github.com/afonsoft/skills)
