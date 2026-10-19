@@ -53,6 +53,7 @@ Most of the human time lost in this mission came from here. None of it was visib
 | 45 | Worker worktrees are never removed | About 45 `pi-worktree-*` folders and `pi-subagents/*` branches after one mission | Remove a ticket's worktrees once its patch is integrated | P3 | roadmap |
 | 46 | An auto-answer said "No" to a question with three options | Options 1 and 2 changed `src/`, option 3 (`vi.doMock` in the test) did not; "No. src/ is frozen" read as refusing all three | The frozen rule refuses only the options that change a frozen path and leaves test-only options open | P2 | ✅ D70 |
 | 47 | "Skip faulty tests using it.skip" reached the human | The silence rule matched `.skip(` only, not `it.skip/describe.skip` or "skipping failing tests" | Wider match for skipped tests | P2 | ✅ D70 |
+| 48 | A wave timed out after 30 minutes on a stronger model | Qwen3.8 27B, thinking high: 51 turns, 2.1M tokens, stopped by pi-subagents' default `timeoutMs` with the work in the worktree | 2 h wave timeout in the machine config; the lead salvages a timed-out wave with `integrate.sh … null` | P1 | ✅ D72 |
 
 ## State and git
 

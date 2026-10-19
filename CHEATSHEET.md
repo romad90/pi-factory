@@ -238,6 +238,7 @@ A blocked agent stops and asks; it never looks for another way. Blocks are logge
 | An `auto` answer in `decisions.tsv` is wrong | a rule matched a question it shouldn't have | change the row's answer, or `/factory-decide` when the worker asks again (a repeat always reaches you) |
 | "factory agents start only from a generated workflow file" | the lead tried to call an agent directly (D71) | Esc, then: `Use only subagent({ workflow: "<the WORKFLOW_FILE path>", context: "fresh", async: false }).` |
 | 429 on the lead's model in a burst | the lead's quota is per minute (5 on some gateways) | Pi waits and retries; ask for more requests per minute for the lead model |
+| "Workflow script timed out after 1800000ms" | pi-subagents' 30-minute default for a wave | `bash scripts/factory/install-pi-config.sh` once (raises it to 2 h); salvage the work: `scripts/factory/integrate.sh <f> <ticket> null` |
 | "sent back to review" in `collect.sh` | the reviewer's verdict had no `**Result:**` line | nothing: reviewed again once, not counted as a round |
 
 ## 14. Where things live

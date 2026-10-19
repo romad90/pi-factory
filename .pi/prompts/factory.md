@@ -17,6 +17,7 @@ Loop:
    - `build`: run `scripts/factory/workflow.sh build-wave $1` and pass its `WORKFLOW_FILE` path as above. For each ticket in the result:
      - `patch` is set: `scripts/factory/integrate.sh $1 <ticket> <patch>`.
      - `patch` is null: `scripts/factory/locate-patch.sh $1 <ticket>`; if it prints a path, integrate it; if not, `scripts/factory/record-no-patch.sh $1 <ticket>`.
+     - The workflow itself failed with "timed out": the workers' work is still in their worktrees. Run `scripts/factory/integrate.sh $1 <ticket> null` for each ticket of the wave (it rebuilds the patch from the worktree), then continue.
      - The worker's run shows a provider error (429, rate limit, quota, 5xx, overloaded, timeout) instead of a report: `scripts/factory/record-no-patch.sh $1 <ticket> --provider "<the error line, verbatim>"`, then stop and show its output. It is not a round, and retrying now burns nothing but the same limit.
      - The output ends with `DECISION NEEDED: <question>`: run `scripts/factory/human.sh ask $1 <ticket> --stdin <<'FACTORY_TEXT_END'`, then the question verbatim on the following lines, then a line `FACTORY_TEXT_END`. Do not integrate. If it prints `AUTO-ANSWERED`, the question was settled by a rule or an earlier answer: continue the loop. If it prints `ASKED`, stop.
      A failed integration is expected and recorded as a round; continue.

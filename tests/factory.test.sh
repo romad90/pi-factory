@@ -53,6 +53,10 @@ walk(".pi");console.log(out.join("\n"));')"
 node -e 'const r=require("./.pi/settings.json").retry; process.exit(r && r.enabled && r.maxRetries >= 1 ? 0 : 1)' \
   && t "Pi retries on rate limits in an installed repo" || fail "retry settings" "$(cat .pi/settings.json)"
 grep -q 'every docs/agents/quality-bar-\*.md' .factory/briefs/code-steward.md && t "the steward brief reads the packs' quality bars" || fail "steward pack brief"
+mkdir -p "$work/home/.pi/agent/extensions/subagent"; echo '{"timeoutMs": 600000, "parallel": {"concurrency": 1}}' > "$work/home/.pi/agent/extensions/subagent/config.json"
+HOME="$work/home" bash "$root/scripts/factory/install-pi-config.sh" >/dev/null 2>&1
+node -e 'const c=require(process.argv[1]); process.exit(c.timeoutMs===7200000 && c.parallel.concurrency===1 && /factory-worktree-hook/.test(c.worktreeSetupHook) ? 0 : 1)' "$work/home/.pi/agent/extensions/subagent/config.json" \
+  && t "pi config: waves may run 2 h (D72), concurrency and hook kept" || fail "pi config timeout" "$(cat "$work/home/.pi/agent/extensions/subagent/config.json")"
 if bash "$root/scripts/factory/install-into.sh" "$repo" --pack nope --no-branch >/dev/null 2>&1; then fail "unknown pack must fail"; fi
 t "an unknown pack is refused"
 
