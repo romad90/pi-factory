@@ -83,7 +83,7 @@ Not taken: its orchestrator is a 575-line prompt a model follows, with state in 
 
 ## From the October 2026 scan of open-source factories
 
-Ten projects picked from [awesome-software-factories](https://github.com/pungme/awesome-software-factories) for being closest to ours: deterministic control, gates, or a page showing agents at work. Read from their code (cloned, not run); star counts could not be fetched.
+Ten projects picked from [awesome-software-factories](https://github.com/pungme/awesome-software-factories) for being closest to ours (deterministic control, gates, or a page showing agents at work), plus one suggested by the user. Read from their code (cloned, not run); star counts could not be fetched.
 
 | Project | What it is | Idea for us | Fits |
 |---|---|---|---|
@@ -97,6 +97,7 @@ Ten projects picked from [awesome-software-factories](https://github.com/pungme/
 | [Mastra Factory](https://github.com/mastra-ai/softwarefactory-template) (Apache-2.0) | A board of stages with rules; LLM workers | Stages as data (kind, role, action on entry); deterministic health findings with evidence and a suggested repair; human approvals as proposed decisions; optimistic revisions so a step can't run twice | P2, P10, P8 |
 | [software-factory (nicolasmelo1)](https://github.com/nicolasmelo1/software-factory) (MIT) | Rust rules engine, not an orchestrator | Every rule written twice, prose and check, and each check has a fixture proving it fires; existing violations frozen with a review date (our lint baseline, generalised); evidence hashes recomputed, never trusted | patch guard, resolver, P2 |
 | [Bernstein](https://github.com/sipyourdrink-ltd/bernstein) (Apache-2.0) | Deterministic scheduler for many CLI agents | Completion checked by typed signals, not the agent's word; heartbeat files; time limits by task size; retry 1 raises effort, retry 2 a stronger model; a hash chain over the audit log | P9, P1, `decisions.tsv` |
+| [zazencodes software factory for Claude Code](https://github.com/zazencodes/zazencodes-season-3/tree/main/src/software-factory-claude-code) | One skill, seven subagents, markdown files; spec → build → four parallel reviewers (security, UX, UI, code) → approver | A dashboard with no server: one static `dashboard.html` reading job folders and first lines of verdict files, polling every 2 s, cards across stage columns, review chips that fill in; every agent writes only its own file and its first line is the verdict; an approver with an explicit escalate list (money, auth, deploy or CI, schema, a new dependency, a business decision) | P10, P8 risk tiers |
 
 What they agree on, and what it says about us:
 

@@ -17,12 +17,13 @@ Each of these is a question the files already answer. Nobody shows the answer.
 
 ## What others built
 
-Ten open-source factories were read for this ([ideas to borrow](ideas.md), October 2026 scan). Their pages agree on the essentials:
+Eleven open-source factories were read for this ([ideas to borrow](ideas.md), October 2026 scan). Their pages agree on the essentials:
 
 - **The page only reads.** Symphony's spec: the dashboard is never needed for correctness. Atelier's cockpit only writes a cancel flag.
 - **One snapshot, many views.** Symphony serves the same `snapshot()` to the page, a JSON API and a terminal UI.
 - **Signal, then refetch.** sgai and Mastra push a tiny "something changed" event (SSE) and the page refetches one state document, with polling as fallback.
 - **Stages as a rail, agents as rows.** DoorDash's phase rail (done, current, upcoming, *held* on a human); Symphony's one row per running agent with its last event in plain words; Gas Town's last-activity colour (green under 5 min, yellow under 10, red after).
+- **No server at all is enough to start.** zazencodes' factory for Claude Code ships one `dashboard.html` served by `python3 -m http.server`: it lists the job folders, reads each `job.json` and the first line of each review file, and polls every 2 seconds. Jobs move across stage columns as cards; review chips pulse while waiting and fill in as verdicts land; jobs that need a human stand out.
 - **Health as findings with evidence.** Mastra's supervisor computes "stuck", "stalled", "waiting on a human" from rows, each with evidence and a suggested repair; a model only explains them.
 
 ## Proposal
@@ -35,7 +36,7 @@ Scripts append one line per event to `.scratch/<mission>/events.jsonl`: `next.sh
 
 ### 2. The page
 
-`front.mjs`, a small Node server with no dependencies, serves one static HTML page and a `/state` route; an SSE route sends `reload` when a file under `.scratch/<mission>/` changes; the page polls every 5 s if SSE drops. Read-only. Local by default (`localhost`), so it works on the user's machine with nothing to host; P6 later hosts the same page for a team.
+Start with no server, as zazencodes does: `scripts/factory/front.html`, opened through any static server (`python3 -m http.server` from the repo), reads `state.json` and polls every 2 s. `status.sh --json --watch` rewrites `state.json` when the mission's files change. If polling proves too slow or too heavy, `front.mjs` (a small Node server, no dependencies) adds an SSE route that sends `reload`, with polling kept as fallback. Read-only either way. Local by default (`localhost`), so it works on the user's machine with nothing to host; P6 later hosts the same page for a team.
 
 Layout, top to bottom:
 
@@ -53,7 +54,7 @@ Workers run through pi-subagents, which writes each run's output under its async
 
 | For | Against |
 |---|---|
-| The human sees the real state from files, not the lead's account of it | Another surface to maintain. Kept small: one server file, one page, one snapshot script, all tested from fixtures |
+| The human sees the real state from files, not the lead's account of it | Another surface to maintain. Kept small: one page and one snapshot script, tested from fixtures; a server only if needed |
 | No database, no build step, nothing hosted: works offline, behind the corporate proxy | No history beyond the mission's own files; trends wait for P6 |
 | The same snapshot feeds the page, a terminal view and P6 | Reading pi-subagents' logs ties tile details to its format; the tiles degrade, the page doesn't break |
 | Health findings catch a stuck worker in minutes, not hours | A finding can be noisy; thresholds live in `commands.env` |
@@ -61,7 +62,7 @@ Workers run through pi-subagents, which writes each run's output under its async
 ## Plan
 
 1. `events.jsonl` written by the scripts; `status.sh --json` snapshot; tests from a fixture mission. **S**
-2. `front.mjs` and the page: rail, needs-you, tickets × stages. **M**
+2. `front.html` on a static server: rail, needs-you, tickets × stages. `front.mjs` with SSE only if polling falls short. **M**
 3. Subagent tiles from pi-subagents' run logs, with the fallback. **M**
 4. Health findings with evidence and the fixing command. **S**
 
