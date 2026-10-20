@@ -12,6 +12,7 @@ A fix round should get closer to green than the one before. In mission 2 it ofte
 | A worker fixes before seeing the failure | Round 1 of 08 handed over a test using `workerModule` and `MockMongo` without declaring them: 5 `ReferenceError`s at integration | A fix that never ran red can't be known to fix anything |
 | A round that changes nothing still costs a round | Escalation counts rounds, not progress; two rounds failing on the same tests look like two attempts | The third round is often spent where the second one was |
 | The contract's own mistake shows up as code failures | 05's test logs that a contract literal "is unreachable under its own Given": only visible in test stdout | Several tickets escalate one by one for one wrong line in the contract |
+| A worker hands over without its self-check | On 20 October, 02, 03, 04, 07 and 08 escalated after three rounds on test-writing mistakes the self-check would have caught: `beforeEach` not imported, the real `process.exit` called, mocks not reset between runs, one unused variable. The brief asks for the self-check; nothing makes it happen | The same mistake costs three rounds and a human decision |
 | An agent talks itself past a check | The lead wrote "Given time, I will assume lint now passes", then reported a self-check PASS and an integration that never ran | The cheapest failure to prevent is a sentence |
 
 Two outside projects arrived at the same answers independently: [Machinist](https://github.com/owainlewis/machinist) passes handoff notes between runs and detects runs that make no progress; [afonsoft/skills](https://github.com/afonsoft/skills) (MIT) makes its `diagnose` skill refuse any fix before a command reproduces the failure, and stops after three failed fixes to question the design. Neither is adopted as a tool: both are prompt-driven where the factory's loop is scripts ([ideas to borrow](ideas.md)).
@@ -66,6 +67,14 @@ A short table in the worker and reviewer briefs (and the lead's, until P2):
 
 Borrowed from afonsoft's "common rationalizations" tables. Costs nothing; the guard (D71) and P2 remain the real fix for the lead.
 
+### 6. The script runs the self-check, not the worker
+
+After each worker, the wave runs `self-check.sh` in its worktree itself. On FAIL, the same worker session gets the output and one more turn budget to fix it (correction in the same session, as Super Simple Software Factory and Atelier do); a second FAIL hands the patch to integration as today. A worker can no longer hand over red work by skipping the check, and the cheap fix happens before a round is spent.
+
+### 7. Ticket notes from the human after an escalation
+
+When tickets escalate on the same mistakes, the human adds one `## Notes from rounds 1-3` section to the tickets (the pitfalls, with the passing tickets to copy) and resets them. On 20 October this was one decision for five tickets. `next.sh` suggests it when the escalated verdicts share an error, and `reset-ticket.sh --note <file>` appends the note and resets in one step.
+
 ## Trade-offs
 
 | For | Against |
@@ -83,8 +92,10 @@ Borrowed from afonsoft's "common rationalizations" tables. Costs nothing; the gu
 4. `CONTRACT DOUBT:` marker, `contract-doubts.md`, clustered escalations in `next.sh`. **S**
 5. Rationalization table in the briefs. **S**
 6. The three measures in `metrics.sh`. **S**
+7. The wave runs `self-check.sh` after each worker and corrects in the same session once. **M**
+8. `reset-ticket.sh --note`; shared errors across escalated verdicts suggest it. **S**
 
-Steps 1, 2 and 5 first: they change only briefs and one check, and could ship before mission 3.
+Steps 7, 1, 2 and 5 first (7 removes the most rounds): they change only briefs and one check, and could ship before mission 3.
 
 ## Open questions
 
