@@ -33,7 +33,7 @@ Mission 2 finished: 10 tickets, behavior and health PASS, 34 characterization te
 | P6 | Control room | Needs P2, P4 | Later; P10 is its first piece |
 | P7 | Launch gate | No evidence yet | Later |
 | P8 | Hands-off mission | 31 decisions; 3 in the last two days | Continue: steps 5–6 |
-| P9 | Rounds that converge | Findings 53–55, 66 | **Steps 1, 5 and 6 done** (reproduce first, no guessing, self-check gate); 2–4 next |
+| P9 | Rounds that converge | Findings 53–55, 66 | **Steps 5 and 6 done**, step 1 in the brief (reproduce first; the `REPRO:` check in `collect.sh` is next); 2–4 next |
 | P10 | Front page | Hours spent reading terminals to learn the state | **Before mission 4**: `runs.tsv` (D77) is its first data |
 
 ## Borrowed ideas, sorted
