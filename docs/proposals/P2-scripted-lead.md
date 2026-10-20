@@ -60,6 +60,10 @@ Provider errors, rounds, pauses, the 70% context rule and the watchdog become pl
 
 This is the step from "an agent that runs the factory" to "a factory that runs agents". Every reliable orchestration system separates the control plane (deterministic) from the workers (where the variance lives). The factory already did it for decisions (scripts decide rounds, coverage, verdicts); this finishes the job.
 
+## Seen elsewhere
+
+The October 2026 scan ([ideas](ideas.md)) found the same split in every factory that runs on more than one model: Super Simple Software Factory and Atelier (Python owns the graph, every phase starts as failed, agents return a typed envelope that code checks), DoorDash's orchestrator (fixed phases in Go, the harness writes the verification report), Bernstein and Mastra (deterministic scheduler, stages as data). SSSF and Anneal drive Pi headless with `pi -p --mode json`, which answers the first open question below.
+
 ## Plan
 
 1. Spike: run one generated workflow headless and read its result. If it fails, stop here and decide the fallback. **S**

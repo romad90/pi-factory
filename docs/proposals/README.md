@@ -15,6 +15,7 @@ Status: **draft** (open for discussion) · **accepted** (in the roadmap) · **re
 | P7 | [Launch gate: done when the service runs, in a sandbox, secure by design](P7-launch-gate.md) | draft | — |
 | P8 | [Hands-off mission: the human decides, the factory does the rest](P8-hands-off-mission.md) | steps 1–3 done | P2 for the last step |
 | P9 | [Rounds that converge: reproduce first, carry what was learned, doubt the contract early](P9-converging-rounds.md) | draft | — |
+| P10 | [Front page: every subagent, at every stage, on one page](P10-front-page.md) | draft | — (P2 completes the events) |
 
 ## Why these four, in this order
 
@@ -34,5 +35,7 @@ P7 changes what "done" means: a mission ends when the service builds and boots w
 P8 comes from counting what the human did in mission 2: most of it was plumbing, rules the worker didn't have and hand repairs, not decisions. Its target is at most five human interventions per mission, and it comes first.
 
 P9 comes from the end of mission 2: 4 of 10 tickets escalated after three rounds, while others passed on round 1. Rounds started almost from scratch, fixes were written before the failure was reproduced, and one wrong line in the contract surfaced as failures in several tickets.
+
+P10 answers what the human did most during mission 2 besides deciding: finding out what was going on. The files already know; a read-only local page shows it, and P6 later hosts the same page.
 
 Smaller ideas seen in other tools, not yet proposals, are collected in [ideas to borrow](ideas.md).
