@@ -38,4 +38,6 @@ P9 comes from the end of mission 2: 4 of 10 tickets escalated after three rounds
 
 P10 answers what the human did most during mission 2 besides deciding: finding out what was going on. The files already know; a read-only local page shows it, and P6 later hosts the same page.
 
+The [assessment after mission 2](assessment-2026-10.md) sorts all of them and the borrowed ideas by what that mission showed.
+
 Smaller ideas seen in other tools, not yet proposals, are collected in [ideas to borrow](ideas.md).
