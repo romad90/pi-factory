@@ -53,7 +53,7 @@ if [ "${1:-}" = "--quick" ]; then
   # Models probed on their providers since the last model change (D59, D79):
   # each agent's provider from Pi's models.json, else FACTORY_GATEWAY_URL.
   if FACTORY_GATEWAY_URL="$FACTORY_GATEWAY_URL" node "$here/models-probe.mjs" --resolvable 2>/dev/null; then
-    if [ "$(cat .factory/models-probe.ok 2>/dev/null)" = "$(node "$here/models-probe.mjs" --hash 2>/dev/null)" ]; then
+    if [ "$(cat .factory/models-probe.ok 2>/dev/null)" = "$(FACTORY_GATEWAY_URL="$FACTORY_GATEWAY_URL" node "$here/models-probe.mjs" --hash 2>/dev/null)" ]; then
       ok "models probed on their providers (served, thinking level, tool turns)"
     else bad "models changed since the last probe: node scripts/factory/models-probe.mjs --stamp, then commit .factory/models-probe.ok"; fi
   else

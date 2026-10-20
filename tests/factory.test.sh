@@ -277,6 +277,9 @@ FACTORY_SELF_CHECK_GATE=1 bash scripts/factory/workflow.sh build-wave demo >"$wo
 wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
 grep -q 'scripts/factory/self-check.sh demo' "$wf" && grep -q 'resume: r.runId' "$wf" && jscheck "$wf" \
   && t "build wave: FACTORY_SELF_CHECK_GATE=1 gates each worker on its self-check, one same-session retry (D78)" || fail "gate on" "$(sed -n 2,40p "$wf")"
+gcmd="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8"); process.stdout.write(JSON.parse(s.match(/^const GATE = (.*);$/m)[1]).command)' "$wf")"
+(cd "$(git rev-parse --show-toplevel)" && bash -c "$gcmd") > "$work/gate.log" 2>&1 || true
+grep -q '^SELF-CHECK: ' "$work/gate.log" && t "build wave: the gate command runs from the worktree root, project path quoted" || fail "gate command" "$gcmd: $(cat "$work/gate.log")"
 
 # The wave returned no patch path: the work is in the worker's worktree,
 # which pi-subagents keeps on a pi-subagents/<ticket>-… branch (D60).
@@ -656,12 +659,12 @@ p1=$((port + 1)); p2=$((port + 2)); mkdir -p "$PI_CODING_AGENT_DIR"
 printf '{"providers":{"makers":{"baseUrl":"http://127.0.0.1:%s/v1","api":"openai-completions","apiKey":"MAKERS_KEY","models":[]},"judges":{"baseUrl":"http://127.0.0.1:%s/v1","api":"openai-completions","apiKey":"literal-key","models":[]}}}' "$p1" "$p2" > "$PI_CODING_AGENT_DIR/models.json"
 SERVED="other-model" PICKY=none PORT=$p1 node "$work/gw.mjs" & g1=$!
 SERVED="$judge" PICKY=none PORT=$p2 node "$work/gw.mjs" & g2=$!; sleep 1
-if MAKERS_KEY=k node scripts/factory/models-probe.mjs >"$work/probe.log" 2>&1; then fail "probe must catch a model its provider doesn't serve"; fi
+if MAKERS_KEY=env-key-4711 node scripts/factory/models-probe.mjs >"$work/probe.log" 2>&1; then fail "probe must catch a model its provider doesn't serve"; fi
 grep -q "factory-worker: makers/$maker is not served to this key on makers" "$work/probe.log" && grep -q "factory-reviewer: judges/$judge served" "$work/probe.log" \
   && t "probe: each agent on its own provider from Pi's models.json; the 403 case is caught before a wave (D79)" || fail "two gateways" "$(cat "$work/probe.log")"
 kill $g1; wait $g1 2>/dev/null || true
 SERVED="$maker" PICKY=none PORT=$p1 node "$work/gw.mjs" & g1=$!; sleep 1
-MAKERS_KEY=k node scripts/factory/models-probe.mjs >"$work/probe.log" 2>&1 && grep -q 'PROBE: OK' "$work/probe.log" && ! grep -q 'literal-key' "$work/probe.log" \
+MAKERS_KEY=env-key-4711 node scripts/factory/models-probe.mjs >"$work/probe.log" 2>&1 && grep -q 'PROBE: OK' "$work/probe.log" && ! grep -qE 'literal-key|env-key-4711' "$work/probe.log" \
   && t "probe: two gateways pass, keys never printed" || fail "two gateways ok" "$(cat "$work/probe.log")"
 kill $g1 $g2; wait $g1 $g2 2>/dev/null || true
 git checkout -q -- .pi .factory; rm -f "$PI_CODING_AGENT_DIR/models.json"

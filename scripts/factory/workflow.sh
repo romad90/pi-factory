@@ -115,9 +115,12 @@ return { output: r.output };'
     gate=null
     if [ "${FACTORY_SELF_CHECK_GATE:-0}" = 1 ]; then
       prefix="$(project_prefix)"
+      qp="$(printf %q "$prefix")"; qf="$(printf %q "$feature")"
       gate="$(node -e 'process.stdout.write(JSON.stringify({ command: process.argv[1], timeoutMs: 600000 }))' \
-        "${prefix:+cd $prefix && }bash scripts/factory/self-check.sh $feature")"
+        "${prefix:+cd $qp && }bash scripts/factory/self-check.sh $qf")"
     fi
+    # A new round starts without the last round's self-check result (D78).
+    for name in "${T_BUILD[@]}"; do rm -f "$(draft_patch "$feature" "$name").status"; done
     body='const GATE = '"$gate"';
 const first = await runs.all(ITEMS.map(it => Object.assign({
   key: it.key, agent: it.agent, task: it.task, worktree: true,
@@ -125,10 +128,14 @@ const first = await runs.all(ITEMS.map(it => Object.assign({
 const results = [];
 for (let i = 0; i < first.length; i++) {
   let r = first[i];
-  if (GATE && r && r.ok === false && r.resumability && r.resumability.state === "resumable") {
+  // Only a red self-check goes back; a stop for a human decision, or a
+  // provider error, is returned as it is.
+  const gateFailed = GATE && r && r.ok === false && /SELF-CHECK: FAIL/.test(String(r.error || "")) &&
+    !/No change against HEAD/.test(String(r.error || "")) && !/DECISION NEEDED/.test(String(r.output || ""));
+  if (gateFailed && r.resumability && r.resumability.state === "resumable") {
     r = await runs.run(ITEMS[i].key + "-selfcheck", { resume: r.runId, task:
-      "Your hand-over failed the self-check:\n" + (r.error || "") +
-      "\nFix the code, run scripts/factory/self-check.sh until it prints SELF-CHECK: PASS, then report again." });
+      "Your hand-over failed the self-check:\n" + String(r.error || "") +
+      "\nFix the code, run " + GATE.command + " until it prints SELF-CHECK: PASS, then report again." });
   }
   results.push(r);
 }
@@ -189,7 +196,7 @@ i=2; while [ -e "$wf_file" ]; do wf_file="$wf_dir/$(date +%Y%m%d-%H%M%S)-$mode-$
 # (models change mid-mission). metrics.sh reads it; nothing else depends on it.
 runs_tsv="$(dirname "$wf_dir")/runs.tsv"
 [ -f "$runs_tsv" ] || printf 'date\tworkflow\tkey\tagent\tmodel\tthinking\n' > "$runs_tsv"
-fm() { sed -n "s/^$2:[[:space:]]*//p" ".pi/agents/factory/$1.md" 2>/dev/null | head -1; }
+fm() { awk -v k="$2" '/^---$/ { c++; next } c == 1 && index($0, k ":") == 1 { sub("^" k ":[ \t]*", ""); print; exit }' "$FACTORY_AGENTS_DIR/$1.md" 2>/dev/null; }
 while IFS=$'\t' read -r key agent _ _; do
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$(date '+%F %H:%M')" "$(basename "$wf_file")" "$key" "$agent" "$(fm "$agent" model)" "$(fm "$agent" thinking)" >> "$runs_tsv"
 done < "$items"

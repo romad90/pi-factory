@@ -44,12 +44,13 @@ skip=(); while IFS= read -r x; do skip+=("$x"); done < <(hook_excludes)
 idx="$tmp/index"; cp "$(git rev-parse --git-path index)" "$idx"   # keeps sparse-checkout bits: the hidden instrument is not a deletion
 GIT_INDEX_FILE="$idx" git add -A -- . "${skip[@]}" ":(exclude)${FACTORY_DIR}"
 GIT_INDEX_FILE="$idx" git diff --cached --binary --relative HEAD -- . > "$tmp/change.patch"
+draft=""
+if ticket="$(worker_ticket "$feature")"; then draft="$(draft_patch "$feature" "$ticket")"; mkdir -p "$(dirname "$draft")"; fi
 if [ ! -s "$tmp/change.patch" ]; then
-  echo "SELF-CHECK: FAIL change"; echo "No change against HEAD: nothing to hand over."; exit 1
+  status "FAIL change"; echo "SELF-CHECK: FAIL change"; echo "No change against HEAD: nothing to hand over."; exit 1
 fi
 # D73: the draft keeps root-relative paths, like a patch rebuilt from a worktree.
-if ticket="$(worker_ticket "$feature")"; then
-  draft="$(draft_patch "$feature" "$ticket")"; mkdir -p "$(dirname "$draft")"
+if [ -n "$draft" ]; then
   GIT_INDEX_FILE="$idx" git diff --cached --binary HEAD -- . > "$draft.tmp" && mv "$draft.tmp" "$draft"
 fi
 bash "$here/patch-guard.sh" "$tmp/change.patch" --mission "$feature" > "$tmp/guard.out" 2>&1 || fail guard "$tmp/guard.out"

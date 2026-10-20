@@ -38,8 +38,9 @@ export function agentModels(dir = AGENTS_DIR) {
   });
 }
 // Hash of every (agent, model, thinking): the stamp is valid only for this set.
+// D79: the provider's URL is part of it, so moving a provider needs a new probe.
 export function modelsHash(list = agentModels()) {
-  return createHash("sha256").update(list.map((a) => `${a.agent}=${a.model}@${a.thinking}`).sort().join("\n")).digest("hex").slice(0, 16);
+  return createHash("sha256").update(list.map((a) => `${a.agent}=${a.model}@${a.thinking}>${gatewayOf(a.model).base || ""}`).sort().join("\n")).digest("hex").slice(0, 16);
 }
 const bareId = (m) => m.replace(/^[^/]+\//, "");          // "provider/id" → "id" as the gateway knows it
 
@@ -100,12 +101,14 @@ function quota(h) {
 async function main() {
   console.log("Model probe");
   const agents = agentModels();
-  const groups = new Map();                      // base → { gw, agents }
+  const groups = new Map();                      // provider@base → { gw, agents }
+  let skipped = 0;
   for (const a of agents) {
     const gw = gatewayOf(a.model);
-    if (gw.skip) { console.log(`  - ${a.agent}: ${a.model}: ${gw.skip}`); continue; }
-    if (!groups.has(gw.base)) groups.set(gw.base, { gw, agents: [] });
-    groups.get(gw.base).agents.push(a);
+    if (gw.skip) { console.log(`  - ${a.agent}: ${a.model}: ${gw.skip}`); skipped++; continue; }
+    const id = `${gw.name}@${gw.base}`;          // one gateway may serve two providers with two keys
+    if (!groups.has(id)) groups.set(id, { gw, agents: [] });
+    groups.get(id).agents.push(a);
   }
   if (!groups.size) { console.log("  - skipped: no agent model maps to a provider in Pi's models.json, and FACTORY_GATEWAY_URL is empty"); process.exit(0); }
 
@@ -154,6 +157,7 @@ async function main() {
     }
   }
 
+  if (!failed && skipped && process.argv.includes("--stamp")) { warn(`${skipped} agent(s) not probed: no stamp`); failed = true; }
   if (!failed && process.argv.includes("--stamp")) { writeFileSync(STAMP, modelsHash(agents) + "\n"); ok(`stamped ${STAMP}`); }
   console.log(failed ? "PROBE: FAIL" : "PROBE: OK");
   process.exit(failed ? 1 : 0);
