@@ -76,6 +76,9 @@ test("D71: agents start only from a generated workflow file", () => {
   const wf = "./.scratch/demo/workflows/20261018-183000-build-wave.js";
   assert.equal(sub({ workflow: wf, context: "fresh", async: false }), null);
   assert.equal(sub({ action: "status", id: "abc" }), null);
+  // D75: a reviewer dispatches its code-review axes, fresh, and nothing else.
+  assert.equal(sub({ agent: "factory-review-axis", task: "Standards axis: git diff a..b" }), null);
+  assert.equal(sub({ agent: "factory-review-axis", task: "Spec axis", context: "fresh", async: false }), null);
   for (const input of [
     { agent: "worker", task: "build 05" },
     { agent: "factory-worker", task: "x", worktree: true },
@@ -84,6 +87,10 @@ test("D71: agents start only from a generated workflow file", () => {
     { workflow: true, context: "fresh" },
     { workflow: "const r = await runs.run('x', {});" },
     { workflow: wf, context: "fresh", agent: "worker" },
+    { agent: "factory-review-axis", task: "x", context: "fork" },
+    { agent: "factory-review-axis", task: "x", worktree: true },
+    { agent: "factory-review-axis" },
+    { agent: "factory-reviewer", task: "x", context: "fresh" },
   ]) assert.equal(sub(input)?.rule, "lead", `should block: ${JSON.stringify(input)}`);
 });
 

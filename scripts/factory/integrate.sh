@@ -96,13 +96,16 @@ if check_lint && run_check tests "$FACTORY_TEST_CMD" \
     -m "Integrated by the factory after lint and tests passed." -- . ":(exclude)${FACTORY_DIR}"
   git rev-parse HEAD > "$dir/state/$ticket.integrated"
   bash "$here/checkpoint.sh" "$feature" >/dev/null
-  rm -f "$(draft_patch "$feature" "$ticket")"   # D73: the draft is spent
+  rm -f "$(draft_patch "$feature" "$ticket")" "$(draft_patch "$feature" "$ticket").status"   # D73: the draft is spent
   echo "  ✓ committed $(git rev-parse --short "$(cat "$dir/state/$ticket.integrated")"); ready for review"
 else
   project_apply -R --index "$patch"
+  # D78: say whether the worker checked its own work before handing it over.
+  sc="$(cat "$(draft_patch "$feature" "$ticket").status" 2>/dev/null || true)"
+  sc="${sc:-never run}"
   # The failure is a round like any review FAIL, so escalation is automatic (D38).
   write_fail_verdict "$feature" "$ticket" integrate \
-    "Lint, tests or the extra check failed when integrating the worker's patch. Log: $log${lint_fail:+. New lint errors (fix them, never silence them): $lint_fail}"
+    "Lint, tests or the extra check failed when integrating the worker's patch. Log: $log${lint_fail:+. New lint errors (fix them, never silence them): $lint_fail}. The worker's last self-check: $sc. Run scripts/factory/self-check.sh $feature until it prints SELF-CHECK: PASS before handing over."
   bash "$here/checkpoint.sh" "$feature" >/dev/null
   echo "  ✗ checks failed; patch reverted. Recorded in $dir/verdicts/$ticket-code.md (log: $log)"
   exit 1

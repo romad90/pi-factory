@@ -8,6 +8,7 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"; [ -n "${KEEP:-}" ] || trap 'rm -rf "$work"' EXIT
 export FACTORY_NOTIFY=0 GIT_AUTHOR_NAME=test GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=t@t
+export PI_CODING_AGENT_DIR="$work/pi-agent"   # never this machine's Pi providers (D79)
 export GIT_CONFIG_GLOBAL="$work/gitconfig"; printf '[commit]\n\tgpgsign = false\n[init]\n\tdefaultBranch = main\n' > "$GIT_CONFIG_GLOBAL"
 
 pass=0
@@ -269,6 +270,13 @@ rm bad.patch
 bash scripts/factory/workflow.sh build-wave demo >"$work/wf.log"
 wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
 grep -q '"agent": "factory-worker-heavy"' "$wf" && t "round 2 routes to the heavy worker" || fail "heavy routing"
+jscheck() { { echo '(async () => {'; sed 1d "$1"; echo '})'; } > "$work/wf-check.js"; node --check "$work/wf-check.js"; }
+grep -q '^const GATE = null;' "$wf" && jscheck "$wf" && t "build wave: no self-check gate by default, script parses" || fail "gate default" "$(head -5 "$wf")"
+git rm -q --cached "$wf" >/dev/null 2>&1; rm -f "$wf"; git commit -qm "test: drop wave" >/dev/null 2>&1 || true
+FACTORY_SELF_CHECK_GATE=1 bash scripts/factory/workflow.sh build-wave demo >"$work/wf.log"
+wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
+grep -q 'scripts/factory/self-check.sh demo' "$wf" && grep -q 'resume: r.runId' "$wf" && jscheck "$wf" \
+  && t "build wave: FACTORY_SELF_CHECK_GATE=1 gates each worker on its self-check, one same-session retry (D78)" || fail "gate on" "$(sed -n 2,40p "$wf")"
 
 # The wave returned no patch path: the work is in the worker's worktree,
 # which pi-subagents keeps on a pi-subagents/<ticket>-… branch (D60).
@@ -296,6 +304,8 @@ grep -q '^SELF-CHECK: FAIL guard' "$work/sc.log" && grep -q 'silence' "$work/sc.
 cp "$work/hello.bak" "$wt_project/src/tools/hello.js"; mv "$wt_project/src/tools/a.js" "$work/a.js.bak"
 if sc; then fail "self-check must fail on red tests" "$(cat "$work/sc.log")"; fi
 grep -q '^SELF-CHECK: FAIL tests' "$work/sc.log" && t "self-check fails on red tests, with the end of their output" || fail "self-check tests" "$(cat "$work/sc.log")"
+grep -q '^FAIL tests ' "$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/drafts/demo/01-hello.patch.status" \
+  && t "self-check records its last result next to the draft (D78)" || fail "self-check status"
 mv "$work/a.js.bak" "$wt_project/src/tools/a.js"
 # D73: every self-check run saves the change as a draft that outlives the worktree.
 sc || fail "self-check pass again" "$(cat "$work/sc.log")"
@@ -307,7 +317,7 @@ git -C "$wt" switch -q -c not-a-worker
   && t "locate-patch falls back to the draft when no worktree is left (D73)" || fail "draft fallback" "$(bash scripts/factory/locate-patch.sh demo 01-hello 2>&1)"
 git -C "$wt" switch -q pi-subagents/01-hello-abc123-s0-t0; git branch -q -D not-a-worker
 bash scripts/factory/integrate.sh demo 01-hello null >"$work/int.log" 2>&1 || fail "integrate 01 from the worktree" "$(cat "$work/int.log")"
-[ ! -e "$draft" ] && t "a successful integration removes the ticket's draft" || fail "draft left after integration"
+[ ! -e "$draft" ] && [ ! -e "$draft.status" ] && t "a successful integration removes the ticket's draft and its status" || fail "draft left after integration"
 t "null patch is rebuilt from the worker's worktree"
 ! git show --stat HEAD~1 | grep -q 'node_modules\|\.env\.factory' && t "the rebuilt patch leaves out the dependency link and .env.factory" \
   || fail "dependency link in the patch" "$(git show --stat HEAD~1)"
@@ -465,6 +475,9 @@ gate_ok "gate passes the whole mission (G1-G5)"
 bash scripts/factory/metrics.sh demo > "$work/metrics.md"
 grep -q 'First-pass review rate | 0% (0/2)' "$work/metrics.md" && t "metrics: first pass from history (no ticket passed its first round)" || fail "metrics first pass" "$(cat "$work/metrics.md")"
 grep -q '(3)' "$work/metrics.md" && grep -q 'patch guard | 1' "$work/metrics.md" && t "metrics: deterministic fails and guard blocks counted" || fail "metrics det" "$(cat "$work/metrics.md")"
+grep -q 'factory-worker: gw/maker-1' "$work/metrics.md" && grep -q 'factory-worker-heavy: gw/maker-1' "$work/metrics.md" \
+  && grep -q 'factory-contract-critic: gw/judge-1' "$work/metrics.md" \
+  && t "metrics: models of every role, from the runs workflow.sh recorded (D77)" || fail "metrics models" "$(grep -i model "$work/metrics.md")"
 
 echo "Health ratchet"
 mkdir -p src/lib
@@ -499,6 +512,21 @@ sed -i.bak 's/x/y/' README.md && rm README.md.bak; mkdir -p deploy; echo 'name: 
 git add -A; git commit -q -m "fix(deploy): kebab-case app name"
 bash scripts/factory/fix.sh check helm-name >"$work/fix.log" 2>&1 && t "small non-behavior fix passes blast radius + checks" || fail "fix check" "$(cat "$work/fix.log")"
 grep -q 'workflow.sh light helm-name' "$work/fix.log" && t "fix lane hands over to one light reviewer" || fail "fix next"
+# D75: the fix-lane reviewer can ask, and the human answers, without a mission.
+printf 'Should the chart keep the old name as an alias?\n' | bash scripts/factory/human.sh ask helm-name - --stdin >"$work/ask.log" 2>&1 \
+  && grep -q 'ASKED' "$work/ask.log" && [ -f .scratch/light/helm-name/state/open-question.md ] \
+  && bash scripts/factory/human.sh decide helm-name "no alias" >/dev/null 2>&1 \
+  && grep -q 'no alias' .scratch/light/helm-name/decisions.tsv && [ ! -f .scratch/light/helm-name/state/open-question.md ] \
+  && t "fix lane: a reviewer's question is recorded and answered without a mission spec" || fail "light ask" "$(cat "$work/ask.log")"
+bash scripts/factory/human.sh approve helm-name >"$work/ask.log" 2>&1 && fail "approve must need a mission"
+grep -q 'needs a mission' "$work/ask.log" && t "fix lane: contract gates still need a mission" || fail "light approve" "$(cat "$work/ask.log")"
+# D76: deleting code doesn't count against the fix-lane limit.
+bash scripts/factory/fix.sh start dedupe "remove duplicated lists" >/dev/null
+mkdir -p docs/dup; seq 1 150 > docs/dup/list.txt; git add -A; git commit -q -m "docs: list"
+bash scripts/factory/fix.sh start dedupe2 "remove duplicated lists" >/dev/null
+git rm -q docs/dup/list.txt; mkdir -p docs/dup; echo 'see the generator' > docs/dup/README.md; git add -A; git commit -q -m "docs: drop the copied list"
+bash scripts/factory/fix.sh check dedupe2 >"$work/fix.log" 2>&1 && grep -q 'Lines removed:\*\* 150' "$work/fix.log" \
+  && t "fix lane: 150 deleted lines pass the limit, only added lines count (D76)" || fail "fix deletions" "$(cat "$work/fix.log")"
 bash scripts/factory/fix.sh start tool-tweak "tweak a tool" >/dev/null
 echo '// tweak' >> src/tools/a.js; git commit -q -am "fix: tweak"
 if bash scripts/factory/fix.sh check tool-tweak >"$work/fix.log" 2>&1; then fail "behavior fix must be blocked" "$(cat "$work/fix.log")"; fi
@@ -616,6 +644,27 @@ grep -q "models changed since the last probe" "$work/pre.log" && t "pre-flight r
 node scripts/factory/models-probe.mjs --stamp >"$work/probe.log" 2>&1 && git add .factory/models-probe.ok && git commit -qm "test: probe" \
   && bash scripts/factory/doctor.sh --quick >"$work/pre.log" 2>&1 && t "probed models pass pre-flight" || fail "probe ok" "$(cat "$work/probe.log" "$work/pre.log")"
 kill $gw; wait $gw 2>/dev/null || true; unset FACTORY_GATEWAY_URL
+
+# D79: two gateways, as in mission 2's last day. Pi's models.json maps each
+# provider to its own URL and key; the worker's provider doesn't serve its model.
+maker="$(sed -n 's/^model: gw\///p' .pi/agents/factory/factory-worker.md)"; judge="$(sed -n 's/^model: gw\///p' .pi/agents/factory/factory-reviewer.md)"
+for a in .pi/agents/factory/*.md; do sed -i.bak "s|^model: gw/$maker|model: makers/$maker|; s|^model: gw/$judge|model: judges/$judge|" "$a" && rm -f "$a.bak"; done
+node -e '
+const fs=require("fs"); const f=".factory/model-families.json"; const j=JSON.parse(fs.readFileSync(f,"utf8"));
+j.families.unshift({match:"makers/*",family:"maker"},{match:"judges/*",family:"judge"}); fs.writeFileSync(f, JSON.stringify(j,null,2));'
+p1=$((port + 1)); p2=$((port + 2)); mkdir -p "$PI_CODING_AGENT_DIR"
+printf '{"providers":{"makers":{"baseUrl":"http://127.0.0.1:%s/v1","api":"openai-completions","apiKey":"MAKERS_KEY","models":[]},"judges":{"baseUrl":"http://127.0.0.1:%s/v1","api":"openai-completions","apiKey":"literal-key","models":[]}}}' "$p1" "$p2" > "$PI_CODING_AGENT_DIR/models.json"
+SERVED="other-model" PICKY=none PORT=$p1 node "$work/gw.mjs" & g1=$!
+SERVED="$judge" PICKY=none PORT=$p2 node "$work/gw.mjs" & g2=$!; sleep 1
+if MAKERS_KEY=k node scripts/factory/models-probe.mjs >"$work/probe.log" 2>&1; then fail "probe must catch a model its provider doesn't serve"; fi
+grep -q "factory-worker: makers/$maker is not served to this key on makers" "$work/probe.log" && grep -q "factory-reviewer: judges/$judge served" "$work/probe.log" \
+  && t "probe: each agent on its own provider from Pi's models.json; the 403 case is caught before a wave (D79)" || fail "two gateways" "$(cat "$work/probe.log")"
+kill $g1; wait $g1 2>/dev/null || true
+SERVED="$maker" PICKY=none PORT=$p1 node "$work/gw.mjs" & g1=$!; sleep 1
+MAKERS_KEY=k node scripts/factory/models-probe.mjs >"$work/probe.log" 2>&1 && grep -q 'PROBE: OK' "$work/probe.log" && ! grep -q 'literal-key' "$work/probe.log" \
+  && t "probe: two gateways pass, keys never printed" || fail "two gateways ok" "$(cat "$work/probe.log")"
+kill $g1 $g2; wait $g1 $g2 2>/dev/null || true
+git checkout -q -- .pi .factory; rm -f "$PI_CODING_AGENT_DIR/models.json"
 
 if [ -n "${mono:-}" ]; then
   [ "$(cat "$mono/projects/other/keep.js")" = keep ] && [ -z "$(git -C "$mono" log --format=%H -- projects/other README.md | awk 'NR > 1')" ] \

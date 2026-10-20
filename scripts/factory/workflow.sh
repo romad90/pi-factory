@@ -108,9 +108,30 @@ return { output: r.output };'
       add "$name" "$agent" true worker "$feature" "$name"
       n=$((n + 1))
     done
-    body='const results = await runs.all(ITEMS.map(it => ({
+    # D78: with FACTORY_SELF_CHECK_GATE=1 (commands.env), pi-subagents runs the
+    # self-check in each worker's worktree when it finishes (a per-child gate);
+    # a red hand-over goes back to the same session once, with the failure.
+    load_commands
+    gate=null
+    if [ "${FACTORY_SELF_CHECK_GATE:-0}" = 1 ]; then
+      prefix="$(project_prefix)"
+      gate="$(node -e 'process.stdout.write(JSON.stringify({ command: process.argv[1], timeoutMs: 600000 }))' \
+        "${prefix:+cd $prefix && }bash scripts/factory/self-check.sh $feature")"
+    fi
+    body='const GATE = '"$gate"';
+const first = await runs.all(ITEMS.map(it => Object.assign({
   key: it.key, agent: it.agent, task: it.task, worktree: true,
-})));
+}, GATE ? { gate: GATE } : {})));
+const results = [];
+for (let i = 0; i < first.length; i++) {
+  let r = first[i];
+  if (GATE && r && r.ok === false && r.resumability && r.resumability.state === "resumable") {
+    r = await runs.run(ITEMS[i].key + "-selfcheck", { resume: r.runId, task:
+      "Your hand-over failed the self-check:\n" + (r.error || "") +
+      "\nFix the code, run scripts/factory/self-check.sh until it prints SELF-CHECK: PASS, then report again." });
+  }
+  results.push(r);
+}
 // D39: return the patch path, so the lead never searches for it.
 const patchOf = (r) => {
   const paths = [].concat(r?.artifactPaths ?? [], r?.handoff?.artifactPaths ?? []);
@@ -119,6 +140,7 @@ const patchOf = (r) => {
 return results.map((r, i) => ({
   ticket: ITEMS[i].key, patch: patchOf(r), output: r?.output,
   artifactPaths: r?.artifactPaths, handoff: r?.handoffPath ?? r?.handoff ?? null,
+  ok: r?.ok, error: r?.error ?? null, usage: r?.results?.[0]?.usage ?? null,
 }));'
     ;;
 
@@ -163,7 +185,15 @@ i=2; while [ -e "$wf_file" ]; do wf_file="$wf_dir/$(date +%Y%m%d-%H%M%S)-$mode-$
   printf '%s\n' "$body"
 } > "$wf_file"
 
-# The file is written after the checkpoints above, so commit it now. An
+# D77: who ran with which model, as configured when the wave was generated
+# (models change mid-mission). metrics.sh reads it; nothing else depends on it.
+runs_tsv="$(dirname "$wf_dir")/runs.tsv"
+[ -f "$runs_tsv" ] || printf 'date\tworkflow\tkey\tagent\tmodel\tthinking\n' > "$runs_tsv"
+fm() { sed -n "s/^$2:[[:space:]]*//p" ".pi/agents/factory/$1.md" 2>/dev/null | head -1; }
+while IFS=$'\t' read -r key agent _ _; do
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$(date '+%F %H:%M')" "$(basename "$wf_file")" "$key" "$agent" "$(fm "$agent" model)" "$(fm "$agent" thinking)" >> "$runs_tsv"
+done < "$items"
+# The files are written after the checkpoints above, so commit them now. An
 # untracked file makes the tree dirty and worktree admission refuses to run.
 if [ "$mode" = "light" ]; then bash "$here/checkpoint.sh" --light "$feature" >/dev/null
 else bash "$here/checkpoint.sh" "$feature" >/dev/null; fi

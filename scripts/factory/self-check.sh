@@ -27,7 +27,11 @@ load_commands
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 lines="${FACTORY_SELF_CHECK_LINES:-40}"
 
+status() {                             # D78: what the worker's last self-check said
+  [ -n "${draft:-}" ] && printf '%s %s\n' "$1" "$(date '+%F %H:%M')" > "$draft.status" || true
+}
 fail() {                               # <check> <output file>
+  status "FAIL $1"
   echo "SELF-CHECK: FAIL $1"
   tail -n "$lines" "$2"
   echo "Fix the code and run scripts/factory/self-check.sh $feature again. Never silence the check."
@@ -62,4 +66,5 @@ for check in tests extra; do
   bash -c "$cmd" > "$tmp/$check.out" 2>&1 || fail "$check" "$tmp/$check.out"
 done
 
+status PASS
 echo "SELF-CHECK: PASS (guard, lint, tests${FACTORY_EXTRA_CMD:+, extra}; $(grep -c '^diff --git' "$tmp/change.patch") files changed)"

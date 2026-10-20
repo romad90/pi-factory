@@ -147,6 +147,11 @@ The factory builds and maintains bots, APIs, front ends and batch jobs, in any l
 | Waves run up to 2 h; a timeout is salvaged (D72) | A strong model thinking hard is slow; 30 minutes cut it off mid-work. The worktree still holds the work, so integrating it costs nothing. |
 | Self-check saves a draft patch (D73) | A worktree can be removed before anyone salvages it. Saving the change at every self-check means a timeout loses at most the work since the last check. |
 | Only the `STEP:` line moves the lead (D74) | A table of statuses invites interpretation; one machine-readable line doesn't. |
+| Reviewers dispatch axes, fixes can ask (D75) | A guard that refuses the one call a brief asks for turns every review into a question for the human. |
+| The fix lane limits added lines (D76) | Deleting duplication is the safest change; counting it as risk blocks the wrong thing. |
+| Every run records its model (D77) | Models change mid-mission; metrics have to say which model did the work, not only which judged it. |
+| The worker's check is recorded, then enforced (D78) | A hand-over without a passing self-check costs a whole round; first make it visible, then make it impossible. |
+| Each model probed on its own provider (D79) | Two machines, two keys, two model lists: a probe that knows one gateway passes while the other refuses. |
 | A monorepo folder is its own project (D56) | Many teams keep each domain in a folder with its own CI. Installing at the root would impose the factory on every team; scoping every diff, patch, gate and CI job to the folder keeps the pilot to your project, and the guards prove nothing leaks to a sibling. |
 | Skills pinned by checksum (D36), models linted (D31) | "Use version X" and "judges on another family" must be checkable, not conventions. |
 

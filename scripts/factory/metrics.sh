@@ -19,7 +19,7 @@ assertions="$(contract_ids "$spec" | grep -c . || true)"
 amendments="$(grep -cE '^\s*- \*\*(Amended|Withdrawn):\*\*' "$spec" || true)"
 
 shopt -s nullglob
-tickets=0; fixes=0; first_pass=0; rounds=0; reviewed=0; tokens=0; det_fail=0
+tickets=0; fixes=0; first_pass=0; rounds=0; reviewed=0; tokens=0; det_fail=0; unchecked=0
 for t in "$dir"/issues/*.md; do
   tickets=$((tickets + 1))
   name="$(ticket_name "$t")"
@@ -34,6 +34,7 @@ for t in "$dir"/issues/*.md; do
   [ "$(verdict_field "$r1" Result)" = "PASS" ] && first_pass=$((first_pass + 1))
   for h in "${v%.md}".r*.md; do
     case "$(verdict_field "$h" Brief)" in integrate|worker-no-patch|patch-guard) det_fail=$((det_fail + 1)) ;; esac
+    grep -qE "worker's last self-check: (never run|FAIL)" "$h" 2>/dev/null && unchecked=$((unchecked + 1))
   done
 done
 
@@ -64,6 +65,11 @@ if [ -f "$dir/decisions.tsv" ]; then      # P8: human interventions vs questions
 fi
 models_list=""
 [ ${#models[@]} -gt 0 ] && models_list="$(printf '%s\n' "${models[@]}" | sort -u | paste -sd, - | sed 's/,/, /g')"
+# D77: every role's models, from the runs workflow.sh recorded (judges only before).
+if [ -s "$dir/runs.tsv" ]; then
+  models_list="$(awk -F'\t' 'NR > 1 && $5 != "" { k = $4 ": " $5 ($6 != "" ? " (" $6 ")" : ""); if (!(k in seen)) { seen[k] = 1; n[$4]++ } c[k]++ }
+    END { for (k in c) print k " ×" c[k] }' "$dir/runs.tsv" | sort | paste -sd';' - | sed 's/;/; /g')"
+fi
 
 first="$(git log --reverse --format=%ct -- "$dir" | awk 'NR == 1')"
 last="$(git log -1 --format=%ct -- "$dir")"
@@ -86,6 +92,7 @@ cat <<EOF
 | Tickets (of which fix tickets) | $tickets ($fixes) |
 | First-pass review rate | $(pct "$first_pass" "$reviewed") ($first_pass/$reviewed) |
 | Rounds, total (of which deterministic fails: integration, no patch) | $rounds ($det_fail) |
+| Failed integrations handed over without a passing self-check (D78) | $unchecked |
 | Behavior validation rounds | ${behavior_rounds:--} |
 | Behavior assertions (evidence or label) | $evidence |
 | Code health: ratchet and repo tool (G5) | $health |
@@ -95,5 +102,5 @@ cat <<EOF
 | Questions answered by the resolver (auto, unreviewed until a human reads them) | $auto |
 | Cycle time (first → last mission commit) | $cycle |
 | Tokens reported in verdicts | $( [ "$tokens" -gt 0 ] && echo "$tokens" || echo "not reported" ) |
-| Models used (configured, from collect.sh) | ${models_list:--} |
+| Models used (role: model ×runs) | ${models_list:--} |
 EOF

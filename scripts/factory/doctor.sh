@@ -49,12 +49,15 @@ if [ "${1:-}" = "--quick" ]; then
   if [ -n "$FACTORY_GATEWAY_URL" ]; then
     if curl -sS -m 5 -o /dev/null "$FACTORY_GATEWAY_URL" 2>/dev/null; then ok "model gateway reachable"
     else bad "model gateway unreachable ($FACTORY_GATEWAY_URL): VPN or network down?"; fi
-    # Models probed against the gateway since the last model change (D59).
+  fi
+  # Models probed on their providers since the last model change (D59, D79):
+  # each agent's provider from Pi's models.json, else FACTORY_GATEWAY_URL.
+  if FACTORY_GATEWAY_URL="$FACTORY_GATEWAY_URL" node "$here/models-probe.mjs" --resolvable 2>/dev/null; then
     if [ "$(cat .factory/models-probe.ok 2>/dev/null)" = "$(node "$here/models-probe.mjs" --hash 2>/dev/null)" ]; then
-      ok "models probed on the gateway (served, thinking level, tool turns)"
-    else bad "models changed since the last probe: FACTORY_GATEWAY_URL=… node scripts/factory/models-probe.mjs --stamp, then commit .factory/models-probe.ok"; fi
+      ok "models probed on their providers (served, thinking level, tool turns)"
+    else bad "models changed since the last probe: node scripts/factory/models-probe.mjs --stamp, then commit .factory/models-probe.ok"; fi
   else
-    printf '  - gateway checks skipped (set FACTORY_GATEWAY_URL in .factory/commands.env)\n'
+    printf '  - model probe skipped (no agent model maps to a provider in Pi'"'"'s models.json, and FACTORY_GATEWAY_URL is empty)\n'
   fi
   [ "$fail" -eq 0 ] && echo "PREFLIGHT: OK" || echo "PREFLIGHT: FAIL"
   exit "$fail"
