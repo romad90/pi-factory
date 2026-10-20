@@ -81,6 +81,31 @@ Skills we already use in the session and that map to lanes: code review (review 
 
 Not taken: its orchestrator is a 575-line prompt a model follows, with state in a file the model edits, the design P2 moves away from.
 
+## From the October 2026 scan of open-source factories
+
+Ten projects picked from [awesome-software-factories](https://github.com/pungme/awesome-software-factories) for being closest to ours: deterministic control, gates, or a page showing agents at work. Read from their code (cloned, not run); star counts could not be fetched.
+
+| Project | What it is | Idea for us | Fits |
+|---|---|---|---|
+| [DoorDash agentic-orchestrator](https://github.com/doordash-oss/agentic-orchestrator) (Apache-2.0) | Go server and desktop app; fixed phases from idea to PR | Progress is measured, not claimed: a round counts only if blockers drop or the worktree fingerprint changes; stop after 3 without progress, with a typed outcome. At 60% context the worker writes `progress.md` and a fresh session continues. The harness writes the verification report, never the agent | P9 step 3, P2 |
+| [Symphony](https://github.com/openai/symphony) (Apache-2.0) | Spec and Elixir reference; the issue tracker is the control plane | Stall = no agent event for N seconds, not total time; typed end reasons (succeeded, failed, timed out, stalled); one snapshot for page, API and terminal; "the dashboard is never needed for correctness" | P10, worker timeouts |
+| [Gas Town](https://github.com/gastownhall/gastown) (MIT) | Go; a mayor agent dispatches fleets of workers | Model escalation table (after N failures, move up a model, with a cap); stuck-agent detection by ping; last-activity colours per worker | P1 chains, P10 |
+| [Super Simple Software Factory](https://github.com/disler/super-simple-software-factory) (MIT) | Deterministic Python owns the graph, agents are bounded nodes, runs on **Pi** | Every phase starts as failed and must earn success; agents return a typed envelope (status, summary, artifacts, notes for the next agent) checked by code; a malformed answer or failed gate is corrected in the same session; a write allowlist checked by fingerprinting the repo before and after | P2, P9 |
+| [Anneal](https://github.com/mosonlab/anneal) (MIT) | Chains of agents plan, review, implement, merge; drives **Pi** | Isolated Pi launches (`--no-skills --no-context-files --no-prompt-templates`, a fresh config folder per run, a pre-flight on `pi --help` for required flags); stall timeout from the last JSON event; two reviewers of different families, one blind to the other; one settlement step that answers every finding instead of review loops | worker launch, P9, review lane |
+| [Atelier](https://github.com/duanecilliers/atelier) (MIT) | Python engine on SSSF and a Next.js cockpit | SQLite trace (sessions, phases, events, envelopes, gate results) read by the page with a row cursor; gates that check claims (`diff_matches_claims`, `artifacts_exist`); a fresh builder resumes from a diff handoff | P10, P9 |
+| [sgai](https://github.com/sandgardenhq/sgai) (MIT) | Go server, React page, one coordinator agent | Signal-then-refetch: a payload-less SSE `reload`, then one state fetch, with polling fallback | P10 |
+| [Mastra Factory](https://github.com/mastra-ai/softwarefactory-template) (Apache-2.0) | A board of stages with rules; LLM workers | Stages as data (kind, role, action on entry); deterministic health findings with evidence and a suggested repair; human approvals as proposed decisions; optimistic revisions so a step can't run twice | P2, P10, P8 |
+| [software-factory (nicolasmelo1)](https://github.com/nicolasmelo1/software-factory) (MIT) | Rust rules engine, not an orchestrator | Every rule written twice, prose and check, and each check has a fixture proving it fires; existing violations frozen with a review date (our lint baseline, generalised); evidence hashes recomputed, never trusted | patch guard, resolver, P2 |
+| [Bernstein](https://github.com/sipyourdrink-ltd/bernstein) (Apache-2.0) | Deterministic scheduler for many CLI agents | Completion checked by typed signals, not the agent's word; heartbeat files; time limits by task size; retry 1 raises effort, retry 2 a stronger model; a hash chain over the audit log | P9, P1, `decisions.tsv` |
+
+What they agree on, and what it says about us:
+
+- **The control plane is code.** The projects that work with several models (SSSF, Atelier, Anneal, DoorDash, Bernstein, Mastra) all keep the loop in code. The ones with an LLM coordinator (Gas Town's mayor, sgai, Symphony's prompt-driven stages) assume a frontier model. Our gateway models make P2 more urgent, not less.
+- **No agent reports its own success.** Envelopes, typed signals, recomputed evidence: success is something code observes. Our integrate gate already works this way; the lead's report and the worker's "self-check PASS" do not yet.
+- **Stalls are about silence, not duration.** Time since the last event, not since the start.
+
+Not taken: LLM coordinators (Gas Town, sgai, Symphony's routing by prompt), heavy stacks (Postgres, Redis, Electron, OpenTelemetry), merge trains and signed receipts. They answer a team's scale, not a file-in-git factory's.
+
 ## What to watch for
 
 Each of these tools keeps something we don't want to give away: the runtime (OpenCode Swarm needs OpenCode), the hosted control plane and its data (Factory, Port), or a maintainer we depend on. The test for anything we take: does it keep working if that vendor disappears tomorrow?

@@ -5,7 +5,7 @@ From mission 1's retro and from ideas borrowed (never installed) elsewhere. One 
 Sources: **M** mission 1 retro · **A** Addy Osmani's agent-skills · **P** pstack · **E** ECC · **N** new, from reviewing the flow.
 Effort: S < half a day · M ≈ 1–2 days · L > 2 days.
 
-**Larger changes** are discussed as [proposals](proposals/README.md) first: several gateways (P1), the lead as a script (P2), the maintenance lane (P3, the content of X9), director and triggers (P4), continuous improvement with pull requests (P5), a control room with a dashboard and events from operations (P6), a launch gate in a sandbox (P7), a hands-off mission with at most five human interventions (P8, next), rounds that converge (P9).
+**Larger changes** are discussed as [proposals](proposals/README.md) first: several gateways (P1), the lead as a script (P2), the maintenance lane (P3, the content of X9), director and triggers (P4), continuous improvement with pull requests (P5), a control room with a dashboard and events from operations (P6), a launch gate in a sandbox (P7), a hands-off mission with at most five human interventions (P8, next), rounds that converge (P9), a front page showing every subagent at every stage (P10).
 
 **Rule for borrowed ideas:** mattpocock/skills v1.3.1 stays the only skill foundation. Borrow an idea or a single skill, vendored, pinned and scanned. Never install a second skill router.
 
