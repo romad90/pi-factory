@@ -33,8 +33,11 @@ dirty="$(git status --porcelain --untracked-files=no -- . ":(exclude)${FACTORY_D
 
 # D56: in a monorepo, every patch is made relative to the project first; a
 # patch that reaches outside the project is blocked like any unsafe patch.
-raw_patch="$patch"; patch="$(mktemp)"; trap 'rm -f "$patch"' EXIT
-if ! project_patch "$raw_patch" "$patch"; then
+raw_patch="$patch"; patch="$(mktemp)"; hookless="$(mktemp)"; trap 'rm -f "$patch" "$hookless"' EXIT
+# D87: the hook's dependency links and .env.factory are never part of a
+# change; a captured patch that still has them loses them here, not a round.
+node "$here/patch-paths.mjs" strip-hook "$raw_patch" "$hookless" "${FACTORY_DEPS_LINKS:-node_modules .venv}" 2>&1 | sed 's/^/  /' >&2
+if ! project_patch "$hookless" "$patch"; then
   write_fail_verdict "$feature" "$ticket" patch-guard \
     "The patch was blocked by the patch guard: paths: it changes files outside the project $(project_prefix)/"
   bash "$here/checkpoint.sh" "$feature" >/dev/null
@@ -110,7 +113,7 @@ if check_lint && run_check tests "$FACTORY_TEST_CMD" \
    && run_check extra "$FACTORY_EXTRA_CMD"; then
   type="feat"; [[ "$ticket" == *-fix-* ]] && type="fix"
   git commit -q -m "${FACTORY_COMMIT_TYPE:-$type}($feature): $ticket" \
-    -m "Integrated by the factory after lint and tests passed." -- . ":(exclude)${FACTORY_DIR}"
+    -m "Integrated by the factory after lint and tests passed." -m "Factory-Script: integrate" -- . ":(exclude)${FACTORY_DIR}"
   git rev-parse HEAD > "$dir/state/$ticket.integrated"
   bash "$here/checkpoint.sh" "$feature" >/dev/null
   journal_collect "$feature" "$ticket" "integrated $(git rev-parse --short HEAD)"   # D84
