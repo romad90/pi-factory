@@ -16,13 +16,16 @@ if (cmd === "ci") {
   let y = fs.readFileSync(from, "utf8");
   if (pkg) {
     // D92: the factory is not in the repository. Each job that runs a factory
-    // script first fetches the version the project expects and links it.
-    const fetch = '    - test -e scripts/factory || { git clone -q --depth 1 --branch "v$(cat .factory/VERSION)" "$FACTORY_PACKAGE_GIT" /tmp/pi-factory && bash /tmp/pi-factory/scripts/factory/link.sh; }\n';
+    // script first fetches it and links it: from FACTORY_PACKAGE_GIT (a CI
+    // variable, no default: the project decides where its CI may fetch from),
+    // at the commit onboard recorded in .factory/package-sha, checked before
+    // anything from it runs; into a directory of its own.
+    const fetch = "    - 'test -e scripts/factory || { if [ -z \"$FACTORY_PACKAGE_GIT\" ]; then echo \"FACTORY_PACKAGE_GIT is not set (a CI variable, the URL of your pi-factory mirror)\" >&2; exit 1; fi; [ -s .factory/package-sha ] || { echo \".factory/package-sha missing (factory onboard records it)\" >&2; exit 1; }; sha=\"$(cat .factory/package-sha)\"; d=\"$(mktemp -d)\"; git clone -q \"$FACTORY_PACKAGE_GIT\" \"$d/pi-factory\" && git -C \"$d/pi-factory\" checkout -q --detach \"$sha\" && [ \"$(git -C \"$d/pi-factory\" rev-parse HEAD)\" = \"$sha\" ] && bash \"$d/pi-factory/scripts/factory/link.sh\"; }'\n";
     y = y.replace(/^  script:\n(?=(?:    - .*\n)*?    - .*scripts\/factory\/)/gm, "  script:\n" + fetch)
          .replace("command -v bash >/dev/null && command -v node >/dev/null || apk add --no-cache bash nodejs", "command -v bash >/dev/null && command -v node >/dev/null && command -v git >/dev/null || apk add --no-cache bash nodejs git")
          .replace(/command -v bash >\/dev\/null \|\| apk add --no-cache bash$/m, "command -v bash >/dev/null && command -v git >/dev/null || apk add --no-cache bash git")
          .replace("node scripts/factory/models-lint.mjs", "node scripts/factory/models-lint.mjs --per-machine-ok")
-         .replace(/^variables:\n/m, 'variables:\n  FACTORY_PACKAGE_GIT: "https://github.com/romad90/pi-factory.git"   # or your mirror of it\n');
+         .replace(/^variables:\n/m, "# FACTORY_PACKAGE_GIT: set it as a CI/CD variable, the URL of your pi-factory mirror\n# (no default). Jobs check out the commit in .factory/package-sha.\nvariables:\n");
     const fetched = (y.match(/pi-factory\/scripts\/factory\/link\.sh/g) || []).length;
     if (fetched !== 3) { console.error(`CI template: ${fetched}/3 jobs fetch the package; update project-files.cjs`); process.exit(1); }
   }
@@ -67,7 +70,7 @@ if (cmd === "ci") {
   // In a monorepo the project is this folder, not the git root (D56).
   if (prefix) cur.subagents.projectRootResolution = "nearest";
   const ov = cur.subagents.agentOverrides || {};
-  for (const k of Object.keys(ov)) if (k.startsWith("factory-")) delete ov[k];  // would crash pi-subagents
+  // Kept: pi-subagents 0.76.1 applies agentOverrides to factory-* agents (D92 spike).
   if (cur.subagents.agentOverrides && !Object.keys(ov).length) delete cur.subagents.agentOverrides;
   fs.mkdirSync(require("path").dirname(dstFile), { recursive: true });
   fs.writeFileSync(dstFile, JSON.stringify(cur, null, 2) + "\n");

@@ -449,7 +449,7 @@ echo 'export const count = (n) => n - 1;' > src/tools/count.js; git diff -- src 
 bash scripts/factory/integrate.sh demo 02-count "$work/02c.patch" >/dev/null 2>&1 || true
 [ ! -f $m/state/02-count.stuck ] && bash scripts/factory/integrate.sh demo 02-count "$work/02c.patch" >/dev/null 2>&1 || true
 [ -f $m/state/02-count.stuck ] && grep -q 'No progress' $m/verdicts/02-count-code.md \
-  && bash scripts/factory/next.sh demo | grep -q '02-count .*ESCALATE' \
+  && grep -q '02-count .*ESCALATE' <<<"$(bash scripts/factory/next.sh demo)" \
   && t "two rounds failing the same way escalate without a third (D84)" || fail "stuck" "$(ls $m/state; bash scripts/factory/next.sh demo | head -12)"
 git reset -q --hard "$head"
 cat > $m/verdicts/02-count-code.md <<V
@@ -762,11 +762,32 @@ t "onboard writes only the project's own files ($(wc -w <<<"$changed" | tr -d ' 
   && grep -qx '/apps/svc/scripts/factory' "$pk/.git/info/exclude" && bash scripts/factory/link.sh --check >/dev/null \
   && t "factory scripts, briefs and docs are local links, excluded from git (monorepo folder)" || fail "links" "$(ls -la scripts; cat "$pk/.git/info/exclude")"
 [ "$(cat .factory/VERSION)" = "$(cat "$root/.factory/VERSION")" ] && ! grep -q '<' .pi/settings.json \
+  && [ "$(cat .factory/package-sha)" = "$(git -C "$root" rev-parse HEAD)" ] \
   && [ "$(grep -c 'pi-factory/scripts/factory/link.sh' .factory/ci/factory.gitlab-ci.yml)" = 3 ] && grep -q 'models-lint.mjs --per-machine-ok' .factory/ci/factory.gitlab-ci.yml \
-  && grep -q 'cd "apps/svc"' .factory/ci/factory.gitlab-ci.yml \
-  && t "project expects this factory version; CI fetches it and links it; no placeholder model scope" || fail "onboard files" "$(cat .pi/settings.json .factory/ci/factory.gitlab-ci.yml)"
+  && grep -q 'cd "apps/svc"' .factory/ci/factory.gitlab-ci.yml && ! grep -qE 'FACTORY_PACKAGE_GIT: *"?http' .factory/ci/factory.gitlab-ci.yml \
+  && t "project expects this factory version and commit; CI has no default fetch URL; no placeholder model scope" || fail "onboard files" "$(cat .pi/settings.json .factory/ci/factory.gitlab-ci.yml)"
+# The CI fetch line, run as a job would: a fresh checkout without the links.
+fetch="$(grep -m1 "^    - 'test -e scripts/factory" .factory/ci/factory.gitlab-ci.yml | sed "s/^    - '//; s/'\$//")"
+git -C "$pk" add -A; git -C "$pk" commit -qm onboard
+rm -rf "$work/ci"; git clone -q "$pk" "$work/ci"
+out="$(cd "$work/ci/apps/svc" && bash -c "$fetch" 2>&1)" && fail "CI fetch must refuse without FACTORY_PACKAGE_GIT"
+grep -q 'FACTORY_PACKAGE_GIT is not set' <<<"$out" || fail "CI fetch message" "$out"
+echo 0000000000000000000000000000000000000000 > "$work/ci/apps/svc/.factory/package-sha"
+(cd "$work/ci/apps/svc" && FACTORY_PACKAGE_GIT="$root" bash -c "$fetch" >/dev/null 2>&1) && fail "CI fetch must refuse a commit it can't check out"
+git -C "$work/ci" checkout -q -- .
+(cd "$work/ci/apps/svc" && FACTORY_PACKAGE_GIT="$root" bash -c "$fetch" >/dev/null 2>&1) && [ -L "$work/ci/apps/svc/scripts/factory" ] \
+  && [ "$(git -C "$(cd -P "$work/ci/apps/svc/scripts/factory/../.." && pwd)" rev-parse HEAD)" = "$(git -C "$root" rev-parse HEAD)" ] \
+  && t "CI fetches the factory from FACTORY_PACKAGE_GIT at the recorded commit, into a directory of its own, then links it" || fail "CI fetch" "$(ls -la "$work/ci/apps/svc/scripts" 2>&1)"
 [ "$(node scripts/factory/effective-models.mjs | wc -l | tr -d ' ')" = 9 ] && node scripts/factory/models-lint.mjs --per-machine-ok >/dev/null \
   && t "agents come from the package; CI accepts models set per machine" || fail "package agents" "$(node scripts/factory/effective-models.mjs; node scripts/factory/models-lint.mjs --per-machine-ok)"
+cp .pi/settings.json "$work/svc-settings"; node -e 'const f=".pi/settings.json",s=require("./"+f);s.subagents.disableBuiltins=false;require("fs").writeFileSync(f,JSON.stringify(s))'
+out="$(node scripts/factory/models-lint.mjs --per-machine-ok 2>&1)" && fail "per-machine lint must still check the settings" "$out"
+grep -q 'disableBuiltins must be true' <<<"$out" && t "per-machine lint skips only the model checks: settings still checked" || fail "per-machine lint" "$out"
+cp "$work/svc-settings" .pi/settings.json
+printf '{"subagents":{"agentOverrides":{"factory-worker":{"model":"gw/x"}}}}' > "$work/ov.json"
+node scripts/factory/project-files.cjs settings "$root/.pi/settings.json" "$work/ov.json" "" >/dev/null
+node -e 'process.exit(require(process.argv[1]).subagents.agentOverrides["factory-worker"].model==="gw/x"?0:1)' "$work/ov.json" \
+  && t "a project's factory-* agentOverrides are kept (pi-subagents 0.76.1 applies them)" || fail "overrides kept" "$(cat "$work/ov.json")"
 printf '{"agents":{"factory-worker":{"model":"gw/maker-1","thinking":"medium"},"factory-reviewer":{"model":"gw/judge-1"}},"allow":["gw/*"]}' > "$work/profile.json"
 bash "$root/scripts/factory/factory.sh" models apply --user "$work/profile.json" >/dev/null
 node -e 'const s=require(process.argv[1]).subagents;process.exit(s.agentOverrides["factory-worker"].model==="gw/maker-1"&&s.modelScope.allow[0]==="gw/*"?0:1)' "$PI_CODING_AGENT_DIR/settings.json" \
@@ -778,8 +799,7 @@ echo 99.0.0 > .factory/VERSION
 bash scripts/factory/doctor.sh --quick >"$work/pre.log" 2>&1 || true
 grep -q 'older than this project expects (99.0.0)' "$work/pre.log" && grep -q 'linked to the factory package' "$work/pre.log" \
   && t "pre-flight: an installed factory older than the project expects is refused; links checked" || fail "version check" "$(cat "$work/pre.log")"
-git checkout -q -- . 2>/dev/null || true; printf '%s\n' "$(cat "$root/.factory/VERSION")" > .factory/VERSION
-git -C "$pk" add -A; git -C "$pk" commit -qm onboard
+printf '%s\n' "$(cat "$root/.factory/VERSION")" > .factory/VERSION
 git -C "$pk" worktree add -q "$work/pk-wt" -b wt-test
 printf '{"repoRoot":"%s","worktreePath":"%s","agentCwd":"%s","index":0}' "$pk" "$work/pk-wt" "$work/pk-wt/apps/svc" \
   | FACTORY_PROJECT_PREFIX=apps/svc node scripts/factory/worktree-hook.mjs > "$work/hook.json"

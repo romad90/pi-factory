@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # Onboards a project on the factory installed once per machine (P11, D92).
-# Writes only what belongs to the project, links the rest, commits nothing:
+# Writes only what belongs to the project and links the rest. It never
+# commits; with --migrate it stages the removal of the copied files (git rm).
 #   project-owned, created once: .factory/commands.env, behavior-paths,
 #     model-families.json, docs/agents/quality-bar.md, GLOSSARY.md (stub),
 #     instrument/scenarios/, the AGENTS.md pointer, .gitignore lines,
 #     the .pi/settings.json subagents block
 #   refreshed: .factory/VERSION (the factory version this project expects),
-#     .factory/ci/factory.gitlab-ci.yml (fetches that version in CI)
+#     .factory/package-sha (the factory commit CI fetches and checks),
+#     .factory/ci/factory.gitlab-ci.yml
 #   linked, untracked: scripts/factory, briefs, skills pin, the factory's
 #     docs/agents files (link.sh); agents, prompts, skills and the command
 #     guard load from the package itself
@@ -62,6 +64,13 @@ put docs/agents/quality-bar.md
 mkdir -p instrument/scenarios
 [ -n "$(ls -A instrument/scenarios)" ] || { : > instrument/scenarios/.gitkeep; note "+ instrument/scenarios/"; }
 [ -e GLOSSARY.md ] || { printf '# Glossary\n\nThe domain terms of this project, one per line: **Term**: what it means here.\n' > GLOSSARY.md; note "+ GLOSSARY.md (stub)"; }
+# CI fetches the factory at this commit and checks it before running it (D92).
+if sha="$(git -C "$pkg" rev-parse HEAD 2>/dev/null)"; then
+  [ -z "$(git -C "$pkg" status --porcelain --untracked-files=no)" ] || note "WARNING: the factory checkout has local changes; CI runs $sha without them"
+  printf '%s\n' "$sha" > .factory/package-sha
+else
+  note "the factory is not a git checkout: write the pi-factory commit CI must run into .factory/package-sha"
+fi
 old="$(cat .factory/VERSION 2>/dev/null || true)"
 printf '%s\n' "$version" > .factory/VERSION
 [ "$old" = "$version" ] || note ".factory/VERSION: ${old:-none} → $version"
@@ -91,9 +100,10 @@ fi
 
 cat <<MSG
 
-Review and commit on its own branch and MR (D48):
+Nothing committed$( [ "$migrate" -eq 1 ] && printf ' (the removals of the copied files are staged)'). Review, commit on its own branch, MR (D48):
 $(git status --short -- . | sed 's/^/  /')
-Then: .factory/commands.env (FACTORY_TEST_CMD), the CI include
+Then: .factory/commands.env (FACTORY_TEST_CMD), the CI variable FACTORY_PACKAGE_GIT
+(the URL your CI may fetch pi-factory from, no default), the CI include
   include: [{ local: ${prefix:+$prefix/}.factory/ci/factory.gitlab-ci.yml }]
 and, in Pi from here: scripts/factory/doctor.sh.
 MSG

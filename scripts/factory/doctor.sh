@@ -32,6 +32,9 @@ if [ "${1:-}" = "--quick" ]; then
       1) printf '  - installed factory %s, project expects %s: factory onboard moves the project up (its own MR)\n' "$inst" "$expect" ;;
     esac
   fi
+  if [ -f .factory/package-sha ] && head="$(git -C "$FACTORY_PACKAGE_ROOT" rev-parse HEAD 2>/dev/null)" && [ "$head" != "$(cat .factory/package-sha)" ]; then
+    printf '  - this machine runs factory %s, CI runs %s (.factory/package-sha): factory onboard records the new one\n' "${head:0:12}" "$(head -c 12 .factory/package-sha)"
+  fi
   if [ -L scripts/factory ]; then bash "$FACTORY_LIB_DIR/link.sh" --check >/dev/null 2>&1 && ok "linked to the factory package ($FACTORY_PACKAGE_ROOT)" || bad "factory links missing or stale: factory link"; fi
   if [ -n "${2:-}" ]; then
     if why="$(mission_guard "$2")"; then ok "mission $2 on branch $(git branch --show-current)"; else bad "$why"; fi

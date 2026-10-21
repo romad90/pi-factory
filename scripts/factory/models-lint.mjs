@@ -30,14 +30,14 @@ if (failed) process.exit(1);
 
 const sub = subagentSettings().merged;
 // D92: in CI, a project on the installed package has no models in the repo:
-// they are set per machine and checked by each machine's pre-flight.
-if (process.argv.includes("--per-machine-ok") && !existsSync(".pi/agents/factory")
-    && effectiveAgents().every((a) => !a.model || isPlaceholder(a.model))) {
-  ok("models are set per machine (factory installed as a package): checked by the pre-flight, not here");
-  console.log("MODELS: PASS");
-  process.exit(0);
-}
+// they are set per machine and checked by each machine's pre-flight. Only the
+// per-agent model checks are skipped; settings, agent files and families stay.
+const perMachine = process.argv.includes("--per-machine-ok") && !existsSync(".pi/agents/factory")
+  && effectiveAgents().every((a) => !a.model || isPlaceholder(a.model));
+if (perMachine) warn("models set per machine (factory installed as a package): each machine's pre-flight checks them, not this run");
 const fam = JSON.parse(readFileSync(FAMILIES, "utf8"));
+if (!Array.isArray(fam.families) || !fam.families.every((f) => f && f.match && f.family) || !Array.isArray(fam.rules))
+  bad(`${FAMILIES}: needs families [{ match, family }] and rules [[left], [right]]`);
 
 // Package-level guards
 sub.disableBuiltins === true
@@ -46,6 +46,7 @@ sub.disableBuiltins === true
 const scope = sub.modelScope ?? {};
 const allow = Array.isArray(scope.allow) ? scope.allow : [];
 if (scope.enforce === true && allow.length && !allow.some(isPlaceholder)) ok(`model scope enforced (${allow.join(", ")})`);
+else if (perMachine && !sub.modelScope) warn("model scope set per machine (models-profile apply --user), not in the repo");
 else bad("subagents.modelScope must have enforce: true and a filled allow list");
 
 // Agents
@@ -59,8 +60,9 @@ for (const { file, fm, model, source } of agents) {
   if (fm.inheritSkills !== "false") bad(`${name}: inheritSkills must be false (pinned skills only)`);
   if (!fm.skillPath) bad(`${name}: skillPath must point at the pinned skills`);
   if ("memory" in fm) bad(`${name}: agent memory is off for factory agents (could carry instrument details past the wall)`);
-  if (!model) { bad(`${name}: no model (frontmatter or agentOverrides.${name}.model)`); continue; }
   if ("fallbackModels" in fm) bad(`${name}: fallbackModels was removed by pi-subagents and stops the agent from launching; delete that line`);
+  if (perMachine) continue;
+  if (!model) { bad(`${name}: no model (frontmatter or agentOverrides.${name}.model)`); continue; }
   const list = [model];
   if (list.some(isPlaceholder)) { bad(`${name}: placeholder model ids left (${list.join(", ")}); set them per machine: factory models apply --user`); continue; }
   if (source === "user" || source === "project") ok(`${name}: ${model} (from ${source} agentOverrides)`);
@@ -75,7 +77,7 @@ for (const [name, list] of Object.entries(models)) {
     if (!familyOf(id)) bad(`${name}: ${id} matches no family in ${FAMILIES}; add one`);
   }
 }
-for (const [left, right] of fam.rules) {
+for (const [left, right] of Array.isArray(fam.rules) ? fam.rules : []) {
   const fams = (group) => new Set(group.flatMap((a) => (models[a] ?? []).map(familyOf)).filter(Boolean));
   const L = fams(left), R = fams(right);
   const shared = [...L].filter((x) => R.has(x));
