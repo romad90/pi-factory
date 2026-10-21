@@ -459,6 +459,16 @@ Steps: **1 Assisted** (one agent, you hold the context), **2 Parallel** (~10 age
 **D79. Each model is probed on its own provider.** On the last day, a second machine used a key that could not call the worker's model (403), and the probe never ran: it knew one gateway (`FACTORY_GATEWAY_URL`) and none was set. The probe now reads each agent's `provider/model` from Pi's `models.json` and calls that provider's `baseUrl` with its key (an environment variable name or the key itself, never printed); `FACTORY_GATEWAY_URL` remains the fallback. A 404 on `/models` suggests a missing `/v1`. The pre-flight requires a fresh probe whenever any agent maps to a provider.
 
 **D80. A conflicting patch never leaves a conflicted tree.** In mission 3, three workers of one wave wrote the same test file; after 03, 04 and 14 were integrated, ticket 05's patch passed `git apply --check --3way` but its 3-way apply conflicted, and `set -e` stopped `integrate.sh` with the file unmerged: every later integration refused the dirty tree, and only a human could clean it. A failed 3-way apply now puts every touched path back as HEAD has it and records a failed round ("conflicts with code integrated since it started; rebuild from the current code"), so the ticket rebuilds on HEAD like any red round.
+
+**D81. A verdict on an older commit is stale, not a round.** In mission 3, ticket 14 escalated on a FAIL that reviewed the README-only commit while its docs had since been integrated in a later commit nobody reviewed. `collect.sh` now keeps such a verdict aside (`state/<ticket>.stale-verdict.md`) when its `Commit` is not the ticket's last integration: no round is counted and the ticket goes back to review.
+
+**D82. A missing deliverable is a FAIL the reviewer decides.** A reviewer asked the human whether to fail a commit that left out the files the ticket named. The reviewer brief now says it is a [blocking] FAIL, never a question, and the resolver answers the question if it is asked anyway (rule `deliverable`).
+
+**D83. Tickets of one wave never write the same file.** Four tickets writing one test file conflicted on integration (D80). The ticket writer gives each its own file or chains them with `Blocked by`.
+
+**D84. Rounds carry a journal, and a round that changes nothing escalates.** Workers end every round with `journal.sh` (what they tried, ruled out, where they stopped); integration moves it into `.scratch/<mission>/journal/<ticket>.md` under its round, and fix rounds read it. A red integration keeps a failure signature (failing tests and lint keys, without times or counts); when the next round fails with the same signature, the ticket escalates at once instead of spending a third round. Borrowed from Machinist's handoff notes and DoorDash's measured progress (P9 steps 2 and 3).
+
+**D85. Tokens per run are recorded.** `usage.sh` reads pi-subagents' per-run metadata (`*_meta.json`: usage, model, duration) and appends each factory run once to `.scratch/<mission>/usage.tsv`; integration and collection run it, and the metrics show the totals. Best effort: no metadata, no line.
 ---
 
 ## 11. Path to Step 2

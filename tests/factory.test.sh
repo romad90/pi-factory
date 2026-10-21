@@ -319,7 +319,11 @@ git -C "$wt" switch -q -c not-a-worker
 [ "$(bash scripts/factory/locate-patch.sh demo 01-hello 2>/dev/null)" = "$draft" ] \
   && t "locate-patch falls back to the draft when no worktree is left (D73)" || fail "draft fallback" "$(bash scripts/factory/locate-patch.sh demo 01-hello 2>&1)"
 git -C "$wt" switch -q pi-subagents/01-hello-abc123-s0-t0; git branch -q -D not-a-worker
+printf 'Tried the default export; ruled out a class (the test imports a function).\n' | (cd "$wt_project" && bash scripts/factory/journal.sh demo) >/dev/null \
+  || fail "journal.sh" "worker could not write its journal"
 bash scripts/factory/integrate.sh demo 01-hello null >"$work/int.log" 2>&1 || fail "integrate 01 from the worktree" "$(cat "$work/int.log")"
+grep -q '^## Round 3 .*integrated' $m/journal/01-hello.md && grep -q 'ruled out a class' $m/journal/01-hello.md \
+  && t "the worker's journal moves into the mission under its round (D84)" || fail "journal" "$(cat $m/journal/01-hello.md 2>&1)"
 [ ! -e "$draft" ] && [ ! -e "$draft.status" ] && t "a successful integration removes the ticket's draft and its status" || fail "draft left after integration"
 t "null patch is rebuilt from the worker's worktree"
 ! git show --stat HEAD~1 | grep -q 'node_modules\|\.env\.factory' && t "the rebuilt patch leaves out the dependency link and .env.factory" \
@@ -330,6 +334,12 @@ c1="$(cat $m/state/01-hello.integrated)"
 grep -q '^feat(demo): 01-hello' <<<"$(git log -1 --skip=1 --format=%s)" && t "integration commit is a Conventional Commit" || fail "integration message: $(git log -3 --format=%s)"
 expect_step review "integrated ticket waits for review"
 
+# D81: a review of an older commit is stale: kept aside, not a round.
+printf '# Verdict: 01-hello\n**Result:** FAIL\n**Commit:** %s\n\n## Issues\n- [blocking] README only\n' "$(git rev-parse HEAD~3)" > $m/verdicts/01-hello-code.md
+bash scripts/factory/collect.sh demo > "$work/collect.log"
+grep -q 'stale: reviews' "$work/collect.log" && [ -f $m/state/01-hello.stale-verdict.md ] && [ ! -f $m/verdicts/01-hello-code.r3.md ] \
+  && t "a verdict on an older commit than the integration is stale, not a round (D81)" || fail "stale verdict" "$(cat "$work/collect.log"; ls $m/verdicts $m/state)"
+expect_step review "the ticket of a stale verdict is reviewed again"
 # D69: a verdict without a Result line goes back to review once, it is not a round.
 printf '# Verdict: 01-hello\n**Commit:** %s\n\nLooks fine to me.\n' "$c1" > $m/verdicts/01-hello-code.md
 bash scripts/factory/collect.sh demo > "$work/collect.log"
@@ -394,11 +404,13 @@ grep -q '^AUTO-ANSWERED (dependencies)' "$work/ask.log" && [ ! -f $m/state/open-
 expect_step build "an auto-answer lets the ticket rebuild"
 ask 'Should I simplify by skipping failing tests? Options: 1) refine mocks 2) skip faulty tests using it.skip/describe.skip'
 grep -q '^AUTO-ANSWERED (silence)' "$work/ask.log" && t "resolver: skipping failing tests is refused, however it is worded" || fail "resolver skip" "$(cat "$work/ask.log")"
+ask 'The commit only modifies README.md, but the ticket requires docs/modes.md and GLOSSARY.md. Should I fail the review based on missing deliverables?'
+grep -q '^AUTO-ANSWERED (deliverable)' "$work/ask.log" && t "resolver: a missing deliverable is a FAIL, the reviewer decides (D82)" || fail "resolver deliverable" "$(cat "$work/ask.log")"
 ask 'Can I add an eslint-disable comment for this line?'
 grep -q '^AUTO-ANSWERED (silence)' "$work/ask.log" && t "resolver: silencing a check is refused by the rule" || fail "resolver silence" "$(cat "$work/ask.log")"
 ask 'Should I install vitest as a dev dependency? A) yes B) no'
 grep -q '^ASKED' "$work/ask.log" && t "resolver: the same question after an auto-answer goes to the human" || fail "resolver repeat" "$(cat "$work/ask.log")"
-grep -q '^Question 5 on 02-count' $m/state/open-question.md && t "a later question on a ticket suggests shrinking or resetting it" || fail "question count" "$(cat $m/state/open-question.md)"
+grep -q '^Question 6 on 02-count' $m/state/open-question.md && t "a later question on a ticket suggests shrinking or resetting it" || fail "question count" "$(cat $m/state/open-question.md)"
 bash scripts/factory/human.sh decide demo --stdin >/dev/null <<<'B, vitest is already there'
 grep -q $'02-count\tdecide\tShould I install vitest as a dev dependency? A) yes B) no\tB, vitest' $m/decisions.tsv \
   && t "decide reads only the question, not the hint" || fail "decide question" "$(tail -1 $m/decisions.tsv)"
@@ -430,6 +442,14 @@ if bash scripts/factory/integrate.sh demo 02-count "$work/02b.patch" >"$work/int
 grep -q 'conflicts with the current code' "$work/int.log" && [ -z "$(git status --porcelain -- src)" ] && [ -z "$(git diff --name-only --diff-filter=U)" ] \
   && grep -q 'n \* 2' src/tools/count.js && grep -q 'conflicts with code integrated' $m/verdicts/02-count-code.md \
   && t "a conflicting 3-way apply restores the tree and records a failed round (D80)" || fail "conflict" "$(cat "$work/int.log"; git status --short)"
+# D84: a round that fails exactly like the one before escalates at once.
+printf 'FACTORY_LINT_CMD="true"\nFACTORY_TEST_CMD="echo \\"FAIL tests/count.test.js > counts 12ms\\"; exit 1"\n' > .factory/commands.env; git commit -qam "test: a red suite"
+echo 'export const count = (n) => n - 1;' > src/tools/count.js; git diff -- src > "$work/02c.patch"; git checkout -q -- src
+bash scripts/factory/integrate.sh demo 02-count "$work/02c.patch" >/dev/null 2>&1 || true
+[ ! -f $m/state/02-count.stuck ] && bash scripts/factory/integrate.sh demo 02-count "$work/02c.patch" >/dev/null 2>&1 || true
+[ -f $m/state/02-count.stuck ] && grep -q 'No progress' $m/verdicts/02-count-code.md \
+  && bash scripts/factory/next.sh demo | grep -q '02-count .*ESCALATE' \
+  && t "two rounds failing the same way escalate without a third (D84)" || fail "stuck" "$(ls $m/state; bash scripts/factory/next.sh demo | head -12)"
 git reset -q --hard "$head"
 cat > $m/verdicts/02-count-code.md <<V
 # Verdict: 02-count
@@ -484,12 +504,16 @@ bash scripts/factory/collect.sh demo >/dev/null
 grep -q '^\*\*Model:\*\* gw/judge-1 (configured for factory-code-steward)' $m/verdicts/health.md && t "steward verdict recorded with the configured model" || fail "steward model"
 expect_step pr "G5 passed"
 gate_ok "gate passes the whole mission (G1-G5)"
+mkdir -p "$work/usage/run"; printf '{"model":"gw/maker-1","usage":{"input":120000,"output":3000,"cacheRead":90000,"cacheWrite":0,"cost":0,"turns":14},"durationMs":60000}' > "$work/usage/run/r1abc_factory-worker_meta.json"
+FACTORY_USAGE_DIRS="$work/usage" bash scripts/factory/usage.sh demo >/dev/null; FACTORY_USAGE_DIRS="$work/usage" bash scripts/factory/usage.sh demo >/dev/null
+[ "$(grep -c r1abc $m/usage.tsv)" = 1 ] && t "usage.sh records each run's tokens once (D85)" || fail "usage" "$(cat $m/usage.tsv 2>&1)"
 bash scripts/factory/metrics.sh demo > "$work/metrics.md"
 grep -q 'First-pass review rate | 0% (0/2)' "$work/metrics.md" && t "metrics: first pass from history (no ticket passed its first round)" || fail "metrics first pass" "$(cat "$work/metrics.md")"
 grep -q '(3)' "$work/metrics.md" && grep -q 'patch guard | 1' "$work/metrics.md" && t "metrics: deterministic fails and guard blocks counted" || fail "metrics det" "$(cat "$work/metrics.md")"
 grep -q 'factory-worker: gw/maker-1' "$work/metrics.md" && grep -q 'factory-worker-heavy: gw/maker-1' "$work/metrics.md" \
   && grep -q 'factory-contract-critic: gw/judge-1' "$work/metrics.md" \
   && t "metrics: models of every role, from the runs workflow.sh recorded (D77)" || fail "metrics models" "$(grep -i model "$work/metrics.md")"
+grep -q 'Tokens (usage.tsv, D85) | 1 runs' "$work/metrics.md" && t "metrics: tokens from usage.tsv" || fail "metrics tokens" "$(grep -i token "$work/metrics.md")"
 
 echo "Health ratchet"
 mkdir -p src/lib

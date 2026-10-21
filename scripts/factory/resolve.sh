@@ -40,6 +40,11 @@ if [ -f "$dir/decisions.tsv" ]; then
   [ -z "$prev" ] || answer earlier "$prev (the human's earlier answer to the same question)"
 fi
 
+# 1b. A reviewer asking whether a missing deliverable fails the ticket (D82).
+if has '(should|shall|do|must) i (fail|reject)|fail the (review|ticket)' && has 'not (changed|updated|modified|added|touched)|missing|only (modifies|changes|touches)|absent'; then
+  answer deliverable "Yes, FAIL. A file or deliverable the ticket or its assertions name that the commit does not change is a [blocking] issue: list it, and the next round adds it. Reviewers decide this without asking."
+fi
+
 # 2. Silencing a check.
 if has 'eslint-disable|ts-ignore|ts-nocheck|ts-expect-error|noqa|nolint|type: ignore|\.(skip|only)([^a-z]|$)|skip(ping)? (the |this |these |a )?(failing |faulty |broken )?tests?|disable (the |this |a )?(lint|rule|check|test)|--no-verify'; then
   answer silence "No. Checks are never silenced: the patch guard refuses it. Fix the code; your brief lists how to fix common lint errors."

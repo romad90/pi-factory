@@ -22,7 +22,7 @@ Rules:
 
 - **`## Covers`** lists the assertion IDs the ticket makes true, or `## Covers: enabler` followed by one sentence naming what it unblocks. Every active assertion is covered by at least one ticket.
 - **Size:** S = one unit and its tests; M = a few units, one seam; L = core logic or more than two assertions of core behavior. The efficient worker builds S and M; **L goes straight to the heavy worker**. Prefer splitting an L into two Ms.
-- **`## Blocked by`** uses two-digit ticket numbers. No cycles.
+- **`## Blocked by`** uses two-digit ticket numbers. No cycles. Tickets that could run in one wave never change the same file: give each its own file, or chain them with `Blocked by` (in mission 3, four tickets writing one test file conflicted on integration).
 - **Fix tickets** are named `NN-fix-<slug>.md` and cover the assertions (or `QB-` items) their finding names: one ticket per root cause, never one per failed case.
 - **Notes after an escalation:** when several tickets escalate on the same mistakes, the human adds a `## Notes from rounds 1-3` section (the pitfalls, and the passing tickets to copy) and resets them. In mission 2 one such note unblocked five tickets.
 

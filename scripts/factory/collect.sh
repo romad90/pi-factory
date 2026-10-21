@@ -51,6 +51,19 @@ for v in "$dir"/verdicts/*-code.md; do
     printf '  %-40s sent back to review: no **Result:** PASS or FAIL line (kept in state/%s.invalid-verdict.md)\n' "$(basename "$v")" "$ticket"
     continue
   fi
+  # D81: a review of an older commit than the ticket's last integration is
+  # stale (a late verdict, a reviewer handed the wrong commit). It is kept
+  # aside, never counted as a round, and the ticket goes back to review.
+  marker="$(ticket_marker "$feature" "$ticket")"; vc="$(verdict_field "$v" Commit)"
+  if [ -n "$marker" ] && [ -n "$vc" ] && [ "$vc" != "$marker" ] \
+     && ! [[ "$(verdict_field "$v" Brief)" =~ ^(integrate|worker-no-patch|patch-guard)$ ]] \
+     && { [ "$n" -eq 0 ] || ! cmp -s "$v" "${v%.md}.r$n.md"; }; then
+    mkdir -p "$dir/state"; mv "$v" "$dir/state/$ticket.stale-verdict.md"
+    if [ "$n" -gt 0 ]; then cp "${v%.md}.r$n.md" "$v"; fi
+    printf '  %-40s stale: reviews %s, the ticket is integrated at %s; sent back to review (kept in state/%s.stale-verdict.md)\n' \
+      "$(basename "$v")" "${vc:0:8}" "${marker:0:8}" "$ticket"
+    continue
+  fi
   record_verdict "$v" factory-reviewer; summary "$v"
   [[ "$(verdict_field "$v" Result)" =~ ^(PASS|FAIL)$ ]] && rm -f "$sent" "$dir/state/$ticket.invalid-verdict.md"
 done
@@ -60,4 +73,5 @@ fi
 if [ -f "$dir/verdicts/health.md" ]; then
   record_verdict "$dir/verdicts/health.md" factory-code-steward; summary "$dir/verdicts/health.md"
 fi
+bash "$here/usage.sh" "$feature" >/dev/null 2>&1 || true   # D85
 bash "$here/checkpoint.sh" "$feature" >/dev/null

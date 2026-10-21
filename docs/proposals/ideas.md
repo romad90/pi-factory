@@ -107,6 +107,22 @@ What they agree on, and what it says about us:
 
 Not taken: LLM coordinators (Gas Town, sgai, Symphony's routing by prompt), heavy stacks (Postgres, Redis, Electron, OpenTelemetry), merge trains and signed receipts. They answer a team's scale, not a file-in-git factory's.
 
+## From Factory Missions (announcement and screenshots, October 2026)
+
+Read from the [announcement](https://factory.com/news/missions) and the screenshots the user shared; the product is closed, so these are ideas, not code.
+
+| Idea | What we would do | Fits |
+|---|---|---|
+| **Mission Control is one screen per mission**: the active feature with its preconditions and expected behavior, a features checklist (16/22), a progress log, the active worker with its live tool calls, tokens and time, keys to switch views | The cockpit's mission view takes this layout. Ticket = feature, `## Assertions` = expected behavior, `Blocked by` = preconditions; the live worker pane reads the run's last events and `usage.tsv` (D85) | P10, cockpit |
+| **Milestones, each closed by a validation phase** | A mission splits into waves that end in a check, not only one validate at the end: after each wave, the contract assertions it covers are run. Catches a drifting mission at wave 2, not at the end | P9, P8 |
+| **Planning is a conversation (`/enter-mission`), then the human acts as project manager** | Our interview already does this; the new part is naming the human's job after it: answer questions, approve gates, nothing else. That is P8's five interventions, stated as a role | P8, CHEATSHEET |
+| **Skills learned from repeated work** (observe, learn, encode) | The retro's "three times, automate" rule, run by the factory: a pattern seen in three journals (D84) or three decisions becomes a proposed resolver rule or brief line, for the human to accept | P5 |
+| **A model per role, chosen per strength** (a research model, a coding model, a validator) | Already ours (`runs.tsv` records models per role, D77); worth adding the family-diversity rule for validators to the onboarding | done, P11 |
+| **Mission length is reported** (median about 2 hours, some over a day) | `metrics.sh` adds the mission's wall time and time waiting on the human, the two numbers that say whether P8 holds | metrics |
+| **Commands classified by risk; secrets scanned** | The patch guard already blocks frozen paths; add a short list of commands a worker never runs (push, deploy, package publish) checked in the gate | patch guard, P8 risk tiers |
+
+Not taken: the hosted control plane, OpenTelemetry export, enterprise admin. Same test as below: it must keep working if the vendor disappears.
+
 ## What to watch for
 
 Each of these tools keeps something we don't want to give away: the runtime (OpenCode Swarm needs OpenCode), the hosted control plane and its data (Factory, Port), or a maintainer we depend on. The test for anything we take: does it keep working if that vendor disappears tomorrow?

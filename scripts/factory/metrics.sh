@@ -63,6 +63,11 @@ if [ -f "$dir/decisions.tsv" ]; then      # P8: human interventions vs questions
   auto="$(awk -F'\t' 'NR > 1 && $3 == "auto"' "$dir/decisions.tsv" | wc -l | tr -d ' ')"
   decisions=$(( $(wc -l < "$dir/decisions.tsv") - 1 - auto ))
 fi
+usage_line="-"
+if [ -s "$dir/usage.tsv" ]; then      # D85: tokens per run, from pi-subagents' metadata
+  usage_line="$(awk -F'\t' 'NR > 1 { r++; i += $5; o += $6; c += $7; t += $10; if ($4 ~ /worker/) w += $5 + $6 }
+    END { printf "%d runs · %.1fM in (%.0f%% cached), %.1fk out · %d turns · workers %.1fM", r, i / 1e6, (i ? 100 * c / i : 0), o / 1e3, t, w / 1e6 }' "$dir/usage.tsv")"
+fi
 models_list=""
 [ ${#models[@]} -gt 0 ] && models_list="$(printf '%s\n' "${models[@]}" | sort -u | paste -sd, - | sed 's/,/, /g')"
 # D77: every role's models, from the runs workflow.sh recorded (judges only before).
@@ -103,4 +108,5 @@ cat <<EOF
 | Cycle time (first → last mission commit) | $cycle |
 | Tokens reported in verdicts | $( [ "$tokens" -gt 0 ] && echo "$tokens" || echo "not reported" ) |
 | Models used (role: model ×runs) | ${models_list:--} |
+| Tokens (usage.tsv, D85) | $usage_line |
 EOF
