@@ -6,6 +6,10 @@
 // Usage (from a target repo root):
 //   node scripts/factory/models-profile.mjs capture [profile]   # save this repo's configured models
 //   node scripts/factory/models-profile.mjs apply   [profile]   # write them into this repo
+//   node scripts/factory/models-profile.mjs apply --user [profile]
+//        # write them into this machine's Pi settings as agentOverrides (D92):
+//        # every repo on this machine, copied or on the package, uses them, and
+//        # a git pull can't bring another machine's models
 // install-into.sh runs `apply` automatically when the profile exists.
 //
 // A profile holds: agents { name: { model, thinking } }, allow (the model
@@ -14,17 +18,20 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
+import { effectiveAgents, userSettingsFile } from "./effective-models.mjs";
 
 const AGENTS_DIR = ".pi/agents/factory";
 const SETTINGS = ".pi/settings.json";
 const FAMILIES = ".factory/model-families.json";
-const [cmd, arg] = process.argv.slice(2);
+const argv = process.argv.slice(2);
+const userMode = argv.includes("--user");
+const [cmd, arg] = argv.filter((a) => a !== "--user");
 const profile = arg || process.env.PI_FACTORY_MODELS || join(homedir(), ".pi-factory", "models.json");
 const placeholder = (v) => /[<>]/.test(String(v ?? ""));
 const readJson = (f) => JSON.parse(readFileSync(f, "utf8"));
 
 function agentFiles() {
-  if (!existsSync(AGENTS_DIR)) { console.error(`no ${AGENTS_DIR}: run from a repo with the factory installed`); process.exit(2); }
+  if (!existsSync(AGENTS_DIR)) { console.error(`no ${AGENTS_DIR}: run from a repo with the factory copied in, or use --user`); process.exit(2); }
   return readdirSync(AGENTS_DIR).filter((f) => f.endsWith(".md")).map((f) => join(AGENTS_DIR, f));
 }
 function field(text, key) {
@@ -34,9 +41,8 @@ function field(text, key) {
 
 if (cmd === "capture") {
   const agents = {};
-  for (const f of agentFiles()) {
-    const text = readFileSync(f, "utf8");
-    const name = field(text, "name"), model = field(text, "model"), thinking = field(text, "thinking");
+  for (const a of effectiveAgents()) {                 // D92: what really runs, overrides included
+    const { name, model, thinking } = a;
     if (!name || !model || placeholder(model)) continue;
     agents[name] = thinking ? { model, thinking } : { model };
   }
@@ -46,11 +52,30 @@ if (cmd === "capture") {
   mkdirSync(dirname(profile), { recursive: true });
   writeFileSync(profile, JSON.stringify({ agents, allow: allow.filter((a) => !placeholder(a)), families }, null, 2) + "\n");
   console.log(`captured ${Object.keys(agents).length} agents → ${profile}`);
+} else if (cmd === "apply" && userMode) {
+  if (!existsSync(profile)) { console.error(`no profile at ${profile} (create it with: capture, from a configured repo)`); process.exit(1); }
+  const p = readJson(profile), file = userSettingsFile();
+  const s = existsSync(file) ? readJson(file) : {};
+  const sub = (s.subagents = s.subagents ?? {});
+  const ov = (sub.agentOverrides = sub.agentOverrides ?? {});
+  let set = 0;
+  for (const [name, a] of Object.entries(p.agents ?? {})) {
+    if (!a?.model || placeholder(a.model)) continue;
+    ov[name] = { ...(ov[name] ?? {}), model: a.model, ...(a.thinking ? { thinking: a.thinking } : {}) };
+    set++;
+  }
+  if (Array.isArray(p.allow) && p.allow.length) sub.modelScope = { ...(sub.modelScope ?? {}), enforce: true, allow: p.allow };
+  mkdirSync(dirname(file), { recursive: true });
+  if (existsSync(file)) writeFileSync(`${file}.bak`, readFileSync(file));
+  writeFileSync(file, JSON.stringify(s, null, 2) + "\n");
+  console.log(`applied ${profile} to ${file}: ${set} agents (agentOverrides)${sub.modelScope?.allow ? ", model scope" : ""}`);
+  if (Array.isArray(p.families) && p.families.length) console.log("families: run apply (without --user) in each project to add the profile's rules to .factory/model-families.json");
 } else if (cmd === "apply") {
   if (!existsSync(profile)) { console.error(`no profile at ${profile} (create it with: capture, from a configured repo)`); process.exit(1); }
   const p = readJson(profile);
   let set = 0;
-  for (const f of agentFiles()) {
+  if (!existsSync(AGENTS_DIR)) console.log("agents: on the installed package here; their models come from apply --user");
+  for (const f of existsSync(AGENTS_DIR) ? agentFiles() : []) {
     const text = readFileSync(f, "utf8");
     const a = p.agents?.[field(text, "name")];
     if (!a?.model) continue;
@@ -77,6 +102,6 @@ if (cmd === "capture") {
   }
   console.log(`applied ${profile}: ${set} agents set`);
 } else {
-  console.error("usage: models-profile.mjs capture|apply [profile]");
+  console.error("usage: models-profile.mjs capture [profile] | apply [--user] [profile]");
   process.exit(2);
 }

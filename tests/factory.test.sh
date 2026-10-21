@@ -40,7 +40,8 @@ bash "$root/scripts/factory/install-into.sh" "$repo" --pack api --pack batch >"$
 [ -f docs/factory/prompts/audit-gaps.md ] && [ -f docs/factory/prompts/security-audit.md ] && t "read-only prompts installed" || fail "prompts"
 [ -f docs/agents/factory.md ] && grep -q 'docs/agents/factory.md' AGENTS.md && ! grep -q 'END OF BRIEF' AGENTS.md \
   && t "AGENTS.md gets a pointer, the factory rules live in docs/agents/factory.md" || fail "AGENTS.md pointer" "$(cat AGENTS.md)"
-bash scripts/factory/brief.sh worker probe 01 HEAD | grep -q '^Read: docs/agents/factory.md' && ! bash scripts/factory/brief.sh worker probe 01 HEAD | grep -q 'AGENTS.md' \
+b="$(bash scripts/factory/brief.sh worker probe 01 HEAD)"   # captured: grep -q on a pipe can SIGPIPE the writer
+grep -q '^Read: docs/agents/factory.md' <<<"$b" && ! grep -q 'AGENTS.md' <<<"$b" \
   && t "briefs name the factory rules, not AGENTS.md (already in context)" || fail "brief read list"
 [ -f docs/agents/contract-checklist-api.md ] && [ -f docs/agents/quality-bar-batch.md ] && [ ! -f docs/agents/contract-checklist-bots.md ] \
   && t "only the requested practice packs are installed" || fail "packs" "$(ls docs/agents)"
@@ -731,6 +732,71 @@ git ls-remote --heads "$work/origin.git" "$cur" | grep -q . && grep -qx 'product
   && grep -q '^## Summary' "$work/glab.log" && ! grep -q '^# test' "$work/glab.log" && grep -q 'merge_requests/7' $m/mr.url \
   && t "mr.sh pushes the branch and opens the MR with glab; heading becomes the title, the rest the description (D86)" || fail "mr glab create" "$(cat "$work/mr.log" "$work/glab.log")"
 git remote remove origin; rm -f $m/pr.md $m/mr.url
+
+# D92: install once per machine (P11). Models per machine, then a project on the package.
+echo "Install once (D92)"
+mkdir -p "$PI_CODING_AGENT_DIR"
+printf '{"subagents":{"agentOverrides":{"factory-worker":{"model":"gw/maker-2","thinking":"low"}}}}' > "$PI_CODING_AGENT_DIR/settings.json"
+[ "$(node scripts/factory/effective-models.mjs | awk -F'\t' '$1 == "factory-worker" { print $2 "@" $3 }')" = "gw/maker-2@low" ] \
+  && [ "$(bash -c '. scripts/factory/lib.sh; agent_model factory-worker')" = gw/maker-2 ] \
+  && t "a user agentOverride sets the model this machine runs, even on copied agents" || fail "user override" "$(node scripts/factory/effective-models.mjs)"
+cp .pi/settings.json "$work/settings.keep"
+node -e 'const f=".pi/settings.json",s=require("./"+f);s.subagents.agentOverrides={"factory-worker":{model:"gw/maker-3"}};require("fs").writeFileSync(f,JSON.stringify(s))'
+[ "$(bash -c '. scripts/factory/lib.sh; agent_model factory-worker')" = gw/maker-3 ] && t "a project agentOverride wins over the user's, as in pi-subagents" || fail "project override"
+cp "$work/settings.keep" .pi/settings.json; rm -f "$PI_CODING_AGENT_DIR/settings.json"
+[ "$(node -p 'require(process.argv[1]).version' "$root/package.json")" = "$(cat "$root/.factory/VERSION")" ] \
+  && node -e 'const p=require(process.argv[1]),fs=require("fs"),path=require("path");const all=[...p.pi.extensions,...p.pi.prompts,...p.pi.skills,...p.pi.subagents.agents];process.exit(all.every(x=>fs.existsSync(path.join(path.dirname(process.argv[1]),x)))?0:1)' "$root/package.json" \
+  && t "package.json: the version of .factory/VERSION; every Pi resource it declares exists" || fail "package manifest"
+
+pk="$work/pkg repo"; mkdir -p "$pk/apps/svc"; git -C "$pk" init -q
+( cd "$pk"; echo root > README.md; mkdir -p apps/svc/src; echo 'export const s = 1;' > apps/svc/src/s.js; git add -A; git commit -qm init )
+cd "$pk/apps/svc"
+bash "$root/scripts/factory/onboard.sh" >"$work/onboard.log" 2>&1 || fail "onboard" "$(cat "$work/onboard.log")"
+changed="$(git status --porcelain --untracked-files=all -- . | awk '{ print $2 }' | sed 's#^apps/svc/##' | sort | tr '\n' ' ')"
+case "$changed" in *scripts/*|*.pi/agents*|*.pi/skills*|*briefs*|*docs/agents/factory.md*) fail "onboard must not add factory files" "$changed" ;; esac
+for f in .factory/commands.env .factory/VERSION .factory/ci/factory.gitlab-ci.yml docs/agents/quality-bar.md GLOSSARY.md AGENTS.md .pi/settings.json; do
+  grep -q "$f" <<<"$changed" || fail "onboard: $f missing" "$changed"
+done
+t "onboard writes only the project's own files ($(wc -w <<<"$changed" | tr -d ' ') files)"
+[ "$(readlink scripts/factory)" = "$root/scripts/factory" ] && [ "$(readlink docs/agents/factory.md)" = "$root/docs/agents/factory.md" ] \
+  && grep -qx '/apps/svc/scripts/factory' "$pk/.git/info/exclude" && bash scripts/factory/link.sh --check >/dev/null \
+  && t "factory scripts, briefs and docs are local links, excluded from git (monorepo folder)" || fail "links" "$(ls -la scripts; cat "$pk/.git/info/exclude")"
+[ "$(cat .factory/VERSION)" = "$(cat "$root/.factory/VERSION")" ] && ! grep -q '<' .pi/settings.json \
+  && [ "$(grep -c 'pi-factory/scripts/factory/link.sh' .factory/ci/factory.gitlab-ci.yml)" = 3 ] && grep -q 'models-lint.mjs --per-machine-ok' .factory/ci/factory.gitlab-ci.yml \
+  && grep -q 'cd "apps/svc"' .factory/ci/factory.gitlab-ci.yml \
+  && t "project expects this factory version; CI fetches it and links it; no placeholder model scope" || fail "onboard files" "$(cat .pi/settings.json .factory/ci/factory.gitlab-ci.yml)"
+[ "$(node scripts/factory/effective-models.mjs | wc -l | tr -d ' ')" = 9 ] && node scripts/factory/models-lint.mjs --per-machine-ok >/dev/null \
+  && t "agents come from the package; CI accepts models set per machine" || fail "package agents" "$(node scripts/factory/effective-models.mjs; node scripts/factory/models-lint.mjs --per-machine-ok)"
+printf '{"agents":{"factory-worker":{"model":"gw/maker-1","thinking":"medium"},"factory-reviewer":{"model":"gw/judge-1"}},"allow":["gw/*"]}' > "$work/profile.json"
+bash "$root/scripts/factory/factory.sh" models apply --user "$work/profile.json" >/dev/null
+node -e 'const s=require(process.argv[1]).subagents;process.exit(s.agentOverrides["factory-worker"].model==="gw/maker-1"&&s.modelScope.allow[0]==="gw/*"?0:1)' "$PI_CODING_AGENT_DIR/settings.json" \
+  && [ "$(node scripts/factory/effective-models.mjs | awk -F'\t' '$1 == "factory-reviewer" { print $2 }')" = gw/judge-1 ] \
+  && t "factory models apply --user: this machine's models, for every project" || fail "apply --user" "$(cat "$PI_CODING_AGENT_DIR/settings.json")"
+rm -f "$PI_CODING_AGENT_DIR/settings.json"
+bash "$root/scripts/factory/factory.sh" version | grep -q "project expects: $(cat "$root/.factory/VERSION")" && t "factory version: installed and expected" || fail "factory version"
+echo 99.0.0 > .factory/VERSION
+bash scripts/factory/doctor.sh --quick >"$work/pre.log" 2>&1 || true
+grep -q 'older than this project expects (99.0.0)' "$work/pre.log" && grep -q 'linked to the factory package' "$work/pre.log" \
+  && t "pre-flight: an installed factory older than the project expects is refused; links checked" || fail "version check" "$(cat "$work/pre.log")"
+git checkout -q -- . 2>/dev/null || true; printf '%s\n' "$(cat "$root/.factory/VERSION")" > .factory/VERSION
+git -C "$pk" add -A; git -C "$pk" commit -qm onboard
+git -C "$pk" worktree add -q "$work/pk-wt" -b wt-test
+printf '{"repoRoot":"%s","worktreePath":"%s","agentCwd":"%s","index":0}' "$pk" "$work/pk-wt" "$work/pk-wt/apps/svc" \
+  | FACTORY_PROJECT_PREFIX=apps/svc node scripts/factory/worktree-hook.mjs > "$work/hook.json"
+[ -L "$work/pk-wt/apps/svc/scripts/factory" ] && grep -q '"apps/svc/scripts/factory"' "$work/hook.json" && [ -z "$(git -C "$work/pk-wt" status --porcelain)" ] \
+  && t "worker worktrees get the same links, kept out of the patch" || fail "worktree links" "$(cat "$work/hook.json"; git -C "$work/pk-wt" status --porcelain)"
+git -C "$pk" worktree remove --force "$work/pk-wt"
+
+mg="$work/migrate repo"; mkdir -p "$mg"; git -C "$mg" init -q; ( cd "$mg"; echo x > README.md; git add -A; git commit -qm init )
+bash "$root/scripts/factory/install-into.sh" "$mg" --no-branch >/dev/null 2>&1; ( cd "$mg"; echo 'FACTORY_TEST_CMD="true"' >> .factory/commands.env; git add -A; git commit -qm "copied install" )
+cd "$mg"
+out="$(bash "$root/scripts/factory/onboard.sh" 2>&1)" && fail "onboard must refuse a copied install without --migrate"
+grep -q -- '--migrate' <<<"$out" || fail "onboard copied message" "$out"
+bash "$root/scripts/factory/onboard.sh" --migrate >"$work/migrate.log" 2>&1 || fail "migrate" "$(cat "$work/migrate.log")"
+[ -z "$(git ls-files -- scripts/factory .pi/agents/factory .factory/briefs docs/factory)" ] && [ -L scripts/factory ] \
+  && grep -q 'FACTORY_TEST_CMD="true"' .factory/commands.env && [ -f .pi/settings.json ] \
+  && t "onboard --migrate removes the copied factory, keeps the project's own files, links the package" || fail "migrate result" "$(git status --short | head -20)"
+cd "$repo"
 
 if [ -n "${mono:-}" ]; then
   [ "$(cat "$mono/projects/other/keep.js")" = keep ] && [ -z "$(git -C "$mono" log --format=%H -- projects/other README.md | awk 'NR > 1')" ] \

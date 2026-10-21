@@ -15,8 +15,9 @@
 // stdin: { repoRoot, worktreePath, agentCwd, branch, index, runId, baseCommit }
 // stdout: { "syntheticPaths": [...] }
 import { execFileSync, execSync } from "node:child_process";
-import { existsSync, lstatSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const input = JSON.parse(await new Promise((res) => {
   let d = ""; process.stdin.on("data", (c) => (d += c)); process.stdin.on("end", () => res(d));
@@ -62,6 +63,20 @@ if (depsCmd) {
     symlinkSync(from, to, "dir");
     synthetic.push(d ? `${d}/${n}` : n);
   }
+}
+
+// D92: a project on the installed package reaches the factory through local,
+// untracked links (link.sh); a worktree only has tracked files, so it gets
+// the same links, kept out of the patch.
+const here = dirname(realpathSync(fileURLToPath(import.meta.url)));
+const linkList = (() => { try { return readFileSync(join(here, "package-links.txt"), "utf8"); } catch { return ""; } })();
+for (const rel of linkList.split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"))) {
+  const from = join(input.repoRoot, prefix, rel), to = join(wt, prefix, rel);
+  let isLink = false; try { isLink = lstatSync(from).isSymbolicLink(); } catch {}
+  if (!isLink || exists(to)) continue;
+  mkdirSync(dirname(to), { recursive: true });
+  symlinkSync(readlinkSync(from), to);
+  synthetic.push(inProject(rel));
 }
 
 process.stdout.write(JSON.stringify({ syntheticPaths: synthetic }));

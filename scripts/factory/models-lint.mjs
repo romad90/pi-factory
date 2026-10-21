@@ -5,14 +5,15 @@
 // frontmatter field was removed upstream and makes the agent fail to launch.
 //
 // Usage: node scripts/factory/models-lint.mjs
-// Inputs: .pi/agents/factory/*.md (model, fallbackModels in frontmatter),
-//         .pi/settings.json (builtins off, model scope), .factory/model-families.json
-import { readFileSync, readdirSync, existsSync } from "node:fs";
-import { join } from "node:path";
+// Inputs: the factory agents (.pi/agents/factory, or the installed package's)
+//         with their effective model: frontmatter, then user and project
+//         agentOverrides (D92); subagents settings, user then project (builtins
+//         off, model scope); .factory/model-families.json
+import { readFileSync, existsSync } from "node:fs";
+import { effectiveAgents, subagentSettings, agentsDir, userSettingsFile } from "./effective-models.mjs";
 
 const SETTINGS = ".pi/settings.json";
 const FAMILIES = ".factory/model-families.json";
-const AGENTS_DIR = ".pi/agents/factory";
 
 let failed = false;
 const ok = (m) => console.log(`  ✓ ${m}`);
@@ -22,25 +23,21 @@ const isPlaceholder = (v) => typeof v === "string" && /[<>]/.test(v);
 const glob = (pattern) =>
   new RegExp("^" + pattern.split("*").map((s) => s.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*") + "$", "i");
 
-function frontmatter(file) {
-  const text = readFileSync(file, "utf8");
-  const m = text.match(/^---\n([\s\S]*?)\n---/);
-  const out = {};
-  if (!m) return out;
-  for (const line of m[1].split("\n")) {
-    const kv = line.match(/^([A-Za-z][\w-]*):\s*(.*)$/);
-    if (kv) out[kv[1]] = kv[2].trim();
-  }
-  return out;
-}
-
 console.log("Factory models");
-for (const f of [SETTINGS, FAMILIES]) if (!existsSync(f)) { bad(`missing ${f}`); }
+if (!existsSync(SETTINGS) && !existsSync(userSettingsFile())) bad(`missing ${SETTINGS} (and no user settings)`);
+if (!existsSync(FAMILIES)) bad(`missing ${FAMILIES}`);
 if (failed) process.exit(1);
 
-const sub = JSON.parse(readFileSync(SETTINGS, "utf8")).subagents ?? {};
+const sub = subagentSettings().merged;
+// D92: in CI, a project on the installed package has no models in the repo:
+// they are set per machine and checked by each machine's pre-flight.
+if (process.argv.includes("--per-machine-ok") && !existsSync(".pi/agents/factory")
+    && effectiveAgents().every((a) => !a.model || isPlaceholder(a.model))) {
+  ok("models are set per machine (factory installed as a package): checked by the pre-flight, not here");
+  console.log("MODELS: PASS");
+  process.exit(0);
+}
 const fam = JSON.parse(readFileSync(FAMILIES, "utf8"));
-const overrides = sub.agentOverrides ?? {};
 
 // Package-level guards
 sub.disableBuiltins === true
@@ -52,23 +49,22 @@ if (scope.enforce === true && allow.length && !allow.some(isPlaceholder)) ok(`mo
 else bad("subagents.modelScope must have enforce: true and a filled allow list");
 
 // Agents
-const agents = readdirSync(AGENTS_DIR).filter((f) => f.endsWith(".md")).map((f) => ({ file: join(AGENTS_DIR, f), fm: frontmatter(join(AGENTS_DIR, f)) }));
+const agents = effectiveAgents();
+if (!agents.length) bad(`no factory agents in ${agentsDir()}`);
 const models = {};                                   // agent → [primary, ...fallbacks]
-for (const { file, fm } of agents) {
+for (const { file, fm, model, source } of agents) {
   const name = fm.name;
   if (!name) { bad(`${file}: no name`); continue; }
   if (fm.defaultContext !== "fresh") bad(`${name}: defaultContext must be fresh`);
   if (fm.inheritSkills !== "false") bad(`${name}: inheritSkills must be false (pinned skills only)`);
   if (!fm.skillPath) bad(`${name}: skillPath must point at the pinned skills`);
   if ("memory" in fm) bad(`${name}: agent memory is off for factory agents (could carry instrument details past the wall)`);
-  if (!fm.model) { bad(`${name}: no model in its frontmatter (run node scripts/factory/migrate-models.mjs)`); continue; }
+  if (!model) { bad(`${name}: no model (frontmatter or agentOverrides.${name}.model)`); continue; }
   if ("fallbackModels" in fm) bad(`${name}: fallbackModels was removed by pi-subagents and stops the agent from launching; delete that line`);
-  const list = [fm.model];
-  if (list.some(isPlaceholder)) { bad(`${name}: placeholder model ids left (${list.join(", ")})`); continue; }
+  const list = [model];
+  if (list.some(isPlaceholder)) { bad(`${name}: placeholder model ids left (${list.join(", ")}); set them per machine: factory models apply --user`); continue; }
+  if (source === "user" || source === "project") ok(`${name}: ${model} (from ${source} agentOverrides)`);
   models[name] = list;
-}
-for (const name of Object.keys(overrides)) {
-  if (name.startsWith("factory-")) bad(`agentOverrides.${name}: pi-subagents only accepts builtin names there and fails to load agents; run node scripts/factory/migrate-models.mjs`);
 }
 
 // Scope and families

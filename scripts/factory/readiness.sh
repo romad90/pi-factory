@@ -42,8 +42,8 @@ check "no leftover CONTEXT.md" "rename CONTEXT.md to GLOSSARY.md (v1.3)" test ! 
 section "Skills and agents"
 check "pinned skills v1.3.1 verified" "run scripts/factory/skills-pin.sh verify and fix what it lists" bash "$here/skills-pin.sh" verify
 check "local skills present" "copy contract, contract-critic, verify-behavior into $FACTORY_SKILLS_DIR" test -f "$FACTORY_SKILLS_DIR/verify-behavior/SKILL.md"
-check "factory agents present" "copy .pi/agents/factory/" test -f .pi/agents/factory/factory-reviewer.md
-check "lead playbook present" "copy .pi/prompts/factory.md" test -f .pi/prompts/factory.md
+check "factory agents present" "copy .pi/agents/factory/, or install the package: factory onboard" bash -c "node '$here/effective-models.mjs' | grep -q '^factory-reviewer'"
+check "lead playbook present" "copy .pi/prompts/factory.md, or install the package" test -f "$(factory_res .pi/prompts/factory.md)"
 check "issue tracker configured for skills" "run /setup-matt-pocock-skills (local markdown tracker, .scratch/)" test -f docs/agents/issue-tracker.md
 
 section "Validation"

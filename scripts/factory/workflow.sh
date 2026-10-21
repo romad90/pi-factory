@@ -196,9 +196,10 @@ i=2; while [ -e "$wf_file" ]; do wf_file="$wf_dir/$(date +%Y%m%d-%H%M%S)-$mode-$
 # (models change mid-mission). metrics.sh reads it; nothing else depends on it.
 runs_tsv="$(dirname "$wf_dir")/runs.tsv"
 [ -f "$runs_tsv" ] || printf 'date\tworkflow\tkey\tagent\tmodel\tthinking\n' > "$runs_tsv"
-fm() { awk -v k="$2" '/^---$/ { c++; next } c == 1 && index($0, k ":") == 1 { sub("^" k ":[ \t]*", ""); print; exit }' "$FACTORY_AGENTS_DIR/$1.md" 2>/dev/null; }
+effective="$(node "$here/effective-models.mjs" 2>/dev/null || true)"     # D92: overrides included
 while IFS=$'\t' read -r key agent _ _; do
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$(date '+%F %H:%M')" "$(basename "$wf_file")" "$key" "$agent" "$(fm "$agent" model)" "$(fm "$agent" thinking)" >> "$runs_tsv"
+  mt="$(printf '%s\n' "$effective" | awk -F'\t' -v n="$agent" '$1 == n { print $2 "\t" $3; exit }')"
+  printf '%s\t%s\t%s\t%s\t%s\n' "$(date '+%F %H:%M')" "$(basename "$wf_file")" "$key" "$agent" "${mt:-$'\t'}" >> "$runs_tsv"
 done < "$items"
 # The files are written after the checkpoints above, so commit them now. An
 # untracked file makes the tree dirty and worktree admission refuses to run.

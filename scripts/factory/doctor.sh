@@ -24,6 +24,15 @@ if [ "${1:-}" = "--quick" ]; then
   git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ -d .factory ] \
     && ok "at the project root${prefix:+ (monorepo: $prefix)}" || bad "run from the project root (the folder with .factory/)"
   command -v node >/dev/null && ok "node" || bad "node not on PATH"
+  # D92: a project on the installed package names the version it expects.
+  inst="$(cat "$FACTORY_PACKAGE_ROOT/.factory/VERSION" 2>/dev/null || true)"; expect="$(cat .factory/VERSION 2>/dev/null || true)"
+  if [ -n "$inst" ] && [ -n "$expect" ] && [ "$inst" != "$expect" ]; then
+    case "$(version_cmp "$inst" "$expect")" in
+      -1) bad "installed factory $inst is older than this project expects ($expect): upgrade the package, then factory link" ;;
+      1) printf '  - installed factory %s, project expects %s: factory onboard moves the project up (its own MR)\n' "$inst" "$expect" ;;
+    esac
+  fi
+  if [ -L scripts/factory ]; then bash "$FACTORY_LIB_DIR/link.sh" --check >/dev/null 2>&1 && ok "linked to the factory package ($FACTORY_PACKAGE_ROOT)" || bad "factory links missing or stale: factory link"; fi
   if [ -n "${2:-}" ]; then
     if why="$(mission_guard "$2")"; then ok "mission $2 on branch $(git branch --show-current)"; else bad "$why"; fi
   fi
@@ -33,7 +42,7 @@ if [ "${1:-}" = "--quick" ]; then
   [ -z "$dirty" ] && ok "clean tree outside ${FACTORY_DIR}/" || bad "uncommitted changes outside ${FACTORY_DIR}/ (commit or stash)"
   if node "$here/models-lint.mjs" >/dev/null 2>&1; then ok "models: one per role, families separated"
   else bad "models-lint fails (node scripts/factory/models-lint.mjs)"; fi
-  if [ -f .pi/extensions/factory-guard.ts ] && node -e '
+  if [ -f "$(factory_res .pi/extensions/factory-guard.ts)" ] && node -e '
       import("./scripts/factory/guard-rules.mjs").then(({ check }) => {
         process.exit(check({ tool: "bash", input: { command: "git push" }, cwd: process.cwd() }) ? 0 : 1); });' 2>/dev/null; then
     ok "command guard present and blocking (trust the project in Pi so it loads)"

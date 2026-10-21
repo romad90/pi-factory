@@ -47,6 +47,7 @@ check_model() {                         # <file> <label> <agent>
   [ -f "$f" ] || return 0
   want="$(agent_model "$3")"; got="$(verdict_field "$f" Model)"
   [ "$got" = "none" ] && return 0
+  case "$want" in unknown|*'<'*) return 0 ;; esac   # D92: models set per machine, not in the repo
   [ "$got" = "$want" ] || warn "$label: verdict model '${got:-none}' ≠ configured $3 model '$want' (model changed since?)"
 }
 

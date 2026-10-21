@@ -1,0 +1,12 @@
+# Factory files a project on the installed package (P11, D92) reaches through
+# local links: untracked, listed in .git/info/exclude, one set per machine.
+# Agents, prompts, skills and the command guard need no link: Pi and
+# pi-subagents load them from the package itself.
+scripts/factory
+.factory/briefs
+.factory/skills-pin
+docs/agents/factory.md
+docs/agents/contract-format.md
+docs/agents/verdict-format.md
+docs/agents/bot-harness.md
+docs/agents/ticket-format.md

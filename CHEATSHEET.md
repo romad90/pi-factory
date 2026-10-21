@@ -86,9 +86,11 @@ After any model change, probe the gateway once: `doctor.sh` (full) runs `models-
 | `.pi/settings.json` | `subagents.modelScope.allow: ["<your-provider>/*"]` |
 | `.factory/model-families.json` | a `{ "match": "*name*", "family": "x" }` line per model you use |
 
-`node scripts/factory/models-lint.mjs` must print `MODELS: PASS`. It enforces: critic ≠ author family; reviewer, review-axis, validator and code steward ≠ worker families; no `fallbackModels` line (removed upstream, stops the agent from launching); no `factory-*` in `agentOverrides` (crashes discovery).
+`node scripts/factory/models-lint.mjs` must print `MODELS: PASS`. It enforces: critic ≠ author family; reviewer, review-axis, validator and code steward ≠ worker families; no `fallbackModels` line (removed upstream, stops the agent from launching). It reads the model each agent really runs: its frontmatter, then `subagents.agentOverrides` in your user settings, then in the project's (D92; pi-subagents 0.76.1 applies them to `factory-*` agents).
 
 **Set them once, reuse them everywhere.** In a repo where `MODELS: PASS`, run `node scripts/factory/models-profile.mjs capture`: it saves the models, thinking levels, scope and families to `~/.pi-factory/models.json` (outside every repo; `PI_FACTORY_MODELS` overrides the path). From then on, `install-into.sh` applies the profile to each new repo. To refresh a repo after changing the profile: `node scripts/factory/models-profile.mjs apply`, then the lint.
+
+**Models per machine, never pulled from another one (D92).** `node scripts/factory/models-profile.mjs apply --user` writes the profile into your Pi user settings (`~/.pi/agent/settings.json`, `subagents.agentOverrides` and `modelScope`). They win over the agent files in every repo on this machine, copied or on the package, so a `git pull` can no longer bring the Mac's models to the cloud machine. A project's own `agentOverrides` still win over yours.
 
 **Probe your models before a mission:** `node scripts/factory/models-probe.mjs --stamp`, then commit `.factory/models-probe.ok`. Each agent is probed on its own provider from Pi's `~/.pi/agent/models.json` (D79): served to your key, thinking level accepted, tool turns accepted. Run it on every machine you use: two machines can have two keys with different model lists.
 
@@ -126,6 +128,27 @@ Rate limits: the install adds Pi's retry to `.pi/settings.json` (`"retry": { "en
 5. In Pi, **trust the project** once, so the command guard (`.pi/extensions/factory-guard.ts`) loads.
 6. `/setup-matt-pocock-skills`: choose the local markdown tracker in `.scratch/`.
 7. `scripts/factory/doctor.sh` green, then in Pi: `/subagents-doctor`, `/subagents-models` (9 `factory-*` agents).
+
+### Or: install once per machine, onboard projects (D92, opt-in)
+
+The factory as a Pi package: agents, prompts, skills and the command guard load from it; scripts, briefs and the factory's docs reach the project as local links (untracked, in `.git/info/exclude`). A project carries only its own files (about 10), and a factory release changes no project.
+
+```bash
+git clone <pi-factory or your mirror> ~/pi-factory          # once per machine (or git pull to upgrade)
+pi install ~/pi-factory                                      # Pi loads it in place
+alias factory="$HOME/pi-factory/scripts/factory/factory.sh"  # in your shell profile
+factory models apply --user                                  # your models, from ~/.pi-factory/models.json
+scripts/factory/install-pi-config.sh                         # worktree hook (once)
+```
+
+Then, in each project folder (a monorepo project: its folder), on its own branch:
+
+```bash
+factory onboard              # a new project; --ci child as above
+factory onboard --migrate    # a project the factory was copied into: git rm the copies, then onboard
+```
+
+It writes `.factory/commands.env`, `behavior-paths`, `model-families.json`, `VERSION` (the factory version the project expects), the CI include, `docs/agents/quality-bar.md`, a `GLOSSARY.md` stub, the `AGENTS.md` pointer and the `.pi/settings.json` subagents block, links the rest, and commits nothing: review, commit, MR. In CI the factory jobs clone the version in `.factory/VERSION` from `FACTORY_PACKAGE_GIT` (set it to your mirror) and link it; models stay per machine, checked by each pre-flight. **Upgrade:** `git pull` in `~/pi-factory`, then `factory onboard` in each project when you want it to move up (bumps `.factory/VERSION` and the CI include, its own MR). The pre-flight refuses an installed factory older than the project expects, and checks the links (`factory link` repairs them). `factory version` shows both; `factory <script>` runs any factory script (`factory next <mission>`, `factory mr <mission>`).
 
 ## 6. A mission
 
