@@ -22,7 +22,7 @@ Loop:
      - The output ends with `DECISION NEEDED: <question>`: run `scripts/factory/human.sh ask $1 <ticket> --stdin <<'FACTORY_TEXT_END'`, then the question verbatim on the following lines, then a line `FACTORY_TEXT_END`. Do not integrate. If it prints `AUTO-ANSWERED`, the question was settled by a rule or an earlier answer: continue the loop. If it prints `ASKED`, stop.
      A failed integration is expected and recorded as a round; continue.
    - `review`: `scripts/factory/workflow.sh review-wave $1`, pass its `WORKFLOW_FILE` path as above, then `scripts/factory/collect.sh $1`.
-   - `pr`: run `scripts/factory/metrics.sh $1`, then stop: the human runs /pr and /retro.
+   - `pr`: run `scripts/factory/metrics.sh $1`, then stop: the human runs /pr (the body goes to `.scratch/$1/pr.md`), then `scripts/factory/mr.sh $1` to push and open the MR, then /retro.
 3. Repeat from 1 until a stop.
 
 Rules:

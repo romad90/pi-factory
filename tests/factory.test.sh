@@ -702,6 +702,36 @@ MAKERS_KEY=env-key-4711 node scripts/factory/models-probe.mjs >"$work/probe.log"
 kill $g1 $g2; wait $g1 $g2 2>/dev/null || true
 git checkout -q -- .pi .factory; rm -f "$PI_CODING_AGENT_DIR/models.json"
 
+# D86: one command opens the MR from /pr's body.
+out="$(FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo --dry-run 2>&1)" && fail "mr.sh must refuse without a PR body"
+echo "$out" | grep -q 'run /pr first' && t "mr.sh refuses without a PR body" || fail "mr no body" "$out"
+printf '# test(demo): characterize the hello tools\n\n## Summary\n\nTwo tools pinned.\n' > $m/pr.md
+out="$(FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo --dry-run 2>&1)"
+echo "$out" | grep -q "→ production" && echo "$out" | grep -q 'title: test(demo): characterize the hello tools' \
+  && t "mr.sh: title from the body's heading, target from FACTORY_MR_TARGET" || fail "mr dry" "$out"
+cur="$(git rev-parse --abbrev-ref HEAD)"
+out="$(FACTORY_MR_TARGET=production FACTORY_MR_BLOCKED_BRANCHES="other/* ${cur%%/*}*" bash scripts/factory/mr.sh demo --dry-run 2>&1)" && fail "mr.sh must refuse a blocked branch"
+echo "$out" | grep -q 'FACTORY_MR_BLOCKED_BRANCHES' && t "mr.sh refuses a branch that deploys (FACTORY_MR_BLOCKED_BRANCHES)" || fail "mr blocked" "$out"
+out="$(FACTORY_MR_TARGET="$cur" bash scripts/factory/mr.sh demo --dry-run 2>&1)" && fail "mr.sh must refuse the target itself"
+printf '# chore: x [skip ci]\n' > "$work/skip.md"; cp $m/pr.md "$work/pr.keep"; cp "$work/skip.md" $m/pr.md
+out="$(FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo --dry-run 2>&1)" && fail "mr.sh must refuse a title that skips CI"
+cp "$work/pr.keep" $m/pr.md; t "mr.sh refuses the target branch itself and a title that skips CI"
+git init -q --bare "$work/origin.git"; git remote remove origin 2>/dev/null || true; git remote add origin "$work/origin.git"
+mkdir -p "$work/bin"; cat > "$work/bin/glab" <<'GLAB'
+#!/usr/bin/env bash
+case "$1 $2" in
+  "auth status") exit 0 ;;
+  "mr list") echo '[]' ;;
+  "mr create") printf '%s\n' "$@" > "$GLAB_LOG"; echo "https://gitlab.example/g/p/-/merge_requests/7" ;;
+esac
+GLAB
+chmod +x "$work/bin/glab"
+GLAB_LOG="$work/glab.log" PATH="$work/bin:$PATH" FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo >"$work/mr.log" 2>&1 || fail "mr glab" "$(cat "$work/mr.log")"
+git ls-remote --heads "$work/origin.git" "$cur" | grep -q . && grep -qx 'production' "$work/glab.log" && grep -qx 'test(demo): characterize the hello tools' "$work/glab.log" \
+  && grep -q '^## Summary' "$work/glab.log" && ! grep -q '^# test' "$work/glab.log" && grep -q 'merge_requests/7' $m/mr.url \
+  && t "mr.sh pushes the branch and opens the MR with glab; heading becomes the title, the rest the description (D86)" || fail "mr glab create" "$(cat "$work/mr.log" "$work/glab.log")"
+git remote remove origin; rm -f $m/pr.md $m/mr.url
+
 if [ -n "${mono:-}" ]; then
   [ "$(cat "$mono/projects/other/keep.js")" = keep ] && [ -z "$(git -C "$mono" log --format=%H -- projects/other README.md | awk 'NR > 1')" ] \
     && t "monorepo: a whole mission never touched the sibling project or the root" || fail "monorepo leak" "$(git -C "$mono" log --stat -- projects/other README.md)"

@@ -469,6 +469,8 @@ Steps: **1 Assisted** (one agent, you hold the context), **2 Parallel** (~10 age
 **D84. Rounds carry a journal, and a round that changes nothing escalates.** Workers end every round with `journal.sh` (what they tried, ruled out, where they stopped); integration moves it into `.scratch/<mission>/journal/<ticket>.md` under its round, and fix rounds read it. A red integration keeps a failure signature (failing tests and lint keys, without times or counts); when the next round fails with the same signature, the ticket escalates at once instead of spending a third round. Borrowed from Machinist's handoff notes and DoorDash's measured progress (P9 steps 2 and 3).
 
 **D85. Tokens per run are recorded.** `usage.sh` reads pi-subagents' per-run metadata (`*_meta.json`: usage, model, duration) and appends each factory run once to `.scratch/<mission>/usage.tsv`; integration and collection run it, and the metrics show the totals. Best effort: no metadata, no line.
+
+**D86. One command opens the merge request.** After mission 3 the human retyped a body from the terminal into GitLab. `mr.sh <mission>` takes `/pr`'s body (`.scratch/<mission>/pr.md`; its `# ` heading becomes the title), pushes the branch and opens the MR against `FACTORY_MR_TARGET`: with glab when it is logged in, else the GitLab API with the token named by `FACTORY_GITLAB_TOKEN_ENV`, else push options and the body to paste. Run again, it updates the open MR. It refuses the target branch itself, branches listed in `FACTORY_MR_BLOCKED_BRANCHES` (some branch names deploy when pushed) and a title that would skip CI. Opening the MR stays the human's act: the script is run by a person, never by the lead.
 ---
 
 ## 11. Path to Step 2

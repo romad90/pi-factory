@@ -153,4 +153,4 @@ if [ "$(verdict_field "$h" Result)" != "PASS" ]; then
 fi
 unverified_step "$h" "code steward"
 
-step pr "scripts/factory/metrics.sh $feature → /pr (Evidence), open the MR, then /retro"
+step pr "scripts/factory/metrics.sh $feature → /pr (Evidence, written to $dir/pr.md) → scripts/factory/mr.sh $feature opens the MR → /retro"
