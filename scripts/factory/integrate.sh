@@ -62,7 +62,24 @@ if ! project_apply --check --index "$patch" 2>/dev/null; then
     exit 1
   fi
 fi
-project_apply --3way --index "$patch"
+# D80: a 3-way apply can still conflict (two tickets of a wave changed the
+# same lines). Never leave a conflicted tree: put the touched paths back as
+# HEAD has them and record a failed round, so the ticket rebuilds on HEAD.
+if ! project_apply --3way --index "$patch" > "$(mktemp)" 2>&1; then
+  root="$(git rev-parse --show-toplevel)"
+  conflicted="$(git -C "$root" diff --name-only --diff-filter=U)"
+  touched="$(git -C "$root" diff --cached --name-only HEAD; printf '%s\n' "$conflicted")"
+  printf '%s\n' "$touched" | sort -u | while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    if git -C "$root" cat-file -e "HEAD:$f" 2>/dev/null; then git -C "$root" checkout -q HEAD -- "$f"
+    else git -C "$root" rm -q -f --cached -- "$f" 2>/dev/null || true; rm -f -- "$root/$f"; fi
+  done
+  write_fail_verdict "$feature" "$ticket" integrate \
+    "The worker's patch conflicts with code integrated since it started ($(printf '%s' "$conflicted" | paste -sd' ' -)). Rebuild from the current code ($(git rev-parse --short HEAD)); keep the tests already there."
+  bash "$here/checkpoint.sh" "$feature" >/dev/null
+  echo "  ✗ patch conflicts with the current code; tree restored, recorded as a failed round in $dir/verdicts/$ticket-code.md"
+  exit 1
+fi
 # The patch is already in this branch (a wave salvaged after its ticket was
 # integrated, or the same change landed another way): nothing to check or commit.
 if git diff --cached --quiet HEAD -- .; then

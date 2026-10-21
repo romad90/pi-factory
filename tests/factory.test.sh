@@ -422,6 +422,15 @@ head="$(git rev-parse HEAD)"; rc=0; bash scripts/factory/integrate.sh demo 02-co
 [ "$rc" = 3 ] && grep -q 'already in this branch' "$work/int.log" && [ "$(git rev-parse HEAD)" = "$head" ] \
   && [ "$(cat $m/state/02-count.integrated)" = "$c2" ] && git diff --cached --quiet \
   && t "a patch already in the branch is reported as such, nothing committed or recorded" || fail "already integrated" "rc=$rc $(cat "$work/int.log")"
+# D80: a patch that conflicts with a ticket integrated meanwhile leaves no conflicted tree.
+echo 'export const count = (n) => n + 1;' > src/tools/count.js; git diff --full-index -- src/tools/count.js > "$work/02b.patch"; git checkout -q -- src/tools/count.js
+echo 'export const count = (n) => n * 2;' > src/tools/count.js; git commit -qam "test: another ticket changed the same line"
+pre="$(git rev-parse HEAD)"
+if bash scripts/factory/integrate.sh demo 02-count "$work/02b.patch" >"$work/int.log" 2>&1; then fail "a conflicting patch must fail"; fi
+grep -q 'conflicts with the current code' "$work/int.log" && [ -z "$(git status --porcelain -- src)" ] && [ -z "$(git diff --name-only --diff-filter=U)" ] \
+  && grep -q 'n \* 2' src/tools/count.js && grep -q 'conflicts with code integrated' $m/verdicts/02-count-code.md \
+  && t "a conflicting 3-way apply restores the tree and records a failed round (D80)" || fail "conflict" "$(cat "$work/int.log"; git status --short)"
+git reset -q --hard "$head"
 cat > $m/verdicts/02-count-code.md <<V
 # Verdict: 02-count
 **Result:** PASS
