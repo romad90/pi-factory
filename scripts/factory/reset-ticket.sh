@@ -18,7 +18,8 @@ dir="$(mission_dir "$feature")"
 [ -f "$dir/issues/$ticket.md" ] || die "unknown ticket $ticket in $dir/issues"
 
 shopt -s nullglob
-files=("$dir/verdicts/$ticket-code.md" "$dir/verdicts/$ticket-code".r*.md "$dir/state/$ticket.integrated")
+files=("$dir/verdicts/$ticket-code.md" "$dir/verdicts/$ticket-code".r*.md "$dir/state/$ticket.integrated"
+       "$dir/state/$ticket.stuck" "$dir/state/$ticket.signature" "$dir/state/$ticket.stale-verdict.md")
 removed=0
 for f in "${files[@]}"; do
   [ -e "$f" ] || continue

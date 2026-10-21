@@ -113,16 +113,26 @@ if check_lint && run_check tests "$FACTORY_TEST_CMD" \
     -m "Integrated by the factory after lint and tests passed." -- . ":(exclude)${FACTORY_DIR}"
   git rev-parse HEAD > "$dir/state/$ticket.integrated"
   bash "$here/checkpoint.sh" "$feature" >/dev/null
+  journal_collect "$feature" "$ticket" "integrated $(git rev-parse --short HEAD)"   # D84
   rm -f "$(draft_patch "$feature" "$ticket")" "$(draft_patch "$feature" "$ticket").status"   # D73: the draft is spent
+  bash "$here/usage.sh" "$feature" >/dev/null 2>&1 || true   # D85
   echo "  ✓ committed $(git rev-parse --short "$(cat "$dir/state/$ticket.integrated")"); ready for review"
 else
   project_apply -R --index "$patch"
   # D78: say whether the worker checked its own work before handing it over.
   sc="$(cat "$(draft_patch "$feature" "$ticket").status" 2>/dev/null || true)"
   sc="${sc:-never run}"
+  # D84: a round that fails exactly like the one before made no progress:
+  # the ticket escalates now instead of spending another round.
+  mkdir -p "$dir/state"; sig="$(failure_signature "$log")"; stuck=""
+  if [ -n "$sig" ] && [ -f "$dir/state/$ticket.signature" ] && [ "$sig" = "$(cat "$dir/state/$ticket.signature")" ]; then
+    stuck=". No progress: the same failures as the previous round; escalated to the human"
+    date '+%F %H:%M' > "$dir/state/$ticket.stuck"
+  fi
+  [ -n "$sig" ] && printf '%s\n' "$sig" > "$dir/state/$ticket.signature"
   # The failure is a round like any review FAIL, so escalation is automatic (D38).
   write_fail_verdict "$feature" "$ticket" integrate \
-    "Lint, tests or the extra check failed when integrating the worker's patch. Log: $log${lint_fail:+. New lint errors (fix them, never silence them): $lint_fail}. The worker's last self-check: $sc. Run scripts/factory/self-check.sh $feature until it prints SELF-CHECK: PASS before handing over."
+    "Lint, tests or the extra check failed when integrating the worker's patch. Log: $log${lint_fail:+. New lint errors (fix them, never silence them): $lint_fail}. The worker's last self-check: $sc. Run scripts/factory/self-check.sh $feature until it prints SELF-CHECK: PASS before handing over$stuck."
   bash "$here/checkpoint.sh" "$feature" >/dev/null
   echo "  ✗ checks failed; patch reverted. Recorded in $dir/verdicts/$ticket-code.md (log: $log)"
   exit 1

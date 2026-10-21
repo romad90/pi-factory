@@ -181,6 +181,7 @@ write_fail_verdict() {
   local feature="$1" ticket="$2" label="$3" text="$4" dir v marker
   dir="$(mission_dir "$feature")"; v="$dir/verdicts/$ticket-code.md"; mkdir -p "$dir/verdicts"
   marker="$(ticket_marker "$feature" "$ticket")"
+  journal_collect "$feature" "$ticket" "FAIL ($label)"
   cat > "$v" <<VERDICT
 # Verdict: $ticket — round ?
 **Result:** FAIL
@@ -324,6 +325,29 @@ worker_ticket() {                      # <feature>
   done
   [ -n "$best" ] || return 1
   printf '%s\n' "$best"
+}
+
+# D84: move a worker's journal (journal.sh) into the mission, under a round
+# header, so the next round reads what this one tried. No journal: nothing.
+journal_collect() {                    # <feature> <ticket> <outcome>
+  local src out n
+  src="$(draft_patch "$1" "$2").journal"
+  [ -s "$src" ] || return 0
+  out="$(mission_dir "$1")/journal/$2.md"; mkdir -p "$(dirname "$out")"
+  n="$(verdict_history_count "$(mission_dir "$1")/verdicts/$2-code.md")"
+  { [ -s "$out" ] || printf '# Journal: %s\n' "$2"
+    printf '\n## Round %s · %s · %s\n' "$((n + 1))" "$(date '+%F %H:%M')" "$3"
+    cat "$src"; } >> "$out"
+  rm -f "$src"
+}
+
+# D84: the failures of a red integration, reduced to what stays the same
+# between two runs of the same mistake (test names, lint keys; no times or
+# counts). Empty when nothing recognizable failed.
+failure_signature() {                  # <log>
+  grep -E '^[[:space:]]*(FAIL|✗|×|not ok|Error:|[A-Za-z]+Error:)|new errors' "$1" 2>/dev/null \
+    | sed -E 's/[0-9]+(\.[0-9]+)?[[:space:]]*(ms|s)\b//g; s/:[0-9]+(:[0-9]+)?//g; s/[[:space:]]+/ /g; s/^ //; s/ $//' \
+    | sort -u | head -40
 }
 
 # --- commands.env (D8, D34) ---------------------------------------------------
@@ -521,7 +545,7 @@ compute_ticket_state() {
     v="$dir/verdicts/${name}-code.md"; marker="$(ticket_marker "$feature" "$name")"
     vc="$(verdict_field "$v" Commit)"; n="${T_ROUND[$name]}"
     if [ -n "$marker" ] && [ "$vc" != "$marker" ]; then T_REVIEW+=("$name"); continue; fi
-    if [ "$n" -ge "$FACTORY_ROUND_LIMIT" ]; then T_ESCALATE+=("$name"); continue; fi
+    if [ "$n" -ge "$FACTORY_ROUND_LIMIT" ] || [ -f "$dir/state/$name.stuck" ]; then T_ESCALATE+=("$name"); continue; fi
     ready=1
     for b in $(ticket_blockers "$t"); do
       [ "$b" = "$num" ] && continue
