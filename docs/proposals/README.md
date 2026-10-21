@@ -16,6 +16,7 @@ Status: **draft** (open for discussion) · **accepted** (in the roadmap) · **re
 | P8 | [Hands-off mission: the human decides, the factory does the rest](P8-hands-off-mission.md) | steps 1–3 done | P2 for the last step |
 | P9 | [Rounds that converge: reproduce first, carry what was learned, doubt the contract early](P9-converging-rounds.md) | draft | — |
 | P10 | [Front page: every subagent, at every stage, on one page](P10-front-page.md) | draft | — (P2 completes the events) |
+| P11 | [Install the factory once per machine; onboard a project with only what is its own](P11-install-once.md) | draft | — |
 
 ## Why these four, in this order
 
@@ -39,5 +40,7 @@ P9 comes from the end of mission 2: 4 of 10 tickets escalated after three rounds
 P10 answers what the human did most during mission 2 besides deciding: finding out what was going on. The files already know; a read-only local page shows it, and P6 later hosts the same page.
 
 The [assessment after mission 2](assessment-2026-10.md) sorts all of them and the borrowed ideas by what that mission showed.
+
+P11 comes from mission 3's first day: a pulled branch brought another machine's models, two machines ran two factory versions, and every release was a 25-file diff in the project. The factory belongs to the machine; a project keeps what is its own.
 
 Smaller ideas seen in other tools, not yet proposals, are collected in [ideas to borrow](ideas.md).
