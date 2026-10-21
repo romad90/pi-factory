@@ -12,3 +12,10 @@ Characterization of the licenses feature production added to a batch worker (ano
 | 6 | Escalation on a stale verdict | 14 escalated on a review of an older commit; its docs were never reviewed | stale verdicts are not rounds | P1 | ✅ D81 |
 | 7 | The team quota ran out with three parallel workers | 429 on two tickets | `FACTORY_MAX_PARALLEL=1` on a shared key | P2 | docs |
 | 8 | GLM as lead followed the script through every stop | missing install, 403, dirty tree, conflict: each time it stopped and named the rule | keep a strong instruction follower as lead until P2 | P1 | ✅ cheatsheet |
+| 9 | A `node_modules` symlink in the worktree tripped the patch guard | 3 of 18 rounds were deterministic fails on the same block, no code at fault | the guard ignores `node_modules` links the worktree setup creates; a block names the path and the rule | P2 | roadmap |
+| 10 | Tokens not reported | the installed version predates D85; metrics show "not reported" | `usage.sh` after the upgrade, from the run metadata kept on the machine | P3 | ✅ D85 |
+| 11 | Hand repairs not counted as interventions | 4 decisions in `decisions.tsv`, but the monorepo cleanup, the models reset, the ticket 14 marker and a `git rm` were done by hand | P8 counts manual commits; `metrics.sh` should count them too | P2 | roadmap |
+
+## Result
+
+15 tickets PASS, 20 contract assertions, behavior 20/20, health and steward PASS (23 quality-bar items). 18 rounds; first-pass review 86% (13/15). Human decisions: **4** (target 5; mission 2: 31). Cycle time: **7 hours** (mission 2: 9 days, factory work included). Lead GLM, workers Qwen, judges Gemma; one worker at a time on a shared key.
