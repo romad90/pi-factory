@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Factory Cockpit</title>
+<style>
+:root{--bg:#0F1115;--panel:#171A21;--line:#262B35;--ink:#E7E9EE;--soft:#9AA3B2;--dim:#6B7383;--amber:#F2A93B;--green:#3DD68C;--blue:#6CB4FF;--red:#FF7A6B;--violet:#B79CFF}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+code,pre,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
+header{display:flex;align-items:center;gap:16px;padding:14px 24px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:2}
+header h1{font-size:16px;margin:0;font-weight:700;letter-spacing:.2px}
+.crumbs{color:var(--soft);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.crumbs a{color:var(--blue);text-decoration:none}
+.spacer{flex:1}
+.keys{color:var(--dim);font-size:12px}
+.keys b{color:var(--soft);border:1px solid var(--line);border-radius:4px;padding:0 5px;font-weight:500}
+.age{color:var(--dim);font-size:12px}
+main{padding:20px 24px;max-width:1500px;margin:0 auto}
+.grid{display:grid;gap:16px}
+.leads{grid-template-columns:repeat(auto-fill,minmax(330px,1fr))}
+.mc{grid-template-columns:minmax(300px,1.1fr) minmax(280px,1fr) minmax(300px,1.1fr)}
+@media (max-width:1100px){.mc{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}
+.panel h2{font-size:12px;letter-spacing:1.4px;text-transform:uppercase;color:var(--soft);margin:0 0 12px;font-weight:600}
+.card{cursor:pointer;transition:border-color .15s}
+.card:hover,.card.sel{border-color:var(--blue)}
+.title{font-size:16px;font-weight:650;margin:2px 0 6px}
+.muted{color:var(--soft)}
+.pill{display:inline-block;font-size:11.5px;font-weight:600;border-radius:999px;padding:2px 9px;border:1px solid var(--line);white-space:nowrap}
+.s-pass{color:var(--green);border-color:#1f4d36;background:#11261c}
+.s-review{color:var(--blue);border-color:#24476b;background:#122133}
+.s-build{color:var(--violet);border-color:#41376a;background:#1d1830}
+.s-escalate,.s-fail{color:var(--red);border-color:#6b2c26;background:#2b1513}
+.s-blocked{color:var(--dim)}
+.s-human{color:var(--amber);border-color:#6b4b14;background:#2a2010}
+.bar{height:6px;background:#222733;border-radius:4px;overflow:hidden;margin:10px 0 6px;display:flex}
+.bar i{display:block;height:100%}
+.row{display:flex;gap:10px;align-items:center;justify-content:space-between}
+.stat{display:flex;gap:14px;flex-wrap:wrap;color:var(--soft);font-size:12.5px}
+.stat b{color:var(--ink);font-weight:600}
+.needs{border-color:#6b4b14}
+.need{border-left:3px solid var(--amber);padding:8px 10px;margin:8px 0;background:#1d1a14;border-radius:0 8px 8px 0;white-space:pre-wrap;word-break:break-word}
+.need .k{color:var(--amber);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.8px}
+.list{list-style:none;margin:0;padding:0}
+.list li{display:flex;gap:10px;align-items:center;padding:7px 8px;border-radius:8px;cursor:pointer}
+.list li:hover,.list li.sel{background:#1E232D}
+.list .n{color:var(--dim);width:22px;text-align:right;font-variant-numeric:tabular-nums}
+.list .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list .r{color:var(--dim);font-size:12px}
+.log li{cursor:default;align-items:flex-start;padding:5px 4px}
+.log .when{color:var(--dim);width:92px;flex:none;font-size:12px}
+.term{background:#0B0D11;border:1px solid var(--line);border-radius:8px;padding:10px;max-height:260px;overflow:auto;white-space:pre-wrap;word-break:break-word;color:#C9D1DC}
+.kv{display:grid;grid-template-columns:120px 1fr;gap:4px 10px;font-size:13px}
+.kv div:nth-child(odd){color:var(--soft)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--soft);font-weight:600;font-size:12px}
+.assert{margin:6px 0;padding:8px 10px;background:#12151B;border-radius:8px}
+.assert .id{color:var(--blue);font-weight:600;font-size:12px}
+.empty{color:var(--dim);font-style:italic}
+.err{color:var(--red);padding:20px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>Factory Cockpit</h1>
+  <nav class="crumbs" id="crumbs"></nav>
+  <span class="spacer"></span>
+  <span class="keys"><b>L</b> leads · <b>M</b> mission · <b>R</b> rounds · <b>↑↓</b> ticket · <b>Enter</b> open · <b>Esc</b> up</span>
+  <span class="age" id="age"></span>
+</header>
+<main id="app"><p class="muted">Loading state.json…</p></main>
+<script>
+"use strict";
+let state = null, sel = 0, lastOk = 0;
+const $ = (s) => document.querySelector(s);
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const route = () => { const p = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent); return { m: p[0] === "m" ? p[1] : "", t: p[2] === "t" ? p[3] : "" }; };
+const go = (m, t) => { location.hash = m ? `#/m/${encodeURIComponent(m)}${t ? `/t/${encodeURIComponent(t)}` : ""}` : "#/"; };
+const STATE_LABEL = { pass: "PASS", review: "review", build: "build", escalate: "ESCALATE", blocked: "blocked" };
+const pill = (s) => `<span class="pill s-${esc(s)}">${esc(STATE_LABEL[s] || s)}</span>`;
+const stepPill = (m) => `<span class="pill ${m.human ? "s-human" : "s-review"}">${esc(m.step || "?")}${m.human ? " · needs you" : ""}</span>`;
+const fmtK = (n) => n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? Math.round(n / 1e3) + "k" : String(n);
+const ago = (iso) => { const s = (Date.now() - new Date(iso)) / 1000; return s < 90 ? `${Math.round(s)} s` : s < 5400 ? `${Math.round(s / 60)} min` : s < 129600 ? `${Math.round(s / 3600)} h` : `${Math.round(s / 86400)} d`; };
+const mission = (name) => state.missions.find((x) => x.name === name);
+const active = (m) => m.tickets.find((t) => t.state === "review") || m.tickets.find((t) => t.state === "build") || m.tickets.find((t) => t.state === "escalate") || m.tickets[m.tickets.length - 1];
+
+function bar(m) {
+  const c = m.counts, total = c.total || 1, seg = (k, col) => c[k] ? `<i style="width:${(100 * c[k]) / total}%;background:${col}"></i>` : "";
+  return `<div class="bar">${seg("pass", "var(--green)")}${seg("review", "var(--blue)")}${seg("build", "var(--violet)")}${seg("escalate", "var(--red)")}${seg("blocked", "#3a4150")}</div>`;
+}
+
+function interventions(m) {
+  const i = m.interventions, over = i.human > i.target;
+  return `<span>decisions <b style="color:${over ? "var(--red)" : "var(--ink)"}">${i.human}</b>/${i.target}</span><span>auto-answered <b>${i.auto}</b></span>`;
+}
+
+function leads() {
+  if (!state.missions.length) return `<p class="empty">No mission under ${esc(state.factoryDir)}/ yet.</p>`;
+  return `<div class="grid leads">${state.missions.map((m, i) => `
+    <div class="panel card${i === sel ? " sel" : ""}" data-m="${esc(m.name)}">
+      <div class="row"><span class="mono muted">${esc(m.name)}</span>${stepPill(m)}</div>
+      <div class="title">${esc(m.title || m.name)}</div>
+      ${bar(m)}
+      <div class="stat"><span><b>${m.counts.pass || 0}</b>/${m.counts.total} tickets</span>${interventions(m)}
+        ${m.usage ? `<span><b>${fmtK(m.usage.input + m.usage.output)}</b> tokens</span>` : ""}
+        ${m.workers.some((w) => !w.done) ? `<span style="color:var(--green)">● agent running</span>` : ""}</div>
+      ${m.needs.length ? `<div class="need"><span class="k">${esc(m.needs[0].kind)}</span> ${esc(m.needs[0].text).slice(0, 220)}</div>` : ""}
+      <div class="age" style="margin-top:8px">${m.log[0] ? `last: ${esc(m.log[0].subject)} · ${ago(m.log[0].date)} ago` : ""}</div>
+    </div>`).join("")}</div>`;
+}
+
+function needsPanel(m) {
+  return `<div class="panel needs"><h2>Needs you</h2>
+    ${m.needs.length ? m.needs.map((n) => `<div class="need"><span class="k">${esc(n.kind)}${n.ticket ? " · " + esc(n.ticket) : ""}</span>\n${esc(n.text)}</div>`).join("") : `<p class="empty">Nothing. The factory is working.</p>`}
+    <div class="stat" style="margin-top:10px">${interventions(m)}</div></div>`;
+}
+
+function activePanel(m, t) {
+  if (!t) return `<div class="panel"><h2>Active ticket</h2><p class="empty">No tickets yet. Next: ${esc(m.next)}</p></div>`;
+  const pre = t.blockedBy.length ? t.blockedBy.map((b) => { const bt = m.tickets.find((x) => x.num === b); return `<li>${bt ? pill(bt.state) : ""}<span class="t">${esc(b)} ${esc(bt ? bt.title : "")}</span></li>`; }).join("") : `<li class="empty">none</li>`;
+  return `<div class="panel"><h2>Active ticket</h2>
+    <div class="row"><span class="mono muted">${esc(t.name)}</span>${pill(t.state)}</div>
+    <div class="title">${esc(t.title)}</div>
+    <div class="stat"><span>round <b>${t.round}</b></span>${t.size ? `<span>size <b>${esc(t.size)}</b></span>` : ""}${t.integrated ? `<span>integrated <b class="mono">${esc(t.integrated.slice(0, 8))}</b></span>` : ""}</div>
+    <h2 style="margin-top:14px">Preconditions · blocked by</h2><ul class="list">${pre}</ul>
+    <h2 style="margin-top:14px">Expected behavior</h2>
+    ${t.assertions.length ? t.assertions.map((a) => `<div class="assert"><span class="id">${esc(a.id)}</span> <span class="muted">${esc(a.kind)}</span><div>${esc(a.title)}</div><div class="muted">${esc(a.given)}</div></div>`).join("") : `<p class="empty">${t.covers.includes("enabler") ? "enabler ticket" : "no assertion listed"}</p>`}
+    ${t.verdict?.blocking ? `<h2 style="margin-top:14px">Last blocking finding</h2><div class="need" style="border-color:var(--red)">${esc(t.verdict.blocking)}</div>` : ""}
+  </div>`;
+}
+
+function checklist(m, current) {
+  return `<div class="panel"><h2>Tickets · ${m.counts.pass || 0}/${m.counts.total} pass</h2>${bar(m)}
+    <ul class="list" id="tickets">${m.tickets.map((t, i) => `<li data-t="${esc(t.name)}" class="${i === sel ? "sel" : ""}">
+      <span class="n">${esc(t.num)}</span><span class="t" title="${esc(t.name)}">${esc(t.title || t.name)}${t.name === current ? " ◂" : ""}</span>
+      <span class="r">r${t.round}</span>${pill(t.state)}</li>`).join("")}</ul>
+    <h2 style="margin-top:16px">Gates</h2>
+    <div class="kv"><div>Contract</div><div>${m.contract.total} assertions · ${m.contract.approved ? "approved" : "not approved"}</div>
+      <div>Behavior</div><div>${m.behavior ? pill(m.behavior.result === "PASS" ? "pass" : "fail") + ` round ${m.behavior.round ?? "?"}` : "—"}</div>
+      <div>Health</div><div>${m.health ? pill(m.health.result === "PASS" ? "pass" : "fail") + ` round ${m.health.round ?? "?"}` : "—"}</div>
+      ${m.usage ? `<div>Tokens</div><div>${fmtK(m.usage.input)} in · ${fmtK(m.usage.output)} out · ${m.usage.runs} runs</div>` : ""}</div>
+  </div>`;
+}
+
+function liveAndLog(m) {
+  const w = m.workers;
+  const workers = w.length ? w.map((x) => `<div style="margin-bottom:12px"><div class="row"><span><span class="dot" style="background:${x.done ? "var(--dim)" : x.quiet ? "var(--amber)" : "var(--green)"}"></span> <b>${esc(x.agent || "agent")}</b> ${esc(x.ticket)}</span><span class="age">${x.done ? "done" : "active"} · ${Math.round(x.ageSec / 60)} min ago</span></div>
+      <pre class="term mono">${esc(x.last.join("\n"))}</pre></div>`).join("")
+    : `<p class="empty">No agent run seen for this mission (pi-subagents run logs, best effort).</p>`;
+  const runs = m.runs.slice(-4).reverse().map((r) => `<li><span class="when">${esc((r.date || "").slice(5))}</span><span class="t">${esc(r.agent)} <span class="muted">${esc(r.model)}${r.thinking ? " · " + esc(r.thinking) : ""}</span></span></li>`).join("");
+  return `<div class="panel"><h2>Active worker</h2>${workers}
+    ${runs ? `<h2 style="margin-top:6px">Last runs started</h2><ul class="list log">${runs}</ul>` : ""}
+    <h2 style="margin-top:14px">Progress log</h2>
+    <ul class="list log">${m.log.slice(0, 14).map((l) => `<li><span class="when">${ago(l.date)} ago</span><span class="t" style="white-space:normal">${esc(l.subject)}</span></li>`).join("") || `<li class="empty">no commits yet</li>`}</ul>
+  </div>`;
+}
+
+function missionView(m) {
+  const t = active(m);
+  return `<div class="panel" style="margin-bottom:16px"><div class="row"><div><span class="mono muted">${esc(m.name)}</span> ${m.intent ? `<span class="pill">${esc(m.intent)}</span>` : ""} ${m.paused ? `<span class="pill s-human">paused</span>` : ""}
+      <div class="title">${esc(m.title || m.name)}</div></div>${stepPill(m)}</div>
+    <div class="mono muted">NEXT → ${esc(m.next)}</div></div>
+    <div class="grid mc"><div class="grid" style="align-content:start">${needsPanel(m)}${activePanel(m, t)}</div>${checklist(m, t && t.name)}${liveAndLog(m)}</div>`;
+}
+
+function ticketView(m, t) {
+  const rounds = t.history.length ? t.history : t.verdict ? [t.verdict] : [];
+  return `<div class="grid mc">
+    <div class="grid" style="align-content:start">${activePanel(m, t)}</div>
+    <div class="panel"><h2>Rounds</h2>${rounds.length ? `<table><tr><th>Round</th><th>Result</th><th>Why</th></tr>${rounds.map((v) => `<tr><td>${v.round ?? "?"}</td><td>${pill(v.result === "PASS" ? "pass" : "fail")}</td><td>${v.brief && v.brief !== "-" ? `<b>${esc(v.brief)}</b> · ` : ""}${esc(v.blocking || "")}<div class="muted mono">${esc(v.commit.slice(0, 8))} ${esc(v.model)}</div></td></tr>`).join("")}</table>` : `<p class="empty">No verdict yet.</p>`}
+      ${t.stuck ? `<div class="need"><span class="k">no progress</span> the last round failed like the one before</div>` : ""}
+      ${t.staleVerdict ? `<div class="need"><span class="k">stale verdict</span> a verdict on an older commit was set aside (D81)</div>` : ""}</div>
+    <div class="panel"><h2>Journal</h2>${t.journal ? `<pre class="term mono" style="max-height:600px">${esc(t.journal)}</pre>` : `<p class="empty">No journal yet (written after a round, D84).</p>`}</div>
+  </div>`;
+}
+
+function render() {
+  if (!state) return;
+  const r = route(), m = r.m && mission(r.m), t = m && r.t && m.tickets.find((x) => x.name === r.t);
+  const crumbs = [`<a href="#/">Leads</a>`];
+  if (m) crumbs.push(`<span>›</span><a href="#/m/${encodeURIComponent(m.name)}">${esc(m.name)}</a>`);
+  if (t) crumbs.push(`<span>›</span><span>${esc(t.name)}</span>`);
+  $("#crumbs").innerHTML = crumbs.join("");
+  $("#app").innerHTML = t ? ticketView(m, t) : m ? missionView(m) : r.m ? `<p class="err">No mission “${esc(r.m)}”.</p>` + leads() : leads();
+  document.querySelectorAll("[data-m]").forEach((el) => (el.onclick = () => go(el.dataset.m)));
+  document.querySelectorAll("[data-t]").forEach((el) => (el.onclick = () => go(r.m, el.dataset.t)));
+}
+
+async function poll() {
+  try {
+    const res = await fetch("state.json?ts=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) throw new Error(res.status);
+    state = await res.json(); lastOk = Date.now(); render();
+  } catch (e) { if (!state) $("#app").innerHTML = `<p class="err">No state.json yet (${esc(e.message)}). Run scripts/factory/cockpit.sh.</p>`; }
+  $("#age").textContent = state ? `snapshot ${ago(state.generated)} ago` : "";
+}
+
+document.addEventListener("keydown", (e) => {
+  if (!state || e.metaKey || e.ctrlKey || e.target.tagName === "INPUT") return;
+  const r = route(), m = r.m && mission(r.m);
+  const items = m ? m.tickets : state.missions;
+  if (e.key === "l" || e.key === "L") { sel = 0; go(""); }
+  else if (e.key === "m" || e.key === "M") { const name = m ? m.name : (state.missions[sel] || state.missions[0])?.name; if (name) go(name); }
+  else if ((e.key === "r" || e.key === "R") && m) { const t = r.t ? m.tickets.find((x) => x.name === r.t) : (m.tickets[sel] || active(m)); if (t) go(m.name, t.name); }
+  else if (e.key === "Escape") { if (r.t) go(r.m); else if (r.m) go(""); }
+  else if (e.key === "ArrowDown" || e.key === "j") { sel = Math.min(sel + 1, items.length - 1); render(); e.preventDefault(); }
+  else if (e.key === "ArrowUp" || e.key === "k") { sel = Math.max(sel - 1, 0); render(); e.preventDefault(); }
+  else if (e.key === "Enter") { if (m && !r.t && m.tickets[sel]) go(m.name, m.tickets[sel].name); else if (!m && state.missions[sel]) go(state.missions[sel].name); }
+});
+window.addEventListener("hashchange", () => { sel = 0; render(); });
+poll(); setInterval(poll, 2000);
+</script>
+</body>
+</html>

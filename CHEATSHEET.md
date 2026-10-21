@@ -31,7 +31,7 @@ You keep the decisions that define value and risk; the factory does everything t
 | Retro (`/retro`) | **You** | Learning becomes rules only on a human's word. |
 | Checkpoints, rounds, models in verdicts, notifications, pause/resume | Factory (scripts) | Bookkeeping a human used to do and forget. |
 
-**One command:** `scripts/factory/mr.sh <mission>` pushes the branch and opens the MR from `/pr`'s body (`.scratch/<mission>/pr.md`), with glab, a GitLab token, or push options (D86); rerun it after editing the body. **Still manual, and planned:** reading red CI (roadmap F13); a drift check of spec ↔ code before `/pr` (C10).
+**Watch:** `scripts/factory/cockpit.sh`, then open http://127.0.0.1:7357 (leads → mission → ticket; keys L M R Esc; read-only, D90). **One command:** `scripts/factory/mr.sh <mission>` pushes the branch and opens the MR from `/pr`'s body (`.scratch/<mission>/pr.md`), with glab, a GitLab token, or push options (D86); rerun it after editing the body. **Still manual, and planned:** reading red CI (roadmap F13); a drift check of spec ↔ code before `/pr` (C10).
 
 ## 2. Which lane for which problem
 
