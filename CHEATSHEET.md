@@ -90,6 +90,17 @@ After any model change, probe the gateway once: `doctor.sh` (full) runs `models-
 
 **Set them once, reuse them everywhere.** In a repo where `MODELS: PASS`, run `node scripts/factory/models-profile.mjs capture`: it saves the models, thinking levels, scope and families to `~/.pi-factory/models.json` (outside every repo; `PI_FACTORY_MODELS` overrides the path). From then on, `install-into.sh` applies the profile to each new repo. To refresh a repo after changing the profile: `node scripts/factory/models-profile.mjs apply`, then the lint.
 
+**Probe your models before a mission:** `node scripts/factory/models-probe.mjs --stamp`, then commit `.factory/models-probe.ok`. Each agent is probed on its own provider from Pi's `~/.pi/agent/models.json` (D79): served to your key, thinking level accepted, tool turns accepted. Run it on every machine you use: two machines can have two keys with different model lists.
+
+**Choosing models (missions 1 and 2):**
+
+| Role | What matters | Seen |
+|---|---|---|
+| Lead (your Pi session) | Follows instructions over a long session; stops when a rule says stop | gpt-oss-120b improvised and invented a report; GLM stopped and quoted the rule every time. Low thinking is enough |
+| Worker | Cheap, good on routine tickets | Qwen 27B passed most tickets in one or two rounds |
+| Heavy worker (round 2+, `Size: L`) | The strongest coder you have | GLM fixed in 7 minutes a ticket Qwen failed three rounds on |
+| Judges (reviewer, axes, validator, steward, critic) | Another family than the workers; reliable verdict format | Gemma, all mission |
+
 **Model notes from mission 1:**
 
 | Symptom | Fix |
@@ -185,7 +196,16 @@ A blocked agent stops and asks; it never looks for another way. Blocks are logge
 /factory-fix <slug> check
 ```
 
-`check` blocks anything that touches behavior paths or `instrument/`, changes more than 80 lines (`FACTORY_FIX_MAX_LINES`), or fails the patch guard (skips, silenced checks, secrets, deleted tests). Otherwise it runs lint, tests and the extra check, then one fresh reviewer from another family. The verdict lands in `.scratch/light/<slug>/verdicts/code.md`, and the MR gate checks it.
+`check` blocks anything that touches behavior paths or `instrument/`, adds more than 80 lines (`FACTORY_FIX_MAX_LINES`; removed lines are reported, not counted, D76), or fails the patch guard (skips, silenced checks, secrets, deleted tests). Otherwise it runs lint, tests and the extra check, then one fresh reviewer from another family. The verdict lands in `.scratch/light/<slug>/verdicts/code.md`, and the MR gate checks it.
+
+**Before opening the MR** of a mission whose base moved (you merged the target branch in):
+
+```bash
+git diff --stat origin/<target> HEAD -- src/          # empty for a characterization mission: no production code changed
+git diff origin/<target> HEAD -- package.json         # only test tooling (scripts.test, devDependencies)
+```
+
+If the merge left your branch's dependency versions, take the target's `package.json` and lock file and add only the test tooling (`npm pkg set scripts.test=…`, `npm install -D …`).
 
 ## 11. Commands you may run yourself
 

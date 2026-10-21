@@ -58,6 +58,28 @@ Most of the human time lost in this mission came from here. None of it was visib
 | 50 | The lead stopped at `STEP: build` | 02–04 and 07 were ESCALATE in the ticket table; the lead read that as a human step and left 08 unbuilt | The prompt: only the `STEP:` line decides; `next.sh` says escalated tickets wait until after this step | P1 | ✅ D74 |
 | 51 | Salvaging an already integrated patch ended on "nothing to commit" | Yesterday's 05 worktree held work already committed in `59376c69`; integrate ran every check, then git found nothing to commit | `integrate.sh` reports a change already in the branch and exits 3, no round | P3 | ✅ D74 |
 
+## Last days (19–20 October)
+
+The mission finished: 10 tickets PASS, behavior PASS (29 proven, 4 accepted with evidence), health and steward PASS. What changed the outcome was the lead's model and one human note, not more rounds.
+
+| # | Finding | Evidence | Fix | P | Status |
+|---|---|---|---|---|---|
+| 52 | The lead invented a report | gpt-oss-120b read files, wrote "Given time, I will assume lint now passes", then reported a self-check PASS and an integration that never ran; 08 had no integration commit | A lead model that follows instructions over a long session (GLM: stopped and quoted the rule on a missing install, a 403 and a dirty tree); P2 removes the model from the loop | P1 | ✅ cheatsheet (model guidance); P2 |
+| 53 | Workers handed over red work | 02, 03, 04, 07, 08 escalated after three rounds on mistakes the self-check catches: `beforeEach` not imported, the real `process.exit` called, mocks not reset, an unused variable | Record whether the worker ran its self-check and what it last said; show it in the fail verdict and the metrics; P9 enforces it | P1 | ✅ D78 (recorded; gate opt-in) |
+| 54 | One human note unblocked five tickets | A `## Notes from rounds 1-3` section (the four pitfalls, the passing tickets to copy) and a reset: 02, 03, 04, 07 passed within two hours, unattended | `reset-ticket.sh --note` | P2 | P9 step 7 |
+| 55 | A stronger worker ended a three-round loop | 08 on GLM: PASS in round 1, 7 minutes, after three failed rounds on Qwen | Escalate by model, not by retrying the same one | P2 | ✅ D24 already; P1 chains |
+| 56 | One key, two gateways, different models | The cloud checkout's key could not use Qwen (403 `team_model_access_denied`); the probe never ran because `FACTORY_GATEWAY_URL` was empty, and it knows one gateway only | Probe every agent's model on its own provider, read from Pi's `models.json` | P1 | ✅ D79 |
+| 57 | Provider `baseUrl` without `/v1` | 404 on every GLM call | Probe reports the URL it called | P3 | ✅ D79 |
+| 58 | An incomplete Pi install stopped a wave | `Cannot find module @earendil-works/chord` when pi-subagents spawned a worker; reinstall fixed it | Pre-flight resolves Pi's package from Node before a wave | P2 | roadmap |
+| 59 | `metrics.sh` listed only the judges' models | "Models used: gemma" for a mission built by Qwen and GLM | `workflow.sh` records agent, model and thinking per run in `runs.tsv`; metrics reads it per role | P2 | ✅ D77 |
+| 60 | Tokens per ticket unknown | One GLM worker reported 1.5M input tokens in the Pi footer; nothing reached the metrics | `usage.tsv` per run | P2 | P9 step 3 |
+| 61 | The fix lane blocked a removal of duplication | 276 changed lines, 229 of them deletions of ten copied lists, over the 80-line limit | Count added lines only | P2 | ✅ D76 |
+| 62 | The fix-lane reviewer could not dispatch its review axes | The guard allows agents only from workflow files (D71), so mission reviewers could not dispatch axes either since 18 October; in the fix lane the reviewer asked, and `human.sh ask` refused: no mission spec for a fix | The light reviewer reviews both axes itself; `human.sh ask` and `decide` accept a fix (`light/<slug>`) | P1 | ✅ D75 |
+| 63 | A mission-only check shipped as a test | `code-validation.test.ts` asserted `git diff -- src/` is empty: it fails for anyone editing `src/`, and for the next mission | Constraints of the mission stay in the patch guard and the evidence, never in `npm test` | P2 | ✅ ticket format |
+| 64 | A test waited out the Mongo driver | +30 s per `npm test` for "unmocked Mongo fails" | Characterization tests that expect a connection error set a short `serverSelectionTimeoutMS` | P3 | ✅ ticket format |
+| 65 | Merging production touched `src/` and dependencies | The conflict resolution left 5 lines in `src/` and the branch's dependency versions over production's | `git diff origin/<base> -- src/` must be empty before the MR; take production's lock file and add only test tooling | P2 | ✅ cheatsheet (MR checklist) |
+| 66 | Contract lines unreachable as written | VAL-SHARED-003 (exit code from a load-time throw), "InfraDataSet: 4", a second batch with 5 users, `/perimeters` | Workers flag `CONTRACT DOUBT:`; one amendment for all | P2 | ✅ worker brief (`CONTRACT DOUBT:`); P9 step 4 |
+
 ## State and git
 
 | # | Finding | Evidence | Fix | P | Status |
@@ -86,4 +108,8 @@ Most of the human time lost in this mission came from here. None of it was visib
 | Human time, setup and infrastructure | ~6 h over two evenings, almost all on findings 1–7, 19–20 |
 | Contract | G1 approved after 3 rounds (1 lost to a model that invented behavior) |
 | Tickets | 10, G2 passed |
-| Build | not started at the time of writing: first worker reached the code, stopped on finding 4 |
+| Build | 10 tickets PASS; 02–04, 07, 08 after a human note and a reset; 05, 06, 08 (GLM) in round 1 |
+| Behavior | PASS: 29 proven, 4 accepted as known limits with evidence |
+| Human decisions logged | 31 (target 5); 3 in the last two days |
+| Cycle time | 9 days 4 hours, factory work included |
+| Result | 34 characterization tests, `src/` byte-identical to the mission base |

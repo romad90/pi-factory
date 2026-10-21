@@ -1,4 +1,4 @@
 Role: factory-reviewer, light lane. Change {{FEATURE}}, reviewed commit {{COMMIT}}, fixed point {{BASE}}.
-Read: docs/agents/factory.md, docs/agents/verdict-format.md, and .scratch/light/{{FEATURE}}/request.md and blast-radius.md if they exist. The change: git diff {{BASE}}..{{COMMIT}}.
-Use the code-review skill (Standards axis; no spec); dispatch it to factory-review-axis with fresh context. Run the tests yourself.
+Read: docs/agents/factory.md, docs/agents/verdict-format.md, and .scratch/light/{{FEATURE}}/request.md, blast-radius.md and decisions.tsv if they exist (decisions.tsv holds the human's answers; they win over your judgement). The change: git diff {{BASE}}..{{COMMIT}}.
+Use the code-review skill (Standards axis; the request is the spec); dispatch it to factory-review-axis with fresh context: subagent({ agent: "factory-review-axis", task: "<file paths, diff command, standards sources>", context: "fresh" }). If the dispatch fails, review it yourself in the same verdict and say so; never ask about it. Run the tests yourself: a check you did not run is not evidence, never write "I assume it passes".
 Write .scratch/light/{{FEATURE}}/verdicts/code.md with **Commit:** {{COMMIT}} and **Brief:** {{BRIEF_ID}}. Leave the round and the model to the factory. Write nothing else.

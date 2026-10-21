@@ -22,8 +22,16 @@ here="$(cd "$(dirname "$0")" && pwd)"
 cmd="${1:?usage: human.sh <approve|ask|decide|amend|accept-unverified> <feature> ...}"
 feature="${2:?usage: human.sh $cmd <feature> ...}"
 shift 2
+# D75: a fix-lane reviewer may ask too. A fix has no spec, only a request
+# under light/<slug>; ask and decide work there, the contract gates don't.
+light=""
+if [ ! -f "$(mission_dir "$feature")/spec.md" ] && [ -f "$(mission_dir "light/${feature#light/}")/request.md" ]; then
+  light="${feature#light/}"; feature="light/$light"
+  case "$cmd" in ask|decide) ;; *) die "$cmd needs a mission; $light is a fix (fix lane: ask and decide only)" ;; esac
+fi
 dir="$(mission_dir "$feature")"; spec="$dir/spec.md"
-[ -f "$spec" ] || die "no spec at $spec"
+[ -n "$light" ] || [ -f "$spec" ] || die "no spec at $spec"
+checkpoint() { if [ -n "$light" ]; then bash "$here/checkpoint.sh" --light "$light"; else bash "$here/checkpoint.sh" "$feature"; fi; }
 q="$dir/state/open-question.md"
 
 # The text argument(s), or stdin with --stdin; newlines become spaces.
@@ -72,7 +80,7 @@ case "$cmd" in
     if [ "${FACTORY_RESOLVER:-1}" != 0 ] && settled="$(bash "$here/resolve.sh" "$feature" "$ticket" "$question")"; then
       rule="${settled%%$'\t'*}"; auto="${settled#*$'\t'}"
       decision_log "$feature" "$ticket" auto "$question" "$auto" ticket "factory ($rule)"
-      bash "$here/checkpoint.sh" "$feature" >/dev/null
+      checkpoint >/dev/null
       echo "AUTO-ANSWERED ($rule): $auto"
       echo "Logged in $(mission_dir "$feature")/decisions.tsv as auto, unreviewed. Continue: the ticket rebuilds with the answer."
       exit 0
@@ -86,7 +94,7 @@ case "$cmd" in
           "$((asked + 1))" "$ticket" "$feature" "$ticket"
       fi; } > "$q"
     notify "Factory: $feature needs a decision" "$question"
-    echo "ASKED: question recorded in $q. Answer with: /factory-decide $feature <your answer, and why>"
+    echo "ASKED: question recorded in $q. Answer with: /factory-decide ${light:-$feature} <your answer, and why>"
     ;;
 
   decide)
@@ -124,4 +132,4 @@ case "$cmd" in
 
   *) die "unknown command: $cmd" ;;
 esac
-bash "$here/checkpoint.sh" "$feature" >/dev/null
+checkpoint >/dev/null

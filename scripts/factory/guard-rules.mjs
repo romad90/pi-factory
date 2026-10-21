@@ -56,6 +56,11 @@ const BASH_RULES = [
 // direct call (agent, tasks, chain, an inline script) is the lead improvising.
 const WORKFLOW_FILE = /(^|\/)\.scratch\/.+\.js$/;
 const SUBAGENT_ALLOWED = new Set(["workflow", "context", "async", "action", "id", "runId"]);
+// D75: the one direct call a factory agent needs: a reviewer dispatching a
+// code-review axis to the read-only factory-review-axis agent, fresh.
+const AXIS_ALLOWED = new Set(["agent", "task", "context", "async"]);
+const isAxisDispatch = (i) => i.agent === "factory-review-axis" && typeof i.task === "string"
+  && (i.context === undefined || i.context === "fresh") && Object.keys(i).every((k) => AXIS_ALLOWED.has(k));
 
 // Paths no agent writes or edits.
 const PROTECTED_WRITE = /^(\.git\/|\.factory\/|scripts\/factory\/|\.pi\/|\.github\/|\.gitlab-ci\.yml$|\.husky\/|\.pre-commit-config\.yaml$|lefthook\.yml$)/;
@@ -91,6 +96,7 @@ export function check({ tool, input = {}, cwd = process.cwd() }) {
     if (input.action !== undefined || !projectRoot(cwd)) return null;   // status, list: harmless
     const extra = Object.keys(input).filter((k) => !SUBAGENT_ALLOWED.has(k));
     if (typeof input.workflow === "string" && WORKFLOW_FILE.test(input.workflow) && !extra.length) return null;
+    if (isAxisDispatch(input)) return null;
     return { rule: "lead", reason: `factory agents start only from a generated workflow file: subagent({ workflow: "<the WORKFLOW_FILE path workflow.sh printed>", context: "fresh", async: false })${extra.length ? `, without ${extra.join(", ")}` : ""}: blocked by the factory guard` };
   }
   if (tool === "bash") {

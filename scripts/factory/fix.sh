@@ -41,7 +41,9 @@ case "$cmd" in
     base="$(verdict_field "$req" Base)"
     files="$(git diff --relative --name-only "$base" HEAD -- . ":(exclude)${FACTORY_DIR}")"
     [ -n "$files" ] || die "no committed change since $base: commit the fix first"
-    lines="$(git diff --relative --numstat "$base" HEAD -- . ":(exclude)${FACTORY_DIR}" | awk '{ n += $1 + $2 } END { print n + 0 }')"
+    # D76: the limit counts added lines. Deleting code (duplication, dead
+    # code) is the safest change there is; it is reported, never blocked.
+    read -r lines removed < <(git diff --relative --numstat "$base" HEAD -- . ":(exclude)${FACTORY_DIR}" | awk '{ a += $1; d += $2 } END { print a + 0, d + 0 }')
     patterns="$(behavior_patterns)"
     behavior=""
     [ -n "$patterns" ] && behavior="$(printf '%s\n' "$files" | grep -E -f <(printf '%s\n' "$patterns") || true)"
@@ -49,11 +51,11 @@ case "$cmd" in
     blocked=""
     [ -n "$behavior" ] && blocked="changes behavior paths ($(printf '%s' "$behavior" | paste -sd' ' -)): that needs a mission or a fix ticket"
     [ -n "$instrument" ] && blocked="touches the instrument: that needs a contract amendment"
-    [ "$lines" -gt "$FACTORY_FIX_MAX_LINES" ] && blocked="${blocked:+$blocked; }$lines lines changed (fix lane limit: $FACTORY_FIX_MAX_LINES)"
+    [ "$lines" -gt "$FACTORY_FIX_MAX_LINES" ] && blocked="${blocked:+$blocked; }$lines lines added (fix lane limit: $FACTORY_FIX_MAX_LINES added lines)"
     {
       echo "# Blast radius: $slug"
       echo "**Base:** $base"; echo "**Head:** $(git rev-parse HEAD)"
-      echo "**Lines changed:** $lines"; echo "**Result:** ${blocked:+BLOCKED}${blocked:-OK}"
+      echo "**Lines added:** $lines"; echo "**Lines removed:** $removed"; echo "**Result:** ${blocked:+BLOCKED}${blocked:-OK}"
       echo; echo "## Files"; printf -- '- %s\n' $files
       [ -n "$blocked" ] && { echo; echo "## Why blocked"; echo "$blocked"; }
     } > "$dir/blast-radius.md"

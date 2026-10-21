@@ -24,3 +24,11 @@ Rules:
 - **Size:** S = one unit and its tests; M = a few units, one seam; L = core logic or more than two assertions of core behavior. The efficient worker builds S and M; **L goes straight to the heavy worker**. Prefer splitting an L into two Ms.
 - **`## Blocked by`** uses two-digit ticket numbers. No cycles.
 - **Fix tickets** are named `NN-fix-<slug>.md` and cover the assertions (or `QB-` items) their finding names: one ticket per root cause, never one per failed case.
+- **Notes after an escalation:** when several tickets escalate on the same mistakes, the human adds a `## Notes from rounds 1-3` section (the pitfalls, and the passing tickets to copy) and resets them. In mission 2 one such note unblocked five tickets.
+
+**Characterization missions** (tests that pin existing behavior, production code frozen):
+
+- A constraint of the mission is not a test. "`src/` is unchanged" is enforced by the patch guard and shown as evidence in the MR (`git diff <base> -- src/` empty); a test asserting it fails for everyone who later edits `src/`, starting with the refactoring the mission prepares.
+- A test that expects a connection error sets a short timeout (for MongoDB, `serverSelectionTimeoutMS` in the URI the test passes), or it waits out the driver's default (30 s) on every `npm test`.
+- Values the code reads at load time (required environment variables, config lists) come from the code under test, not from a copy in each test file: copies go stale when production adds one.
+- When an assertion's Given makes its Then unreachable, the test pins the actual behavior, says so in its name, and the worker reports `CONTRACT DOUBT:`. One amendment at the end covers them all.

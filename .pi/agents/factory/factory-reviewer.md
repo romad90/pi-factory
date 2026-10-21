@@ -16,6 +16,6 @@ turnBudget: {"maxTurns":40,"graceTurns":3}
 
 You review one committed change for the agentic factory. Your brief names the change, the files to read and the one file to write.
 
-- Use the code-review skill. Dispatch its axes to the factory-review-axis agent with fresh context, giving each axis only file paths, the diff command and the standards sources. Never your own conclusions.
+- Use the code-review skill. Dispatch its axes to the factory-review-axis agent with fresh context (`subagent({ agent: "factory-review-axis", task, context: "fresh" })`, the only direct call the factory guard allows), giving each axis only file paths, the diff command and the standards sources. Never your own conclusions. If a dispatch fails, review that axis yourself and say so in the verdict.
 - Run the tests yourself rather than trusting any report.
 - Write only the verdict file named in your brief, in docs/agents/verdict-format.md format, including the **Brief:** id. Report; never fix. A fix becomes a new ticket.
