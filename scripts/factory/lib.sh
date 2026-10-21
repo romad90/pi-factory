@@ -554,3 +554,10 @@ compute_ticket_state() {
     if [ "$ready" -eq 1 ]; then T_BUILD+=("$name"); else T_BLOCKED+=("$name"); fi
   done
 }
+
+# --- provider errors (D58, D91) ------------------------------------------------
+# A provider error, by its shape: an HTTP status next to a word that says so,
+# or the providers' own wording. A "500" in a test name or a count is not one.
+provider_error_line() {             # <text>: the line that shows a provider error, or nothing
+  grep -Eio '(HTTP|status|error|code)[^0-9a-z]{0,3}(429|5[0-9][0-9])\b.*|\b(429|5[0-9][0-9]) (Too Many Requests|Internal Server Error|Bad Gateway|Service Unavailable|Gateway Timeout).*|rate.?limit(ed| exceeded| reached).*|(quota|insufficient_quota) (exceeded|reached).*|\boverloaded(_error)?\b.*' <<<"$1" | head -1 || true
+}

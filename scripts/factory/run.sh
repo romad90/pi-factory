@@ -9,9 +9,12 @@
 # Usage: scripts/factory/run.sh <feature> [--no-preflight] [--max-steps N]
 #
 # Runner (how a workflow file is run), FACTORY_RUNNER:
-#   pi-json  (default) pi -p --mode json, with the driver extension as the
-#            "model" (scripts/factory/driver.mjs): one subagent call, no LLM.
-#            FACTORY_PI_CMD overrides the pi command (default: pi).
+#   pi-json  (default) pi -p --mode json --approve, with the driver extension
+#            as the "model" (scripts/factory/driver.mjs): one subagent call,
+#            no LLM. --approve trusts the project's own .pi files for the run:
+#            without it the factory guard does not load (P2, spike results).
+#            FACTORY_PI_BIN: the pi executable (a path, spaces allowed);
+#            FACTORY_PI_CMD: a command line split on spaces (default: pi).
 #   fake     $FACTORY_FAKE_RUNNER <workflow-file> prints the workflow's return
 #            value as JSON (tests).
 #
@@ -30,9 +33,14 @@ while [ $# -gt 0 ]; do case "$1" in
   --max-steps) max_steps="${2:?}"; shift ;;
   *) die "unknown option: $1" ;;
 esac; shift; done
-dir="$(mission_dir "$feature")"
+[ -d "$(mission_dir "$feature")" ] || die "no mission '$feature'"
 runner="${FACTORY_RUNNER:-pi-json}"
-logs="$dir/logs"; mkdir -p "$logs"
+# Raw runner output (agent text, gateway errors, model ids) never goes in the
+# mission folder, which checkpoint.sh commits: it stays in the git folder all
+# worktrees share, next to the draft patches (D73).
+logs="$(dirname "$(dirname "$(dirname "$(draft_patch "$feature" x)")")")/runs/$feature"; mkdir -p "$logs"   # <git-common-dir>/pi-factory/runs/<feature>
+read -r -a pi_cmd <<<"${FACTORY_PI_CMD:-pi}"
+[ -z "${FACTORY_PI_BIN:-}" ] || pi_cmd=("$FACTORY_PI_BIN")    # one path, spaces kept
 
 say()  { printf 'run: %s\n' "$*"; }
 stop() { local code="$1"; shift; printf 'run: STOP — %s\n' "$*"; exit "$code"; }
@@ -49,7 +57,7 @@ run_workflow() {
     pi-json)
       raw="$logs/$(basename "$wf" .js).jsonl"
       # stdin closed: pi -p waits on an open stdin.
-      FACTORY_DRIVE_WORKFLOW="$wf" ${FACTORY_PI_CMD:-pi} -p --mode json --no-session --approve \
+      FACTORY_DRIVE_WORKFLOW="$wf" "${pi_cmd[@]}" -p --mode json --no-session --approve \
         -e "$here/driver.mjs" --model factory-driver/script "run the workflow" </dev/null >"$raw" 2>"$raw.err" || true
       node -e '
         const fs = require("fs"); const lines = fs.readFileSync(process.argv[1], "utf8").split("\n").filter(Boolean);
@@ -82,52 +90,68 @@ $out"
   [ -z "$out" ] || printf '%s\n' "$out"
 }
 
-provider_error() { grep -Eio '(^|[^0-9])(429|5[0-9][0-9])([^0-9]|$).*|rate.?limit.*|quota.*|overloaded.*' <<<"$1" | head -1; }
 
 # --- one build wave: what the lead does per ticket ----------------------------
+# Sets ASKED=1 when a worker's question waits for a human. Runs under set -e:
+# every step that may fail on purpose says so.
 build() {
+  ASKED=0
   wave build-wave "$feature"
-  local tickets asked=0 t patch ok out err line
+  local tickets t patch ok out q line rows
   tickets="$(node -e '
     const s = require("fs").readFileSync(process.argv[1], "utf8"); const m = s.match(/const ITEMS = (\[[\s\S]*?\n\]);/);
-    for (const it of JSON.parse(m[1])) console.log(it.key);' "$WAVE_FILE")"
+    if (!m) process.exit(1);
+    for (const it of JSON.parse(m[1])) console.log(it.key);' "$WAVE_FILE")" || stop 2 "cannot read the tickets of $WAVE_FILE"
+  [ -n "$tickets" ] || stop 2 "no ticket in $WAVE_FILE"
   if [ "$WAVE_OK" = 0 ]; then
-    if line="$(provider_error "$RESULT")" && [ -n "$line" ]; then
+    line="$(provider_error_line "$RESULT")"
+    if [ -n "$line" ]; then
       for t in $tickets; do must record-no-patch.sh "$feature" "$t" --provider "$line"; done
       stop 3 "provider error, mission paused (no round): $line"
     fi
     if grep -qi 'timed out' <<<"$RESULT"; then
       say "wave timed out: salvaging the workers' worktrees"
-      for t in $tickets; do bash "$here/integrate.sh" "$feature" "$t" null || true; done
+      for t in $tickets; do bash "$here/integrate.sh" "$feature" "$t" null || say "$t: salvage failed, recorded as a round"; done
       return 0
     fi
     stop 2 "the build wave failed: $RESULT"
   fi
-  for t in $tickets; do
-    IFS='|' read -r patch ok < <(node -e '
-      const r = (JSON.parse(process.argv[1]) || []).find((x) => x && x.ticket === process.argv[2]) || {};
-      console.log([r.patch || "", r.ok === false ? "no" : "yes"].join("|"));' "$RESULT" "$t")
-    out="$(node -e '
-      const r = (JSON.parse(process.argv[1]) || []).find((x) => x && x.ticket === process.argv[2]) || {};
-      process.stdout.write(String(r.output || "") + "\n" + String(r.error || ""));' "$RESULT" "$t")"
-    if [ "$ok" = no ] && line="$(provider_error "$out")" && [ -n "$line" ]; then
-      must record-no-patch.sh "$feature" "$t" --provider "$line"
-      stop 3 "provider error on $t, mission paused (no round): $line"
+  # One row per ticket: ticket, patch, ok, then its output and error as base64.
+  rows="$(node -e '
+    let res; try { res = JSON.parse(process.argv[1]); } catch { process.exit(1); }
+    if (!Array.isArray(res)) process.exit(1);
+    for (const t of process.argv.slice(2)) {
+      const r = res.find((x) => x && x.ticket === t) || {};
+      const text = String(r.output || "") + "\n" + String(r.error || "");
+      console.log([t, r.patch || "-", r.ok === false ? "no" : "yes", Buffer.from(text).toString("base64")].join(" "));
+    }' "$RESULT" $tickets)" || stop 2 "cannot read the build wave's result: $RESULT"
+  while read -r t patch ok out; do
+    [ "$patch" != - ] || patch=""
+    out="$(printf '%s' "$out" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(Buffer.from(s,"base64").toString()))')"
+    if [ "$ok" = no ]; then
+      line="$(provider_error_line "$out")"
+      if [ -n "$line" ]; then
+        must record-no-patch.sh "$feature" "$t" --provider "$line"
+        stop 3 "provider error on $t, mission paused (no round): $line"
+      fi
     fi
     if grep -q 'DECISION NEEDED:' <<<"$out"; then
-      err="$(sed -n 's/.*DECISION NEEDED: *//p' <<<"$out" | head -1)"
-      printf '%s\n' "$err" | bash "$here/human.sh" ask "$feature" "$t" --stdin | tee "$logs/ask-$t.log"
-      grep -q 'AUTO-ANSWERED' "$logs/ask-$t.log" || asked=1
+      q="$(sed -n 's/.*DECISION NEEDED: *//p' <<<"$out" | head -1)"
+      printf '%s\n' "$q" | bash "$here/human.sh" ask "$feature" "$t" --stdin > "$logs/ask-$t.log" 2>&1 \
+        || stop 2 "human.sh ask failed for $t: $(cat "$logs/ask-$t.log")"
+      cat "$logs/ask-$t.log"
+      if grep -q 'AUTO-ANSWERED' "$logs/ask-$t.log"; then :
+      elif grep -q 'ASKED' "$logs/ask-$t.log"; then ASKED=1
+      else stop 2 "human.sh ask for $t said neither ASKED nor AUTO-ANSWERED"; fi
       continue
     fi
-    if [ -z "$patch" ]; then patch="$(bash "$here/locate-patch.sh" "$feature" "$t" 2>/dev/null || true)"; fi
+    [ -n "$patch" ] || patch="$(bash "$here/locate-patch.sh" "$feature" "$t" 2>/dev/null)" || patch=""
     if [ -n "$patch" ]; then
       bash "$here/integrate.sh" "$feature" "$t" "$patch" || say "$t: integration failed, recorded as a round"
     else
       must record-no-patch.sh "$feature" "$t"
     fi
-  done
-  [ "$asked" = 0 ] || return 10
+  done <<<"$rows"
 }
 
 # --- the loop -----------------------------------------------------------------
@@ -161,8 +185,8 @@ $nxt"
     health)
       bash "$here/health.sh" check "$feature" || say "health check failed (recorded; the loop continues)" ;;
     build)
-      rc=0; build || rc=$?
-      if [ "$rc" = 10 ]; then
+      build
+      if [ "$ASKED" = 1 ]; then
         printf '%s\n' "$(bash "$here/next.sh" "$feature")"; echo "WAITING: human (a worker asked a question)"; exit 0
       fi ;;
     review)

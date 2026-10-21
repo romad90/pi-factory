@@ -75,6 +75,11 @@ Run in a scratch folder with Pi 1.3.0, pi-subagents 0.76.1 and Pi Durable 1.3.0 
 - pi-subagents exposes no programmatic "run this workflow" entry point (its `runWorkflowScript` is internal, and the `/run` command runs one agent, not a file). But a Pi extension can register a provider whose answers are code (`createFauxCore` from pi-ai). `scripts/factory/driver.mjs` answers with exactly the call the lead is allowed to make, then ends the turn. With it, the fake gateway received **only** the child agent's request: no lead model, no lead tokens, no lead quota, nothing to improvise.
 - The driver loads from any folder: Pi resolves `@earendil-works/pi-ai` for extensions.
 
+**`--approve` is what loads the guard; it approves no tool call.** Pi's help: "Trust project-local files for this run". Headless, an untrusted project's own `.pi` files (extensions, agents) are not loaded. Checked with the factory guard copied into a scratch project, a child agent whose fake model runs `git push origin main`, and the driver making the lead's call:
+- with `--approve`: the guard loaded and blocked the child's `git push` ("git push (the human pushes; CI gates): blocked by the factory guard"); it also blocked the driver's own call when the workflow path was not a generated one (`./wf.js`), and let it through for `./.scratch/<mission>/workflows/<…>.js`;
+- without it (`--no-approve`, or no flag): the guard did not load and the child's `git push` **ran** (it failed only because the scratch repo has no remote).
+So `run.sh` always passes `--approve`, and runs in the project the human installed and trusts. Pi has no per-tool approval prompt to bypass; `--approve` changes which project files load, nothing else.
+
 **Pi Durable keeps its promise on crashes** (`openNodeSqliteStorage`, a scripted model, a tool that appends to a file then sleeps 4 s, `kill -9` at 2.5 s, reopen and `resume()`):
 - a tool without `replay` ran **once**; after the restart the model got "Tool step was interrupted and may have partially run";
 - the same tool with `replay: "safe"` ran **twice** (it reran after the restart), as documented;

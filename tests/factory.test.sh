@@ -40,7 +40,8 @@ bash "$root/scripts/factory/install-into.sh" "$repo" --pack api --pack batch >"$
 [ -f docs/factory/prompts/audit-gaps.md ] && [ -f docs/factory/prompts/security-audit.md ] && t "read-only prompts installed" || fail "prompts"
 [ -f docs/agents/factory.md ] && grep -q 'docs/agents/factory.md' AGENTS.md && ! grep -q 'END OF BRIEF' AGENTS.md \
   && t "AGENTS.md gets a pointer, the factory rules live in docs/agents/factory.md" || fail "AGENTS.md pointer" "$(cat AGENTS.md)"
-bash scripts/factory/brief.sh worker probe 01 HEAD | grep -q '^Read: docs/agents/factory.md' && ! bash scripts/factory/brief.sh worker probe 01 HEAD | grep -q 'AGENTS.md' \
+wb="$(bash scripts/factory/brief.sh worker probe 01 HEAD)"   # captured: grep -q under pipefail can SIGPIPE the writer
+grep -q '^Read: docs/agents/factory.md' <<<"$wb" && ! grep -q 'AGENTS.md' <<<"$wb" \
   && t "briefs name the factory rules, not AGENTS.md (already in context)" || fail "brief read list"
 [ -f docs/agents/contract-checklist-api.md ] && [ -f docs/agents/quality-bar-batch.md ] && [ ! -f docs/agents/contract-checklist-bots.md ] \
   && t "only the requested practice packs are installed" || fail "packs" "$(ls docs/agents)"
@@ -747,11 +748,12 @@ echo "No findings. Critique result: approve" > .scratch/runner/contract-critique
 echo '{"type":"session"}'
 echo '{"type":"tool_execution_end","toolName":"subagent","isError":false,"result":{"content":[{"type":"text","text":"Workflow completed."}],"details":{"workflow":{"value":[{"key":"contract-critic","output":"approve"}]}}}}'
 PI
-chmod +x "$work/bin/fakepi"
-out="$(PI_ARGS_LOG="$work/pi.args" FACTORY_PI_CMD="$work/bin/fakepi" bash scripts/factory/run.sh runner --no-preflight 2>&1)" || fail "run.sh contract" "$out"
+chmod +x "$work/bin/fakepi"; mkdir -p "$work/pi dir"; cp "$work/bin/fakepi" "$work/pi dir/pi bin"
+out="$(PI_ARGS_LOG="$work/pi.args" FACTORY_PI_BIN="$work/pi dir/pi bin" bash scripts/factory/run.sh runner --no-preflight 2>&1)" || fail "run.sh contract" "$out"
 grep -q -- '-p --mode json' "$work/pi.args" && grep -q 'driver.mjs --model factory-driver/script' "$work/pi.args" && grep -q 'workflows/.*-contract.js' "$work/pi.args" \
   && echo "$out" | grep -q '^STEP: approve' && echo "$out" | grep -q 'WAITING: human (approve)' \
-  && t "run.sh: pi in JSON mode with the driver as the model runs the contract wave, then stops at G1 (D91)" || fail "run.sh pi-json" "$out
+  && grep -q -- '--approve' "$work/pi.args" \
+  && t "run.sh: pi in JSON mode (path with spaces, project trusted so the guard loads) with the driver as the model runs the contract wave, then stops at G1 (D91)" || fail "run.sh pi-json" "$out
 $(cat "$work/pi.args")"
 bash scripts/factory/human.sh approve runner >/dev/null
 # The fake runner plays every agent from the wave file, as the real ones would write.
@@ -794,6 +796,13 @@ out="$(FACTORY_RUNNER=fake FACTORY_FAKE_RUNNER="$work/bin/fakerun" bash scripts/
 echo "$out" | grep -q '^STEP: pr' && echo "$out" | grep -q 'WAITING: human (pr)' && [ -f tests/run.test.js ] \
   && grep -q 'review-wave' "$FAKE_LOG" && grep -q 'validate' "$FAKE_LOG" && grep -q 'steward' "$FAKE_LOG" \
   && t "run.sh: resumes, builds, integrates, reviews, validates, checks health and stewards up to the MR, unattended" || fail "run.sh to pr" "$out"
+runlogs="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/runs/runner"
+! compgen -G "$r/logs/*.jsonl" >/dev/null && ! compgen -G "$r/logs/*.result.json" >/dev/null && [ -z "$(git ls-files $r | grep -E 'jsonl|result\.json|\.err$')" ] && ls "$runlogs"/*-contract.jsonl >/dev/null 2>&1 && ls "$runlogs"/*-review-wave.result.json >/dev/null 2>&1 \
+  && t "run.sh keeps raw runner output in the git folder, never in the committed mission folder" || fail "run logs" "$(ls -R $r "$runlogs" 2>&1 | head -40)"
+pe() { bash -c '. scripts/factory/lib.sh; provider_error_line "$1"' _ "$1"; }
+[ -n "$(pe 'Error: 429 Too Many Requests')" ] && [ -n "$(pe 'HTTP 503 Service Unavailable')" ] && [ -n "$(pe 'rate limit exceeded')" ] \
+  && [ -z "$(pe 'Tests: 500 passed, 2 failed')" ] && [ -z "$(pe 'expected 500, got 404')" ] \
+  && t "provider errors are recognised by their shape, not by any 429 or 5xx in the text" || fail "provider_error_line"
 bash scripts/factory/gate.sh mission runner >"$work/gate.log" 2>&1 && t "the mission run.sh drove passes the gates (G1-G5)" || fail "run.sh gate" "$(cat "$work/gate.log")"
 out="$(FACTORY_RUNNER=fake FACTORY_FAKE_RUNNER=/bin/false bash scripts/factory/run.sh runner --no-preflight --max-steps 0 2>&1)" && fail "run.sh must stop past --max-steps"
 echo "$out" | grep -q 'more than 0 steps' && t "run.sh: a step budget stops a loop that would not end" || fail "max steps" "$out"
