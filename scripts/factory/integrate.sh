@@ -36,7 +36,10 @@ dirty="$(git status --porcelain --untracked-files=no -- . ":(exclude)${FACTORY_D
 raw_patch="$patch"; patch="$(mktemp)"; hookless="$(mktemp)"; trap 'rm -f "$patch" "$hookless"' EXIT
 # D87: the hook's dependency links and .env.factory are never part of a
 # change; a captured patch that still has them loses them here, not a round.
-node "$here/patch-paths.mjs" strip-hook "$raw_patch" "$hookless" "${FACTORY_DEPS_LINKS:-node_modules .venv}" 2>&1 | sed 's/^/  /' >&2
+if ! node "$here/patch-paths.mjs" strip-hook "$raw_patch" "$hookless" "${FACTORY_DEPS_LINKS:-node_modules .venv}" 2>"$hookless.log"; then
+  cp "$raw_patch" "$hookless"          # unreadable patch: the guard below decides, as before D87
+fi
+sed 's/^/  /' "$hookless.log" >&2; rm -f "$hookless.log"
 if ! project_patch "$hookless" "$patch"; then
   write_fail_verdict "$feature" "$ticket" patch-guard \
     "The patch was blocked by the patch guard: paths: it changes files outside the project $(project_prefix)/"

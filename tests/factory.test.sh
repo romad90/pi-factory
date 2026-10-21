@@ -319,6 +319,13 @@ draft="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/draft
 git -C "$wt" switch -q -c not-a-worker
 [ "$(bash scripts/factory/locate-patch.sh demo 01-hello 2>/dev/null)" = "$draft" ] \
   && t "locate-patch falls back to the draft when no worktree is left (D73)" || fail "draft fallback" "$(bash scripts/factory/locate-patch.sh demo 01-hello 2>&1)"
+mkdir -p "$work/tmp/other-run"; echo 'diff --git a/x b/x' > "$work/tmp/other-run/01-hello.patch"; echo '{"cwd":"/elsewhere/repo"}' > "$work/tmp/other-run/meta.json"
+[ "$(TMPDIR="$work/tmp" bash scripts/factory/locate-patch.sh demo 01-hello 2>/dev/null)" = "$draft" ] \
+  && t "locate-patch ignores a temp patch from another checkout with the same mission name" || fail "foreign patch" "$(TMPDIR="$work/tmp" bash scripts/factory/locate-patch.sh demo 01-hello 2>&1)"
+printf '{"cwd":"%s"}' "$(git rev-parse --show-toplevel)" > "$work/tmp/other-run/meta.json"
+[ "$(TMPDIR="$work/tmp" bash scripts/factory/locate-patch.sh demo 01-hello 2>/dev/null)" = "$work/tmp/other-run/01-hello.patch" ] \
+  && t "locate-patch takes a temp patch whose run names this checkout" || fail "own patch" "$(TMPDIR="$work/tmp" bash scripts/factory/locate-patch.sh demo 01-hello 2>&1)"
+rm -rf "$work/tmp"
 git -C "$wt" switch -q pi-subagents/01-hello-abc123-s0-t0; git branch -q -D not-a-worker
 printf 'Tried the default export; ruled out a class (the test imports a function).\n' | (cd "$wt_project" && bash scripts/factory/journal.sh demo) >/dev/null \
   || fail "journal.sh" "worker could not write its journal"

@@ -85,8 +85,9 @@ cycle="-"
 hand="-"
 start="$(git log --reverse --format=%H -- "$dir" | awk 'NR == 1')"
 if [ -n "$start" ]; then                 # after the spec commit, which is the human's by design
-  marked="$(git log --no-merges --format='%(trailers:key=Factory-Script,valueonly)' "$start..HEAD" | grep -c . || true)"
-  total="$(git log --no-merges --format=%H "$start..HEAD" | wc -l | tr -d ' ')"
+  # first parent only: commits a merge from main brings in are nobody's repair
+  marked="$(git log --first-parent --no-merges --format='%(trailers:key=Factory-Script,valueonly)' "$start..HEAD" | grep -c . || true)"
+  total="$(git log --first-parent --no-merges --format=%H "$start..HEAD" | wc -l | tr -d ' ')"
   if [ "$marked" -gt 0 ]; then hand=$(( total - marked )); else hand="not measured (mission started before D89)"; fi
 fi
 if [ -n "$first" ] && [ -n "$last" ]; then
