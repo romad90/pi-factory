@@ -708,8 +708,10 @@ STEP_NOW="$(FACTORY_NOTIFY=0 bash scripts/factory/next.sh demo | sed -n 's/^STEP
 const s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); const m = s.missions[0];
 const ok = m.name === "demo" && m.step === process.env.STEP_NOW && m.counts.total === 2 && m.counts.pass === 2
   && m.tickets[1].blockedBy.join() === "01" && m.tickets[1].assertions[0].id === "VAL-HELLO-002" && /Given two greetings/.test(m.tickets[1].assertions[0].given)
-  && m.interventions.target === 5 && m.interventions.human >= 2 && m.contract.total === 2 && m.log.length > 0;
-process.exit(ok ? 0 : 1);' "$work/status.json" && t "status.sh --json: the step next.sh gives, tickets with preconditions and expected behavior, interventions (D90)" || fail "status json" "$(head -c 3000 "$work/status.json")"
+  && m.interventions.target === 5 && m.interventions.human >= 2 && m.contract.total === 2
+  && m.log.some((e) => e.kind === "integrated" && e.ticket === "01-hello") && m.log.some((e) => e.kind === "verdict" && e.ticket === "02-count")
+  && m.log.some((e) => e.kind === "decision") && !m.log.some((e) => /state$/.test(e.text));
+process.exit(ok ? 0 : 1);' "$work/status.json" && t "status.sh --json: the step next.sh gives, tickets with preconditions and expected behavior, interventions, a log of events without checkpoints (D90)" || fail "status json" "$(head -c 3000 "$work/status.json")"
 printf '**Ticket:** 02-count\n\nShould the count start at zero?\n' > $m/state/open-question.md
 bash scripts/factory/status.sh --all --json > "$work/all.json"
 node -e '

@@ -46,11 +46,58 @@ function contract(spec) {
   return out;
 }
 
-function gitLog(dir) {
-  try {
-    return execFileSync("git", ["log", "-30", "--format=%h%x09%aI%x09%s", "--", dir], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })
-      .split("\n").filter(Boolean).map((l) => { const [hash, date, subject] = l.split("\t"); return { hash, date, subject }; });
-  } catch { return []; }
+const git = (args) => { try { return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 32 << 20 }); } catch { return ""; } };
+const isCheckpoint = (subject, trailer) => /checkpoint/i.test(trailer || "") || /^chore\(factory\): \S+ state$/.test(subject);
+
+// The progress log is events that mean something (P10): integrations,
+// verdicts and gate results (their archived copies, D38), decisions, stuck and
+// stale markers, questions. Checkpoint commits only carry those files: they are
+// never listed themselves (trailer "Factory-Script: checkpoint", else subject).
+function events(name, dir, prefix) {
+  const ev = [];
+  const fmt = "--format=@@%h%x09%aI%x09%s%x09%(trailers:key=Factory-Script,valueonly,separator=%x2C)";
+  for (const l of git(["log", "-400", fmt]).split("\n")) {
+    if (!l.startsWith("@@")) continue;
+    const [hash, date, subject, trailer] = l.slice(2).split("\t");
+    const m = subject.match(new RegExp(`^(feat|fix|test|docs|refactor|perf|style)\\(${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\): (.+)$`));
+    if (m && !isCheckpoint(subject, trailer)) ev.push({ date, kind: "integrated", ticket: m[2].trim(), text: `${m[1]} commit ${hash}`, ok: true });
+  }
+  let cur = null;
+  for (const l of git(["log", "-300", "--name-status", "--no-renames", fmt, "--", dir]).split("\n")) {
+    if (l.startsWith("@@")) { const [, date] = l.slice(2).split("\t"); cur = date; continue; }
+    const m = l.match(/^A\t(.+)$/); if (!m || !cur) continue;
+    const base = prefix + dir.replace(/^\.\//, "") + "/";
+    if (!m[1].startsWith(base)) continue;
+    const rel = m[1].slice(base.length);
+    let x;
+    if ((x = rel.match(/^verdicts\/(.+)-code\.r(\d+)\.md$/))) {
+      const v = verdict(path.join(dir, rel)) || {};
+      const pass = v.result === "PASS";
+      ev.push({ date: cur, kind: "verdict", ticket: x[1], ok: pass, text: `round ${x[2]} ${v.result || "?"}${v.brief ? " · " + v.brief : ""}${!pass && v.blocking ? " — " + v.blocking : ""}` });
+    } else if ((x = rel.match(/^verdicts\/(behavior|health)\.r(\d+)\.md$/))) {
+      const v = verdict(path.join(dir, rel)) || {};
+      ev.push({ date: cur, kind: "gate", ticket: "", ok: v.result === "PASS", text: `${x[1] === "behavior" ? "behavior (G4)" : "code steward (G5)"} round ${x[2]} ${v.result || "?"}${v.result !== "PASS" && v.blocking ? " — " + v.blocking : ""}` });
+    } else if ((x = rel.match(/^state\/(.+)\.stuck$/))) ev.push({ date: cur, kind: "escalated", ticket: x[1], ok: false, text: "no progress: failed like the round before (D84)" });
+    else if ((x = rel.match(/^state\/(.+)\.stale-verdict\.md$/))) ev.push({ date: cur, kind: "stale", ticket: x[1], ok: null, text: "verdict on an older commit set aside (D81)" });
+    else if (rel === "state/open-question.md") ev.push({ date: cur, kind: "question", ticket: "", ok: null, text: "a question waits for the human" });
+    else if (rel === "health/report.md") ev.push({ date: cur, kind: "gate", ticket: "", ok: null, text: "health ratchet ran (G5)" });
+  }
+  // Decisions, at the time each row was committed.
+  let when = null;
+  for (const l of git(["log", "-200", "-p", "--unified=0", "--format=@@%aI", "--", path.join(dir, "decisions.tsv")]).split("\n")) {
+    if (l.startsWith("@@") && !l.startsWith("@@ ")) { when = l.slice(2); continue; }
+    if (!when || !l.startsWith("+") || l.startsWith("+++") || l.startsWith("+date\t")) continue;
+    const [, ticket, kind, question, answer, , who] = l.slice(1).split("\t");
+    if (!kind) continue;
+    const auto = kind === "auto";
+    ev.push({ date: when, kind: auto ? "auto-answer" : "decision", ticket: ticket === "-" ? "" : ticket, ok: null, human: !auto,
+      text: `${auto ? "" : kind + ": "}${(question || "").slice(0, 140)} → ${(answer || "").slice(0, 160)}${who && !auto ? " (" + who + ")" : ""}` });
+  }
+  ev.sort((a, b) => (a.date < b.date ? 1 : -1));
+  if (ev.length) return ev.slice(0, 60);
+  // Nothing recorded yet: the mission's own commits, checkpoints left out.
+  return git(["log", "-30", fmt, "--", dir]).split("\n").filter((l) => l.startsWith("@@")).map((l) => l.slice(2).split("\t"))
+    .filter(([, , subject, trailer]) => !isCheckpoint(subject, trailer)).map(([hash, date, subject]) => ({ date, kind: "commit", ticket: "", ok: null, text: `${subject} (${hash})` }));
 }
 
 function workers(mission) {
@@ -132,7 +179,7 @@ function mission(name, lines) {
     decisions: decisions.slice(-12).map((d) => ({ date: d.date, ticket: d.ticket, kind: d.kind, question: (d.question || "").slice(0, 200), answer: (d.answer || "").slice(0, 200), who: d.who })),
     runs: tsv(path.join(dir, "runs.tsv")).slice(-12),
     usage: usage.length ? { runs: usage.length, input: sum("input"), output: sum("output"), cacheRead: sum("cache_read"), cost: sum("cost") } : null,
-    log: gitLog(dir), workers: live, needs,
+    log: events(name, dir, (git(["rev-parse", "--show-prefix"]).trim())), workers: live, needs,
   };
 }
 

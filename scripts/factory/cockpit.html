@@ -109,7 +109,7 @@ function leads() {
         ${m.usage ? `<span><b>${fmtK(m.usage.input + m.usage.output)}</b> tokens</span>` : ""}
         ${m.workers.some((w) => !w.done) ? `<span style="color:var(--green)">● agent running</span>` : ""}</div>
       ${m.needs.length ? `<div class="need"><span class="k">${esc(m.needs[0].kind)}</span> ${esc(m.needs[0].text).slice(0, 220)}</div>` : ""}
-      <div class="age" style="margin-top:8px">${m.log[0] ? `last: ${esc(m.log[0].subject)} · ${ago(m.log[0].date)} ago` : ""}</div>
+      <div class="age" style="margin-top:8px">${m.log[0] ? `last: ${esc(m.log[0].kind)}${m.log[0].ticket ? " " + esc(m.log[0].ticket) : ""} · ${ago(m.log[0].date)} ago` : ""}</div>
     </div>`).join("")}</div>`;
 }
 
@@ -146,6 +146,14 @@ function checklist(m, current) {
   </div>`;
 }
 
+const KIND = { integrated: ["integrated", "s-pass"], verdict: ["verdict", ""], gate: ["gate", "s-review"], decision: ["decision", "s-human"], "auto-answer": ["auto", "s-blocked"], escalated: ["escalated", "s-escalate"], stale: ["stale", "s-blocked"], question: ["question", "s-human"], commit: ["commit", "s-blocked"] };
+function logItem(e) {
+  const [label, cls0] = KIND[e.kind] || [e.kind, ""];
+  const cls = e.kind === "verdict" || e.kind === "gate" ? (e.ok === true ? "s-pass" : e.ok === false ? "s-fail" : cls0) : cls0;
+  return `<li><span class="when">${ago(e.date)} ago</span><span class="pill ${cls}" style="min-width:78px;text-align:center">${esc(label)}</span>
+    <span class="t" style="white-space:normal">${e.ticket ? `<b>${esc(e.ticket)}</b> ` : ""}<span class="muted" title="${esc(e.text)}">${esc(e.text.length > 170 ? e.text.slice(0, 168) + "…" : e.text)}</span></span></li>`;
+}
+
 function liveAndLog(m) {
   const w = m.workers;
   const workers = w.length ? w.map((x) => `<div style="margin-bottom:12px"><div class="row"><span><span class="dot" style="background:${x.done ? "var(--dim)" : x.quiet ? "var(--amber)" : "var(--green)"}"></span> <b>${esc(x.agent || "agent")}</b> ${esc(x.ticket)}</span><span class="age">${x.done ? "done" : "active"} · ${Math.round(x.ageSec / 60)} min ago</span></div>
@@ -155,7 +163,7 @@ function liveAndLog(m) {
   return `<div class="panel"><h2>Active worker</h2>${workers}
     ${runs ? `<h2 style="margin-top:6px">Last runs started</h2><ul class="list log">${runs}</ul>` : ""}
     <h2 style="margin-top:14px">Progress log</h2>
-    <ul class="list log">${m.log.slice(0, 14).map((l) => `<li><span class="when">${ago(l.date)} ago</span><span class="t" style="white-space:normal">${esc(l.subject)}</span></li>`).join("") || `<li class="empty">no commits yet</li>`}</ul>
+    <ul class="list log">${m.log.slice(0, 18).map(logItem).join("") || `<li class="empty">nothing recorded yet</li>`}</ul>
   </div>`;
 }
 
