@@ -64,6 +64,24 @@ This is the step from "an agent that runs the factory" to "a factory that runs a
 
 The October 2026 scan ([ideas](ideas.md)) found the same split in every factory that runs on more than one model: Super Simple Software Factory and Atelier (Python owns the graph, every phase starts as failed, agents return a typed envelope that code checks), DoorDash's orchestrator (fixed phases in Go, the harness writes the verification report), Bernstein and Mastra (deterministic scheduler, stages as data). SSSF and Anneal drive Pi headless with `pi -p --mode json`, which answers the first open question below.
 
+## Spike results (October 2026)
+
+Run in a scratch folder with Pi 1.3.0, pi-subagents 0.76.1 and Pi Durable 1.3.0 (`npm install --ignore-scripts`), against a fake OpenAI-compatible gateway, Node 22 (`node:sqlite` present). Status: **step 1 done; step 2 built as `run.sh` (D91).**
+
+**Headless works, and the lead needs no model at all.**
+- `pi -p --mode json` runs a generated workflow file and prints one JSON event per line; the `subagent` call's `tool_execution_end` event carries the workflow's return value in `result.details.workflow.value`, the per-child results, usage and the run ids. A failed workflow comes back as `isError: true` with the error text.
+- `pi -p` waits on an open stdin: run it with `</dev/null`, or it hangs.
+- The workflow path must look like a path (`./.scratch/…`): a bare name is read as a named workflow resource and refused.
+- pi-subagents exposes no programmatic "run this workflow" entry point (its `runWorkflowScript` is internal, and the `/run` command runs one agent, not a file). But a Pi extension can register a provider whose answers are code (`createFauxCore` from pi-ai). `scripts/factory/driver.mjs` answers with exactly the call the lead is allowed to make, then ends the turn. With it, the fake gateway received **only** the child agent's request: no lead model, no lead tokens, no lead quota, nothing to improvise.
+- The driver loads from any folder: Pi resolves `@earendil-works/pi-ai` for extensions.
+
+**Pi Durable keeps its promise on crashes** (`openNodeSqliteStorage`, a scripted model, a tool that appends to a file then sleeps 4 s, `kill -9` at 2.5 s, reopen and `resume()`):
+- a tool without `replay` ran **once**; after the restart the model got "Tool step was interrupted and may have partially run";
+- the same tool with `replay: "safe"` ran **twice** (it reran after the restart), as documented;
+- re-submitting the same input with the same `requestId` after the restart did not admit it again.
+
+**Decision:** the loop is bash (`run.sh`), the runner is `pi -p --mode json` with the driver. Pi Durable is not needed for this step: every factory script already resumes from the mission's files, so a killed `run.sh` is simply run again. It stays the candidate engine for P12 (approvals from a phone, a live view for the cockpit), behind the same runner interface, once P12 is accepted.
+
 ## Plan
 
 1. Spike: run one generated workflow headless and read its result. If it fails, stop here and decide the fallback. **S**
@@ -73,5 +91,5 @@ The October 2026 scan ([ideas](ideas.md)) found the same split in every factory 
 
 ## Open questions
 
-- Which headless entry point does pi-subagents support today, and is it stable across minor versions?
+- ~~Which headless entry point does pi-subagents support today?~~ `pi -p --mode json` with the driver extension (spike above). Stable across minor versions: to check on each upgrade; the test drives `run.sh` with a stand-in for pi that checks the flags.
 - Should `factory-run.sh` notify on every human step (it does today through `next.sh`), or only on stops?
