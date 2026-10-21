@@ -25,11 +25,17 @@ done
 HUMAN_STEPS=" paused grill approve decide approve-tickets coverage setup escalate blocked unverified pr "
 
 # One mission → tab-separated lines node turns into JSON:
-#   S <step> / N <next> / B <branch>
+#   S <step> / N <next> / H <1 if a human step> / O <branch holding the state>
 #   T <name> <num> <state> <round> <blocked by,> <covers,> <integrated marker>
 mission_lines() {
   local f="$1" dir out t name num state
   dir="$(mission_dir "$f")"
+  # A mission whose latest state is on another branch is not waiting for
+  # anyone here (D67): say where it lives, without running its steps.
+  if ! why="$(mission_guard "$f")" && [[ "$why" == *"is on branch '"* ]]; then
+    printf 'S\tother-branch\nN\t%s\nH\t0\nO\t%s\n' "$why" "$(printf '%s' "$why" | sed -n "s/.*is on branch '\([^']*\)'.*/\1/p")"
+    return 0
+  fi
   out="$(FACTORY_NOTIFY=0 bash "$here/next.sh" "$f" 2>/dev/null || true)"
   printf 'S\t%s\n' "$(printf '%s\n' "$out" | sed -n 's/^STEP: //p' | head -1)"
   printf 'N\t%s\n' "$(printf '%s\n' "$out" | sed -n 's/^NEXT → //p' | head -1)"

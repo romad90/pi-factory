@@ -82,7 +82,8 @@ const route = () => { const p = location.hash.replace(/^#\/?/, "").split("/").ma
 const go = (m, t) => { location.hash = m ? `#/m/${encodeURIComponent(m)}${t ? `/t/${encodeURIComponent(t)}` : ""}` : "#/"; };
 const STATE_LABEL = { pass: "PASS", review: "review", build: "build", escalate: "ESCALATE", blocked: "blocked" };
 const pill = (s) => `<span class="pill s-${esc(s)}">${esc(STATE_LABEL[s] || s)}</span>`;
-const stepPill = (m) => `<span class="pill ${m.human ? "s-human" : "s-review"}">${esc(m.step || "?")}${m.human ? " · needs you" : ""}</span>`;
+const stepPill = (m) => m.otherBranch ? `<span class="pill s-blocked" title="${esc(m.next)}">on ${esc(m.otherBranch)}</span>`
+  : `<span class="pill ${m.human ? "s-human" : "s-review"}">${esc(m.step || "?")}${m.human ? " · needs you" : ""}</span>`;
 const fmtK = (n) => n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? Math.round(n / 1e3) + "k" : String(n);
 const ago = (iso) => { const s = (Date.now() - new Date(iso)) / 1000; return s < 90 ? `${Math.round(s)} s` : s < 5400 ? `${Math.round(s / 60)} min` : s < 129600 ? `${Math.round(s / 3600)} h` : `${Math.round(s / 86400)} d`; };
 const mission = (name) => state.missions.find((x) => x.name === name);
@@ -108,7 +109,7 @@ function leads() {
       <div class="stat"><span><b>${m.counts.pass || 0}</b>/${m.counts.total} tickets</span>${interventions(m)}
         ${m.usage ? `<span><b>${fmtK(m.usage.input + m.usage.output)}</b> tokens</span>` : ""}
         ${m.workers.some((w) => !w.done) ? `<span style="color:var(--green)">● agent running</span>` : ""}</div>
-      ${m.needs.length ? `<div class="need"><span class="k">${esc(m.needs[0].kind)}</span> ${esc(m.needs[0].text).slice(0, 220)}</div>` : ""}
+      ${m.needs.length ? `<div class="need"><span class="k">${esc(m.needs[0].kind)}</span> ${esc(m.needs[0].text.slice(0, 220))}</div>` : ""}
       <div class="age" style="margin-top:8px">${m.log[0] ? `last: ${esc(m.log[0].kind)}${m.log[0].ticket ? " " + esc(m.log[0].ticket) : ""} · ${ago(m.log[0].date)} ago` : ""}</div>
     </div>`).join("")}</div>`;
 }

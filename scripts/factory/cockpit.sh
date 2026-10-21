@@ -33,13 +33,16 @@ echo "cockpit: http://127.0.0.1:$port  (read-only; Ctrl+C to stop)"
 SITE="$site" PORT="$port" node -e '
 const http = require("http"), fs = require("fs"), path = require("path");
 const site = process.env.SITE, types = { ".html": "text/html; charset=utf-8", ".json": "application/json" };
+const port = Number(process.env.PORT), hosts = [`127.0.0.1:${port}`, `localhost:${port}`];
 http.createServer((req, res) => {
+  // Only this machine, by name too: a page elsewhere cannot rebind a domain to us.
+  if (!hosts.includes(String(req.headers.host || "").toLowerCase())) { res.writeHead(403); return res.end(); }
   const name = req.url.split("?")[0] === "/" ? "index.html" : path.basename(req.url.split("?")[0]);
   if (!["index.html", "state.json"].includes(name)) { res.writeHead(404); return res.end(); }
   fs.readFile(path.join(site, name), (err, data) => {
     if (err) { res.writeHead(503); return res.end("no snapshot yet"); }
     res.writeHead(200, { "Content-Type": types[path.extname(name)], "Cache-Control": "no-store" }); res.end(data);
   });
-}).listen(Number(process.env.PORT), "127.0.0.1");
+}).listen(port, "127.0.0.1");
 ' & srv=$!
 wait "$srv"

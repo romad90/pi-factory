@@ -170,7 +170,7 @@ function mission(name, lines) {
   const behavior = verdict(path.join(dir, "verdicts", "behavior.md"));
   const health = verdict(path.join(dir, "verdicts", "health.md"));
   return {
-    name, title: heading(spec), intent: firstWord(field(spec, "Intent")), step, next, human: get("H") === "1",
+    name, title: heading(spec), intent: firstWord(field(spec, "Intent")), step, next, human: get("H") === "1", otherBranch: get("O"),
     paused: exists(path.join(dir, "state", "PAUSED.md")),
     contract: { total: Object.keys(assertions).length, approved: /^\*\*Contract approved:\*\*/m.test(spec) },
     counts: tickets.reduce((c, t) => ((c[t.state] = (c[t.state] || 0) + 1), c), { total: tickets.length }),

@@ -719,6 +719,13 @@ const s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); const
 process.exit(m && m.step === "decide" && m.needs[0].kind === "decide" && m.needs.some((n) => /start at zero/.test(n.text) || /factory-decide/.test(n.text)) ? 0 : 1);' "$work/all.json" \
   && t "status.sh --all: every mission, an open question shows as needs-you" || fail "status all" "$(head -c 2000 "$work/all.json")"
 rm -f $m/state/open-question.md
+here_branch="$(git branch --show-current)"; git switch -q -c cockpit-side; echo side > $m/state/side.txt; git add $m/state/side.txt; git commit -qm "test: state on another branch"; git switch -q "$here_branch"
+bash scripts/factory/status.sh --all --json > "$work/all.json"
+node -e '
+const s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); const m = s.missions.find((x) => x.name === "demo");
+process.exit(m && m.step === "other-branch" && m.otherBranch === "cockpit-side" && !m.human && m.needs.length === 0 ? 0 : 1);' "$work/all.json" \
+  && t "status.sh: a mission whose state is on another branch shows where, not as needs-you" || fail "status other branch" "$(head -c 1500 "$work/all.json")"
+git branch -q -D cockpit-side
 bash scripts/factory/cockpit.sh --once "$work/cockpit" >/dev/null && [ -s "$work/cockpit/index.html" ] && grep -q '"missions"' "$work/cockpit/state.json" \
   && [ -z "$(git status --porcelain -- .scratch)" ] && t "cockpit.sh --once writes the page and its snapshot outside the repo, read-only" || fail "cockpit once" "$(ls "$work/cockpit"; git status --porcelain)"
 
