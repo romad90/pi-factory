@@ -17,6 +17,9 @@ Each of these is a question the files already answer. Nobody shows the answer.
 
 ## What others built
 
+Factory's Missions (October 2026, closed product, from screenshots) adds the mission screen used in section 4: the active feature with its preconditions and expected behavior, a features checklist, a progress log, the active worker's live tool calls, and keys to switch views. See [ideas](ideas.md).
+
+
 Eleven open-source factories were read for this ([ideas to borrow](ideas.md), October 2026 scan). Their pages agree on the essentials:
 
 - **The page only reads.** Symphony's spec: the dashboard is never needed for correctness. Atelier's cockpit only writes a cancel flag.
@@ -50,6 +53,23 @@ Layout, top to bottom:
 
 Workers run through pi-subagents, which writes each run's output under its async run folder. `status.sh` reads the newest lines of each running worker's log for the last action, turns and tokens. If the log format proves unstable, the tile falls back to what the scripts know (started, model, elapsed) and says so.
 
+### 4. Zoom: from the leads to a line of the diff
+
+The human's job across missions is supervising leads, not reading logs. The page is built as one zoom, each level one click or key from the next, the URL keeping where you are:
+
+| Level | Shows | Opens from |
+|---|---|---|
+| **Leads** | every mission on the machine (one per repo or project): phase, lead or runner alive, open questions, interventions against five, tokens so far | the start page |
+| **Mission** | Factory's Mission Control layout: the active ticket with its preconditions (`Blocked by`) and expected behavior (`## Assertions`), the ticket checklist (13/16), the progress log from `events.jsonl`, the active worker with its live tool calls, tokens and time | a lead |
+| **Ticket** | its rounds, each with the journal entry (D84), failure signature, verdict and patch | a ticket in the checklist |
+| **Verdict** | the review and its axes, blocking lines first, the question if one was asked and how it was answered | a round |
+| **Log** | the worker's run log from the line that matters (the first failing test, the gate's output) | a verdict line |
+| **Diff** | the commit the verdict reviewed, with the files the ticket named marked (D82) | the verdict |
+
+Keys, as in Mission Control: `L` leads, `M` mission, `W` workers, `R` rounds, `Tab` next pane, `Esc` up one level. On a phone the page shows only **Needs you**: each question with the resolver's recommendation, answerable in one tap once P12 (or P6) gives the page a way to write.
+
+The mockup is the "Factory Cockpit" canvas (desktop and phone boards).
+
 ## Trade-offs
 
 | For | Against |
@@ -65,6 +85,7 @@ Workers run through pi-subagents, which writes each run's output under its async
 2. `front.html` on a static server: rail, needs-you, tickets × stages. `front.mjs` with SSE only if polling falls short. **M**
 3. Subagent tiles from pi-subagents' run logs, with the fallback. **M**
 4. Health findings with evidence and the fixing command. **S**
+5. The zoom: leads → mission → ticket → verdict → log → diff, with keys; the phone shows Needs you. **M**
 
 ## Open questions
 

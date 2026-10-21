@@ -75,6 +75,10 @@ After each worker, the wave runs `self-check.sh` in its worktree itself. On FAIL
 
 When tickets escalate on the same mistakes, the human adds one `## Notes from rounds 1-3` section to the tickets (the pitfalls, with the passing tickets to copy) and resets them. On 20 October this was one decision for five tickets. `next.sh` suggests it when the escalated verdicts share an error, and `reset-ticket.sh --note <file>` appends the note and resets in one step.
 
+### 8. Each wave ends with a check of what it covers
+
+Borrowed from Factory's milestones, each closed by a validation phase. After a build wave integrates, the contract assertions its tickets cover are run on the integrated branch (the validator's command, restricted to those assertions). A red one sends the wave's tickets back before the next wave builds on them. A mission that drifts shows at wave 2, not at the final validate.
+
 ## Trade-offs
 
 | For | Against |
@@ -94,6 +98,8 @@ When tickets escalate on the same mistakes, the human adds one `## Notes from ro
 6. The three measures in `metrics.sh`. **S**
 7. The wave runs `self-check.sh` after each worker and corrects in the same session once. **M**
 8. `reset-ticket.sh --note`; shared errors across escalated verdicts suggest it. **S**
+
+9. Wave check: `next.sh` adds a `wave-check` step after each build wave's integration. **M**
 
 Steps 7, 1, 2 and 5 first (7 removes the most rounds): they change only briefs and one check, and could ship before mission 3.
 

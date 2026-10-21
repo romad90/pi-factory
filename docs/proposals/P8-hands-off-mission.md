@@ -20,6 +20,10 @@ Most interventions were in the first four rows. Each one also cost tokens: a fai
 
 At most **five human interventions per mission**: the spec, the contract (G1), the tickets, one or two real decisions, the MR. An intervention is a human entry in `decisions.tsv`, a manual commit in the mission, or a manual `/factory` relaunch. Mission 2 is the baseline; `metrics.sh` counts them from mission 3.
 
+The human's role after the interview is the one Factory names for Missions: **project manager**. Answer questions, approve gates, nothing else. Anything else the human does is a gap in the factory and becomes a retro finding.
+
+`metrics.sh` adds two times next to the count: the mission's wall time and the time it spent waiting on the human. Factory reports a median mission of about two hours; ours is measured, not assumed.
+
 ## Proposal
 
 Five steps, by human time saved. Steps 1–4 are scripts on today's architecture.
@@ -53,6 +57,8 @@ Removes: the questions whose answer was a rule the worker didn't read.
 | `/factory-decide` loses the split between answer and why, backticks run as commands | a fixed separator, text written without the shell |
 | `/factory <typo>` starts a pre-flight on a mission that doesn't exist | refused, with the closest existing name |
 | Another agent's changes or another branch in the checkout | pre-flight refuses: wrong branch, or changes outside `.scratch/` not made by the factory |
+
+A short list of commands a worker never runs (`git push`, deploy, package publish, anything touching CI settings) is checked by the command guard in every worktree, as Factory classifies commands by risk. A worker that tries one gets a refusal, not a question to the human.
 
 ### 4. A run the human can leave
 
