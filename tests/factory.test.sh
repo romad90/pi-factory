@@ -784,6 +784,81 @@ git ls-remote --heads "$work/origin.git" "$cur" | grep -q . && grep -qx 'product
   && t "mr.sh pushes the branch and opens the MR with glab; heading becomes the title, the rest the description (D86)" || fail "mr glab create" "$(cat "$work/mr.log" "$work/glab.log")"
 git remote remove origin; rm -f $m/pr.md $m/mr.url
 
+# D91: the scripted lead runs a mission's loop with no LLM lead.
+echo "Scripted lead (run.sh)"
+r=.scratch/runner; mkdir -p $r/issues
+printf '# Runner\n**Intent:** feature\n\nA run file.\n\n## Validation contract\n\n### VAL-RUN-001: runs\n**Kind:** code\nGiven the tool, when it runs, then it returns ok.\n' > $r/spec.md
+printf 'FACTORY_LINT_CMD="true"\nFACTORY_TEST_CMD="true"\n' > .factory/commands.env
+git add -A; git commit -qm "test: runner mission"
+mkdir -p "$work/bin"
+# A pi stand-in: checks how run.sh calls it, plays the contract wave, prints pi's JSON events.
+cat > "$work/bin/fakepi" <<'PI'
+#!/usr/bin/env bash
+printf '%s\n' "$*" > "$PI_ARGS_LOG"; echo "$FACTORY_DRIVE_WORKFLOW" >> "$PI_ARGS_LOG"
+echo "No findings. Critique result: approve" > .scratch/runner/contract-critique.md
+echo '{"type":"session"}'
+echo '{"type":"tool_execution_end","toolName":"subagent","isError":false,"result":{"content":[{"type":"text","text":"Workflow completed."}],"details":{"workflow":{"value":[{"key":"contract-critic","output":"approve"}]}}}}'
+PI
+chmod +x "$work/bin/fakepi"; mkdir -p "$work/pi dir"; cp "$work/bin/fakepi" "$work/pi dir/pi bin"
+out="$(PI_ARGS_LOG="$work/pi.args" FACTORY_PI_BIN="$work/pi dir/pi bin" bash scripts/factory/run.sh runner --no-preflight 2>&1)" || fail "run.sh contract" "$out"
+grep -q -- '-p --mode json' "$work/pi.args" && grep -q 'driver.mjs --model factory-driver/script' "$work/pi.args" && grep -q 'workflows/.*-contract.js' "$work/pi.args" \
+  && echo "$out" | grep -q '^STEP: approve' && echo "$out" | grep -q 'WAITING: human (approve)' \
+  && grep -q -- '--approve' "$work/pi.args" \
+  && t "run.sh: pi in JSON mode (path with spaces, project trusted so the guard loads) with the driver as the model runs the contract wave, then stops at G1 (D91)" || fail "run.sh pi-json" "$out
+$(cat "$work/pi.args")"
+bash scripts/factory/human.sh approve runner >/dev/null
+# The fake runner plays every agent from the wave file, as the real ones would write.
+ok_patch run.test.js 'ok' 2>/dev/null || printf 'diff --git a/tests/run.test.js b/tests/run.test.js\nnew file mode 100644\n--- /dev/null\n+++ b/tests/run.test.js\n@@ -0,0 +1 @@\n+ok\n' > "$work/run.test.js.patch"
+cat > "$work/bin/fakerun" <<'FAKE'
+#!/usr/bin/env bash
+set -euo pipefail
+wf="$1"; r=.scratch/runner; . scripts/factory/lib.sh; mkdir -p $r/verdicts
+bid() { node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const m=s.match(/const ITEMS = (\[[\s\S]*?\n\]);/);const it=JSON.parse(m[1]).find(i=>i.key===process.argv[2])||JSON.parse(m[1])[0];console.log((it.task.match(/brief-id: (\S+)/)||[])[1]||"")' "$wf" "$1"; }
+bcommit() { local sha t; for sha in $(grep -oE '[0-9a-f]{40}' "$wf" | sort -u); do for t in - ""; do [ "$(brief_id "$1" runner "$t" "$sha")" = "$2" ] && { echo "$sha"; return; }; done; done; }
+echo "$(basename "$wf")" >> "$FAKE_LOG"
+case "$wf" in
+  *-tickets*.js) printf '# 01 run\n**Size:** S\n## Covers\nVAL-RUN-001\n' > $r/issues/01-run.md; echo '{"output":"1 ticket"}' ;;
+  *-build-wave*.js)
+    if [ ! -f "$FAKE_STATE.429" ]; then touch "$FAKE_STATE.429"; echo '[{"ticket":"01-run","patch":null,"ok":false,"error":"429 Too Many Requests: rate limit"}]'
+    else echo "[{\"ticket\":\"01-run\",\"patch\":\"$FAKE_PATCH\",\"ok\":true}]"; fi ;;
+  *-review-wave*.js)
+    printf '# Verdict: 01-run\n**Result:** PASS\n**Commit:** %s\n**Brief:** %s\n\n## Assertions\n- VAL-RUN-001: PASS — tests/run.test.js "runs"\n' "$(ticket_marker runner 01-run)" "$(bid 01-run)" > $r/verdicts/01-run-code.md
+    echo '[{"ticket":"01-run","output":"PASS"}]' ;;
+  *-validate*.js)
+    printf '# Verdict: behavior\n**Result:** PASS\n**Commit:** %s\n**Brief:** %s\n\n## Assertions\n- VAL-RUN-001: PASS — tests/run.test.js\n' "$(bcommit validator "$(bid behavior)")" "$(bid behavior)" > $r/verdicts/behavior.md
+    echo '{"output":"PASS"}' ;;
+  *-steward*.js)
+    { printf '# Verdict: health\n**Result:** PASS\n**Commit:** %s\n**Brief:** %s\n\n## Bar\n' "$(bcommit code-steward "$(bid code-steward)")" "$(bid code-steward)"
+      for q in QB-SAFE-01 QB-CLEAR-01 QB-TEST-01 QB-PRED-01; do echo "- $q: PASS — tests/run.test.js reviewed"; done
+      printf '\n## Explanations\n### tests/run.test.js\nWhat, how, what can go wrong.\n\n## Findings\n- none\n'; } > $r/verdicts/health.md
+    echo '{"output":"PASS"}' ;;
+  *) echo "unexpected wave $wf"; exit 1 ;;
+esac
+FAKE
+chmod +x "$work/bin/fakerun"
+export FAKE_LOG="$work/fake.log" FAKE_STATE="$work/fake" FAKE_PATCH="$work/run.test.js.patch"
+out="$(FACTORY_RUNNER=fake FACTORY_FAKE_RUNNER="$work/bin/fakerun" bash scripts/factory/run.sh runner --no-preflight 2>&1)" || fail "run.sh tickets" "$out"
+echo "$out" | grep -q 'WAITING: human (approve-tickets)' && [ -f $r/issues/01-run.md ] && t "run.sh: tickets wave, then stops for the human's approval" || fail "run.sh tickets" "$out"
+bash scripts/factory/human.sh approve runner tickets >/dev/null
+rc=0; out="$(FACTORY_RUNNER=fake FACTORY_FAKE_RUNNER="$work/bin/fakerun" bash scripts/factory/run.sh runner --no-preflight 2>&1)" || rc=$?
+[ "$rc" = 3 ] && [ -f $r/state/PAUSED.md ] && [ ! -f $r/verdicts/01-run-code.md ] && echo "$out" | grep -q 'provider error' \
+  && t "run.sh: a 429 from a worker pauses the mission, no round, exit 3 (D58)" || fail "run.sh provider" "rc=$rc $out"
+out="$(FACTORY_RUNNER=fake FACTORY_FAKE_RUNNER="$work/bin/fakerun" bash scripts/factory/run.sh runner --no-preflight 2>&1)" || fail "run.sh to pr" "$out"
+echo "$out" | grep -q '^STEP: pr' && echo "$out" | grep -q 'WAITING: human (pr)' && [ -f tests/run.test.js ] \
+  && grep -q 'review-wave' "$FAKE_LOG" && grep -q 'validate' "$FAKE_LOG" && grep -q 'steward' "$FAKE_LOG" \
+  && t "run.sh: resumes, builds, integrates, reviews, validates, checks health and stewards up to the MR, unattended" || fail "run.sh to pr" "$out"
+runlogs="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/runs/runner"
+! compgen -G "$r/logs/*.jsonl" >/dev/null && ! compgen -G "$r/logs/*.result.json" >/dev/null && [ -z "$(git ls-files $r | grep -E 'jsonl|result\.json|\.err$')" ] && ls "$runlogs"/*-contract.jsonl >/dev/null 2>&1 && ls "$runlogs"/*-review-wave.result.json >/dev/null 2>&1 \
+  && t "run.sh keeps raw runner output in the git folder, never in the committed mission folder" || fail "run logs" "$(ls -R $r "$runlogs" 2>&1 | head -40)"
+pe() { bash -c '. scripts/factory/lib.sh; provider_error_line "$1"' _ "$1"; }
+[ -n "$(pe 'Error: 429 Too Many Requests')" ] && [ -n "$(pe 'HTTP 503 Service Unavailable')" ] && [ -n "$(pe 'rate limit exceeded')" ] \
+  && [ -z "$(pe 'Tests: 500 passed, 2 failed')" ] && [ -z "$(pe 'expected 500, got 404')" ] \
+  && t "provider errors are recognised by their shape, not by any 429 or 5xx in the text" || fail "provider_error_line"
+bash scripts/factory/gate.sh mission runner >"$work/gate.log" 2>&1 && t "the mission run.sh drove passes the gates (G1-G5)" || fail "run.sh gate" "$(cat "$work/gate.log")"
+out="$(FACTORY_RUNNER=fake FACTORY_FAKE_RUNNER=/bin/false bash scripts/factory/run.sh runner --no-preflight --max-steps 0 2>&1)" && fail "run.sh must stop past --max-steps"
+echo "$out" | grep -q 'more than 0 steps' && t "run.sh: a step budget stops a loop that would not end" || fail "max steps" "$out"
+unset FAKE_LOG FAKE_STATE FAKE_PATCH
+
 if [ -n "${mono:-}" ]; then
   [ "$(cat "$mono/projects/other/keep.js")" = keep ] && [ -z "$(git -C "$mono" log --format=%H -- projects/other README.md | awk 'NR > 1')" ] \
     && t "monorepo: a whole mission never touched the sibling project or the root" || fail "monorepo leak" "$(git -C "$mono" log --stat -- projects/other README.md)"
