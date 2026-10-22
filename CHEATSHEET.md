@@ -31,7 +31,7 @@ You keep the decisions that define value and risk; the factory does everything t
 | Retro (`/retro`) | **You** | Learning becomes rules only on a human's word. |
 | Checkpoints, rounds, models in verdicts, notifications, pause/resume | Factory (scripts) | Bookkeeping a human used to do and forget. |
 
-**Still manual, and planned:** opening the draft MR and reading red CI (needs a GitLab token, roadmap F13); a drift check of spec ↔ code before `/pr` (C10).
+**Watch:** `scripts/factory/cockpit.sh`, then open http://127.0.0.1:7357 (leads → mission → ticket; keys L M R Esc; read-only, D90). **One command:** `scripts/factory/mr.sh <mission>` pushes the branch and opens the MR from `/pr`'s body (`.scratch/<mission>/pr.md`), with glab, a GitLab token, or push options (D86); rerun it after editing the body. **Still manual, and planned:** reading red CI (roadmap F13); a drift check of spec ↔ code before `/pr` (C10).
 
 ## 2. Which lane for which problem
 
@@ -141,7 +141,7 @@ Rate limits: the install adds Pi's retry to `.pi/settings.json` (`"retry": { "en
 | 8 | At `STEP: unverified`: prove it, or `/factory-accept-unverified <f> <ids\|ALL> "<why>"` | listed as Known limits |
 | 9 | Approve fix tickets when behavior or health finds something | fixes built, re-validated |
 | 10 | | health ratchet, then code steward (G5) |
-| 11 | At `STEP: pr`: `/pr`, open the MR (draft), then `/retro` | metrics printed |
+| 11 | At `STEP: pr`: `/pr`, then `scripts/factory/mr.sh <mission>` (add `--draft` for a draft), then `/retro` | metrics printed |
 
 Keep specs to roughly 12 stories or fewer; split anything bigger into two missions.
 
@@ -169,7 +169,7 @@ Keep specs to roughly 12 stories or fewer; split anything bigger into two missio
 | `health` | lead | no health report for the current code | `health.sh check` (no model) |
 | `health-fix` | lead | ratchet or steward failed | ticket writer drafts fix tickets |
 | `steward` | lead | no steward verdict for the current code | code steward → `collect.sh` |
-| `pr` | you | all gates green | `/pr`, MR, `/retro` |
+| `pr` | you | all gates green | `/pr`, `mr.sh`, `/retro` |
 
 ## 8. The quality bar (G5)
 

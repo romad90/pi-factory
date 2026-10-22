@@ -40,7 +40,8 @@ bash "$root/scripts/factory/install-into.sh" "$repo" --pack api --pack batch >"$
 [ -f docs/factory/prompts/audit-gaps.md ] && [ -f docs/factory/prompts/security-audit.md ] && t "read-only prompts installed" || fail "prompts"
 [ -f docs/agents/factory.md ] && grep -q 'docs/agents/factory.md' AGENTS.md && ! grep -q 'END OF BRIEF' AGENTS.md \
   && t "AGENTS.md gets a pointer, the factory rules live in docs/agents/factory.md" || fail "AGENTS.md pointer" "$(cat AGENTS.md)"
-bash scripts/factory/brief.sh worker probe 01 HEAD | grep -q '^Read: docs/agents/factory.md' && ! bash scripts/factory/brief.sh worker probe 01 HEAD | grep -q 'AGENTS.md' \
+brief_out="$(bash scripts/factory/brief.sh worker probe 01 HEAD)"   # captured: grep -q closing the pipe early made this flaky
+grep -q '^Read: docs/agents/factory.md' <<<"$brief_out" && ! grep -q 'AGENTS.md' <<<"$brief_out" \
   && t "briefs name the factory rules, not AGENTS.md (already in context)" || fail "brief read list"
 [ -f docs/agents/contract-checklist-api.md ] && [ -f docs/agents/quality-bar-batch.md ] && [ ! -f docs/agents/contract-checklist-bots.md ] \
   && t "only the requested practice packs are installed" || fail "packs" "$(ls docs/agents)"
@@ -318,6 +319,13 @@ draft="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/draft
 git -C "$wt" switch -q -c not-a-worker
 [ "$(bash scripts/factory/locate-patch.sh demo 01-hello 2>/dev/null)" = "$draft" ] \
   && t "locate-patch falls back to the draft when no worktree is left (D73)" || fail "draft fallback" "$(bash scripts/factory/locate-patch.sh demo 01-hello 2>&1)"
+mkdir -p "$work/tmp/other-run"; echo 'diff --git a/x b/x' > "$work/tmp/other-run/01-hello.patch"; echo '{"cwd":"/elsewhere/repo"}' > "$work/tmp/other-run/meta.json"
+[ "$(TMPDIR="$work/tmp" bash scripts/factory/locate-patch.sh demo 01-hello 2>/dev/null)" = "$draft" ] \
+  && t "locate-patch ignores a temp patch from another checkout with the same mission name" || fail "foreign patch" "$(TMPDIR="$work/tmp" bash scripts/factory/locate-patch.sh demo 01-hello 2>&1)"
+printf '{"cwd":"%s"}' "$(git rev-parse --show-toplevel)" > "$work/tmp/other-run/meta.json"
+[ "$(TMPDIR="$work/tmp" bash scripts/factory/locate-patch.sh demo 01-hello 2>/dev/null)" = "$work/tmp/other-run/01-hello.patch" ] \
+  && t "locate-patch takes a temp patch whose run names this checkout" || fail "own patch" "$(TMPDIR="$work/tmp" bash scripts/factory/locate-patch.sh demo 01-hello 2>&1)"
+rm -rf "$work/tmp"
 git -C "$wt" switch -q pi-subagents/01-hello-abc123-s0-t0; git branch -q -D not-a-worker
 printf 'Tried the default export; ruled out a class (the test imports a function).\n' | (cd "$wt_project" && bash scripts/factory/journal.sh demo) >/dev/null \
   || fail "journal.sh" "worker could not write its journal"
@@ -448,7 +456,7 @@ echo 'export const count = (n) => n - 1;' > src/tools/count.js; git diff -- src 
 bash scripts/factory/integrate.sh demo 02-count "$work/02c.patch" >/dev/null 2>&1 || true
 [ ! -f $m/state/02-count.stuck ] && bash scripts/factory/integrate.sh demo 02-count "$work/02c.patch" >/dev/null 2>&1 || true
 [ -f $m/state/02-count.stuck ] && grep -q 'No progress' $m/verdicts/02-count-code.md \
-  && bash scripts/factory/next.sh demo | grep -q '02-count .*ESCALATE' \
+  && grep -q '02-count .*ESCALATE' <<<"$(bash scripts/factory/next.sh demo)" \
   && t "two rounds failing the same way escalate without a third (D84)" || fail "stuck" "$(ls $m/state; bash scripts/factory/next.sh demo | head -12)"
 git reset -q --hard "$head"
 cat > $m/verdicts/02-count-code.md <<V
@@ -513,6 +521,23 @@ grep -q '(3)' "$work/metrics.md" && grep -q 'patch guard | 1' "$work/metrics.md"
 grep -q 'factory-worker: gw/maker-1' "$work/metrics.md" && grep -q 'factory-worker-heavy: gw/maker-1' "$work/metrics.md" \
   && grep -q 'factory-contract-critic: gw/judge-1' "$work/metrics.md" \
   && t "metrics: models of every role, from the runs workflow.sh recorded (D77)" || fail "metrics models" "$(grep -i model "$work/metrics.md")"
+hand0="$(sed -n 's/^| Hand commits in the mission[^|]*| \([0-9]*\) |$/\1/p' "$work/metrics.md")"
+echo "// hand repair" >> src/tools/hello.js; git commit -qam "fix: hand repair"
+bash scripts/factory/metrics.sh demo > "$work/metrics2.md"; git revert --no-edit HEAD >/dev/null
+hand1="$(sed -n 's/^| Hand commits in the mission[^|]*| \([0-9]*\) |$/\1/p' "$work/metrics2.md")"
+[ -n "$hand0" ] && [ "$hand1" = $((hand0 + 1)) ] && t "metrics: a hand commit counts as an intervention; script commits carry Factory-Script (D89)" || fail "hand commits" "$hand0 → $hand1"
+# D87: the hook's dependency link never costs a round.
+ln -s "$work" node_modules; echo 'export const extra = 1;' > src/tools/extra.js
+git add -N node_modules src/tools/extra.js; git diff --relative > "$work/hook.patch"; git reset -q node_modules src/tools/extra.js; rm -f node_modules src/tools/extra.js
+node scripts/factory/patch-paths.mjs strip-hook "$work/hook.patch" "$work/hook.clean" "node_modules .venv" 2>"$work/strip.log"
+! grep -q node_modules "$work/hook.clean" && grep -q 'src/tools/extra.js' "$work/hook.clean" && grep -q 'dropped node_modules' "$work/strip.log" \
+  && bash scripts/factory/patch-guard.sh "$work/hook.clean" >/dev/null && ! bash scripts/factory/patch-guard.sh "$work/hook.patch" >/dev/null \
+  && t "a worktree's node_modules link is dropped from the patch before the guard; other links still block (D87)" || fail "strip hook" "$(cat "$work/strip.log" "$work/hook.clean")"
+# D88: a misspelled frozen-paths heading stops the mission.
+cp $m/spec.md "$work/spec.keep"; printf '\n## Frozen path\n- src/\n' >> $m/spec.md
+out="$(bash scripts/factory/next.sh demo)"; cp "$work/spec.keep" $m/spec.md
+echo "$out" | grep -q '^STEP: blocked' && echo "$out" | grep -q 'must be exactly "## Frozen paths"' \
+  && t "next.sh blocks a misspelled '## Frozen paths' heading (D88)" || fail "frozen heading" "$out"
 grep -q 'Tokens (usage.tsv, D85) | 1 runs' "$work/metrics.md" && t "metrics: tokens from usage.tsv" || fail "metrics tokens" "$(grep -i token "$work/metrics.md")"
 
 echo "Health ratchet"
@@ -701,6 +726,63 @@ MAKERS_KEY=env-key-4711 node scripts/factory/models-probe.mjs >"$work/probe.log"
   && t "probe: two gateways pass, keys never printed" || fail "two gateways ok" "$(cat "$work/probe.log")"
 kill $g1 $g2; wait $g1 $g2 2>/dev/null || true
 git checkout -q -- .pi .factory; rm -f "$PI_CODING_AGENT_DIR/models.json"
+
+# D90: the cockpit's snapshot comes from the mission's files, nothing else.
+bash scripts/factory/status.sh demo --json > "$work/status.json" || fail "status.sh" "$(cat "$work/status.json")"
+STEP_NOW="$(FACTORY_NOTIFY=0 bash scripts/factory/next.sh demo | sed -n 's/^STEP: //p')" node -e '
+const s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); const m = s.missions[0];
+const ok = m.name === "demo" && m.step === process.env.STEP_NOW && m.counts.total === 2 && m.counts.pass === 2
+  && m.tickets[1].blockedBy.join() === "01" && m.tickets[1].assertions[0].id === "VAL-HELLO-002" && /Given two greetings/.test(m.tickets[1].assertions[0].given)
+  && m.interventions.target === 5 && m.interventions.human >= 2 && m.contract.total === 2
+  && m.log.some((e) => e.kind === "integrated" && e.ticket === "01-hello") && m.log.some((e) => e.kind === "verdict" && e.ticket === "02-count")
+  && m.log.some((e) => e.kind === "decision") && !m.log.some((e) => /state$/.test(e.text));
+process.exit(ok ? 0 : 1);' "$work/status.json" && t "status.sh --json: the step next.sh gives, tickets with preconditions and expected behavior, interventions, a log of events without checkpoints (D90)" || fail "status json" "$(head -c 3000 "$work/status.json")"
+printf '**Ticket:** 02-count\n\nShould the count start at zero?\n' > $m/state/open-question.md
+bash scripts/factory/status.sh --all --json > "$work/all.json"
+node -e '
+const s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); const m = s.missions.find((x) => x.name === "demo");
+process.exit(m && m.step === "decide" && m.needs[0].kind === "decide" && m.needs.some((n) => /start at zero/.test(n.text) || /factory-decide/.test(n.text)) ? 0 : 1);' "$work/all.json" \
+  && t "status.sh --all: every mission, an open question shows as needs-you" || fail "status all" "$(head -c 2000 "$work/all.json")"
+rm -f $m/state/open-question.md
+here_branch="$(git branch --show-current)"; git switch -q -c cockpit-side; echo side > $m/state/side.txt; git add $m/state/side.txt; git commit -qm "test: state on another branch"; git switch -q "$here_branch"
+bash scripts/factory/status.sh --all --json > "$work/all.json"
+node -e '
+const s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); const m = s.missions.find((x) => x.name === "demo");
+process.exit(m && m.step === "other-branch" && m.otherBranch === "cockpit-side" && !m.human && m.needs.length === 0 ? 0 : 1);' "$work/all.json" \
+  && t "status.sh: a mission whose state is on another branch shows where, not as needs-you" || fail "status other branch" "$(head -c 1500 "$work/all.json")"
+git branch -q -D cockpit-side
+bash scripts/factory/cockpit.sh --once "$work/cockpit" >/dev/null && [ -s "$work/cockpit/index.html" ] && grep -q '"missions"' "$work/cockpit/state.json" \
+  && [ -z "$(git status --porcelain -- .scratch)" ] && t "cockpit.sh --once writes the page and its snapshot outside the repo, read-only" || fail "cockpit once" "$(ls "$work/cockpit"; git status --porcelain)"
+
+# D86: one command opens the MR from /pr's body.
+out="$(FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo --dry-run 2>&1)" && fail "mr.sh must refuse without a PR body"
+echo "$out" | grep -q 'run /pr first' && t "mr.sh refuses without a PR body" || fail "mr no body" "$out"
+printf '# test(demo): characterize the hello tools\n\n## Summary\n\nTwo tools pinned.\n' > $m/pr.md
+out="$(FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo --dry-run 2>&1)"
+echo "$out" | grep -q "→ production" && echo "$out" | grep -q 'title: test(demo): characterize the hello tools' \
+  && t "mr.sh: title from the body's heading, target from FACTORY_MR_TARGET" || fail "mr dry" "$out"
+cur="$(git rev-parse --abbrev-ref HEAD)"
+out="$(FACTORY_MR_TARGET=production FACTORY_MR_BLOCKED_BRANCHES="other/* ${cur%%/*}*" bash scripts/factory/mr.sh demo --dry-run 2>&1)" && fail "mr.sh must refuse a blocked branch"
+echo "$out" | grep -q 'FACTORY_MR_BLOCKED_BRANCHES' && t "mr.sh refuses a branch that deploys (FACTORY_MR_BLOCKED_BRANCHES)" || fail "mr blocked" "$out"
+out="$(FACTORY_MR_TARGET="$cur" bash scripts/factory/mr.sh demo --dry-run 2>&1)" && fail "mr.sh must refuse the target itself"
+printf '# chore: x [skip ci]\n' > "$work/skip.md"; cp $m/pr.md "$work/pr.keep"; cp "$work/skip.md" $m/pr.md
+out="$(FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo --dry-run 2>&1)" && fail "mr.sh must refuse a title that skips CI"
+cp "$work/pr.keep" $m/pr.md; t "mr.sh refuses the target branch itself and a title that skips CI"
+git init -q --bare "$work/origin.git"; git remote remove origin 2>/dev/null || true; git remote add origin "$work/origin.git"
+mkdir -p "$work/bin"; cat > "$work/bin/glab" <<'GLAB'
+#!/usr/bin/env bash
+case "$1 $2" in
+  "auth status") exit 0 ;;
+  "mr list") echo '[]' ;;
+  "mr create") printf '%s\n' "$@" > "$GLAB_LOG"; echo "https://gitlab.example/g/p/-/merge_requests/7" ;;
+esac
+GLAB
+chmod +x "$work/bin/glab"
+GLAB_LOG="$work/glab.log" PATH="$work/bin:$PATH" FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo >"$work/mr.log" 2>&1 || fail "mr glab" "$(cat "$work/mr.log")"
+git ls-remote --heads "$work/origin.git" "$cur" | grep -q . && grep -qx 'production' "$work/glab.log" && grep -qx 'test(demo): characterize the hello tools' "$work/glab.log" \
+  && grep -q '^## Summary' "$work/glab.log" && ! grep -q '^# test' "$work/glab.log" && grep -q 'merge_requests/7' $m/mr.url \
+  && t "mr.sh pushes the branch and opens the MR with glab; heading becomes the title, the rest the description (D86)" || fail "mr glab create" "$(cat "$work/mr.log" "$work/glab.log")"
+git remote remove origin; rm -f $m/pr.md $m/mr.url
 
 if [ -n "${mono:-}" ]; then
   [ "$(cat "$mono/projects/other/keep.js")" = keep ] && [ -z "$(git -C "$mono" log --format=%H -- projects/other README.md | awk 'NR > 1')" ] \

@@ -34,6 +34,11 @@ step() {                                  # <code> <human explanation>
 
 # D67: a misspelled name or a switched branch stops here, before any step.
 if ! why="$(mission_guard "$feature")"; then step blocked "$why"; fi
+# D88: a misspelled "## Frozen paths" heading would silently unfreeze the code
+# the mission must not touch; stop before any step builds on it.
+if [ -f "$spec" ] && bad="$(grep -nE '^#{1,6}[[:space:]]*[Ff]rozen' "$spec" | grep -vE ':## Frozen paths[[:space:]]*$' | head -1)" && [ -n "$bad" ]; then
+  step blocked "spec.md line ${bad%%:*} reads \"${bad#*:}\": the heading must be exactly \"## Frozen paths\" or the patch guard freezes nothing. Fix it, then next.sh again"
+fi
 if [ -f "$dir/state/PAUSED.md" ]; then
   step paused "resume: scripts/factory/pause.sh resume $feature (shows where it stopped), then next.sh again"
 fi
@@ -153,4 +158,4 @@ if [ "$(verdict_field "$h" Result)" != "PASS" ]; then
 fi
 unverified_step "$h" "code steward"
 
-step pr "scripts/factory/metrics.sh $feature → /pr (Evidence), open the MR, then /retro"
+step pr "scripts/factory/metrics.sh $feature → /pr (Evidence, written to $dir/pr.md) → scripts/factory/mr.sh $feature opens the MR → /retro"

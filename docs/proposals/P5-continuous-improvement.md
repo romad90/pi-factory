@@ -25,6 +25,8 @@ Every worker, reviewer and steward report gets an **Observations** section: fric
 - An observation is **never acted on in the ticket**. It is recorded, the ticket stays in scope.
 - `collect.sh` appends observations to a per-repo **codebase journal** (`docs/factory/journal.md`), deduplicated by location. The journal is the memory the agents don't have.
 
+**Patterns become rules.** Factory's Missions learn skills from repeated work (observe, learn, encode). Ours is the retro's "three times, automate", run by the factory: when the same pattern appears in three round journals (D84), three decisions in `decisions.tsv` or three findings, the strategist proposes the rule it suggests (a resolver rule, a brief line, a ticket-writer check) with the three pieces of evidence. The human accepts or rejects it like any proposal; nothing changes on its own.
+
 ### 2. Decide: a strategist proposes, the human chooses
 
 A strategist run (the code steward's role extended, or its own agent from the judges' family) reads:
