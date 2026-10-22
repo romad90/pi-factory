@@ -40,8 +40,8 @@ bash "$root/scripts/factory/install-into.sh" "$repo" --pack api --pack batch >"$
 [ -f docs/factory/prompts/audit-gaps.md ] && [ -f docs/factory/prompts/security-audit.md ] && t "read-only prompts installed" || fail "prompts"
 [ -f docs/agents/factory.md ] && grep -q 'docs/agents/factory.md' AGENTS.md && ! grep -q 'END OF BRIEF' AGENTS.md \
   && t "AGENTS.md gets a pointer, the factory rules live in docs/agents/factory.md" || fail "AGENTS.md pointer" "$(cat AGENTS.md)"
-b="$(bash scripts/factory/brief.sh worker probe 01 HEAD)"   # captured: grep -q on a pipe can SIGPIPE the writer
-grep -q '^Read: docs/agents/factory.md' <<<"$b" && ! grep -q 'AGENTS.md' <<<"$b" \
+brief_out="$(bash scripts/factory/brief.sh worker probe 01 HEAD)"   # captured: grep -q closing the pipe early made this flaky
+grep -q '^Read: docs/agents/factory.md' <<<"$brief_out" && ! grep -q 'AGENTS.md' <<<"$brief_out" \
   && t "briefs name the factory rules, not AGENTS.md (already in context)" || fail "brief read list"
 [ -f docs/agents/contract-checklist-api.md ] && [ -f docs/agents/quality-bar-batch.md ] && [ ! -f docs/agents/contract-checklist-bots.md ] \
   && t "only the requested practice packs are installed" || fail "packs" "$(ls docs/agents)"
@@ -319,6 +319,13 @@ draft="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/draft
 git -C "$wt" switch -q -c not-a-worker
 [ "$(bash scripts/factory/locate-patch.sh demo 01-hello 2>/dev/null)" = "$draft" ] \
   && t "locate-patch falls back to the draft when no worktree is left (D73)" || fail "draft fallback" "$(bash scripts/factory/locate-patch.sh demo 01-hello 2>&1)"
+mkdir -p "$work/tmp/other-run"; echo 'diff --git a/x b/x' > "$work/tmp/other-run/01-hello.patch"; echo '{"cwd":"/elsewhere/repo"}' > "$work/tmp/other-run/meta.json"
+[ "$(TMPDIR="$work/tmp" bash scripts/factory/locate-patch.sh demo 01-hello 2>/dev/null)" = "$draft" ] \
+  && t "locate-patch ignores a temp patch from another checkout with the same mission name" || fail "foreign patch" "$(TMPDIR="$work/tmp" bash scripts/factory/locate-patch.sh demo 01-hello 2>&1)"
+printf '{"cwd":"%s"}' "$(git rev-parse --show-toplevel)" > "$work/tmp/other-run/meta.json"
+[ "$(TMPDIR="$work/tmp" bash scripts/factory/locate-patch.sh demo 01-hello 2>/dev/null)" = "$work/tmp/other-run/01-hello.patch" ] \
+  && t "locate-patch takes a temp patch whose run names this checkout" || fail "own patch" "$(TMPDIR="$work/tmp" bash scripts/factory/locate-patch.sh demo 01-hello 2>&1)"
+rm -rf "$work/tmp"
 git -C "$wt" switch -q pi-subagents/01-hello-abc123-s0-t0; git branch -q -D not-a-worker
 printf 'Tried the default export; ruled out a class (the test imports a function).\n' | (cd "$wt_project" && bash scripts/factory/journal.sh demo) >/dev/null \
   || fail "journal.sh" "worker could not write its journal"
@@ -514,6 +521,23 @@ grep -q '(3)' "$work/metrics.md" && grep -q 'patch guard | 1' "$work/metrics.md"
 grep -q 'factory-worker: gw/maker-1' "$work/metrics.md" && grep -q 'factory-worker-heavy: gw/maker-1' "$work/metrics.md" \
   && grep -q 'factory-contract-critic: gw/judge-1' "$work/metrics.md" \
   && t "metrics: models of every role, from the runs workflow.sh recorded (D77)" || fail "metrics models" "$(grep -i model "$work/metrics.md")"
+hand0="$(sed -n 's/^| Hand commits in the mission[^|]*| \([0-9]*\) |$/\1/p' "$work/metrics.md")"
+echo "// hand repair" >> src/tools/hello.js; git commit -qam "fix: hand repair"
+bash scripts/factory/metrics.sh demo > "$work/metrics2.md"; git revert --no-edit HEAD >/dev/null
+hand1="$(sed -n 's/^| Hand commits in the mission[^|]*| \([0-9]*\) |$/\1/p' "$work/metrics2.md")"
+[ -n "$hand0" ] && [ "$hand1" = $((hand0 + 1)) ] && t "metrics: a hand commit counts as an intervention; script commits carry Factory-Script (D89)" || fail "hand commits" "$hand0 → $hand1"
+# D87: the hook's dependency link never costs a round.
+ln -s "$work" node_modules; echo 'export const extra = 1;' > src/tools/extra.js
+git add -N node_modules src/tools/extra.js; git diff --relative > "$work/hook.patch"; git reset -q node_modules src/tools/extra.js; rm -f node_modules src/tools/extra.js
+node scripts/factory/patch-paths.mjs strip-hook "$work/hook.patch" "$work/hook.clean" "node_modules .venv" 2>"$work/strip.log"
+! grep -q node_modules "$work/hook.clean" && grep -q 'src/tools/extra.js' "$work/hook.clean" && grep -q 'dropped node_modules' "$work/strip.log" \
+  && bash scripts/factory/patch-guard.sh "$work/hook.clean" >/dev/null && ! bash scripts/factory/patch-guard.sh "$work/hook.patch" >/dev/null \
+  && t "a worktree's node_modules link is dropped from the patch before the guard; other links still block (D87)" || fail "strip hook" "$(cat "$work/strip.log" "$work/hook.clean")"
+# D88: a misspelled frozen-paths heading stops the mission.
+cp $m/spec.md "$work/spec.keep"; printf '\n## Frozen path\n- src/\n' >> $m/spec.md
+out="$(bash scripts/factory/next.sh demo)"; cp "$work/spec.keep" $m/spec.md
+echo "$out" | grep -q '^STEP: blocked' && echo "$out" | grep -q 'must be exactly "## Frozen paths"' \
+  && t "next.sh blocks a misspelled '## Frozen paths' heading (D88)" || fail "frozen heading" "$out"
 grep -q 'Tokens (usage.tsv, D85) | 1 runs' "$work/metrics.md" && t "metrics: tokens from usage.tsv" || fail "metrics tokens" "$(grep -i token "$work/metrics.md")"
 
 echo "Health ratchet"
@@ -703,6 +727,33 @@ MAKERS_KEY=env-key-4711 node scripts/factory/models-probe.mjs >"$work/probe.log"
 kill $g1 $g2; wait $g1 $g2 2>/dev/null || true
 git checkout -q -- .pi .factory; rm -f "$PI_CODING_AGENT_DIR/models.json"
 
+# D90: the cockpit's snapshot comes from the mission's files, nothing else.
+bash scripts/factory/status.sh demo --json > "$work/status.json" || fail "status.sh" "$(cat "$work/status.json")"
+STEP_NOW="$(FACTORY_NOTIFY=0 bash scripts/factory/next.sh demo | sed -n 's/^STEP: //p')" node -e '
+const s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); const m = s.missions[0];
+const ok = m.name === "demo" && m.step === process.env.STEP_NOW && m.counts.total === 2 && m.counts.pass === 2
+  && m.tickets[1].blockedBy.join() === "01" && m.tickets[1].assertions[0].id === "VAL-HELLO-002" && /Given two greetings/.test(m.tickets[1].assertions[0].given)
+  && m.interventions.target === 5 && m.interventions.human >= 2 && m.contract.total === 2
+  && m.log.some((e) => e.kind === "integrated" && e.ticket === "01-hello") && m.log.some((e) => e.kind === "verdict" && e.ticket === "02-count")
+  && m.log.some((e) => e.kind === "decision") && !m.log.some((e) => /state$/.test(e.text));
+process.exit(ok ? 0 : 1);' "$work/status.json" && t "status.sh --json: the step next.sh gives, tickets with preconditions and expected behavior, interventions, a log of events without checkpoints (D90)" || fail "status json" "$(head -c 3000 "$work/status.json")"
+printf '**Ticket:** 02-count\n\nShould the count start at zero?\n' > $m/state/open-question.md
+bash scripts/factory/status.sh --all --json > "$work/all.json"
+node -e '
+const s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); const m = s.missions.find((x) => x.name === "demo");
+process.exit(m && m.step === "decide" && m.needs[0].kind === "decide" && m.needs.some((n) => /start at zero/.test(n.text) || /factory-decide/.test(n.text)) ? 0 : 1);' "$work/all.json" \
+  && t "status.sh --all: every mission, an open question shows as needs-you" || fail "status all" "$(head -c 2000 "$work/all.json")"
+rm -f $m/state/open-question.md
+here_branch="$(git branch --show-current)"; git switch -q -c cockpit-side; echo side > $m/state/side.txt; git add $m/state/side.txt; git commit -qm "test: state on another branch"; git switch -q "$here_branch"
+bash scripts/factory/status.sh --all --json > "$work/all.json"
+node -e '
+const s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); const m = s.missions.find((x) => x.name === "demo");
+process.exit(m && m.step === "other-branch" && m.otherBranch === "cockpit-side" && !m.human && m.needs.length === 0 ? 0 : 1);' "$work/all.json" \
+  && t "status.sh: a mission whose state is on another branch shows where, not as needs-you" || fail "status other branch" "$(head -c 1500 "$work/all.json")"
+git branch -q -D cockpit-side
+bash scripts/factory/cockpit.sh --once "$work/cockpit" >/dev/null && [ -s "$work/cockpit/index.html" ] && grep -q '"missions"' "$work/cockpit/state.json" \
+  && [ -z "$(git status --porcelain -- .scratch)" ] && t "cockpit.sh --once writes the page and its snapshot outside the repo, read-only" || fail "cockpit once" "$(ls "$work/cockpit"; git status --porcelain)"
+
 # D86: one command opens the MR from /pr's body.
 out="$(FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo --dry-run 2>&1)" && fail "mr.sh must refuse without a PR body"
 echo "$out" | grep -q 'run /pr first' && t "mr.sh refuses without a PR body" || fail "mr no body" "$out"
@@ -732,6 +783,81 @@ git ls-remote --heads "$work/origin.git" "$cur" | grep -q . && grep -qx 'product
   && grep -q '^## Summary' "$work/glab.log" && ! grep -q '^# test' "$work/glab.log" && grep -q 'merge_requests/7' $m/mr.url \
   && t "mr.sh pushes the branch and opens the MR with glab; heading becomes the title, the rest the description (D86)" || fail "mr glab create" "$(cat "$work/mr.log" "$work/glab.log")"
 git remote remove origin; rm -f $m/pr.md $m/mr.url
+
+# D91: the scripted lead runs a mission's loop with no LLM lead.
+echo "Scripted lead (run.sh)"
+r=.scratch/runner; mkdir -p $r/issues
+printf '# Runner\n**Intent:** feature\n\nA run file.\n\n## Validation contract\n\n### VAL-RUN-001: runs\n**Kind:** code\nGiven the tool, when it runs, then it returns ok.\n' > $r/spec.md
+printf 'FACTORY_LINT_CMD="true"\nFACTORY_TEST_CMD="true"\n' > .factory/commands.env
+git add -A; git commit -qm "test: runner mission"
+mkdir -p "$work/bin"
+# A pi stand-in: checks how run.sh calls it, plays the contract wave, prints pi's JSON events.
+cat > "$work/bin/fakepi" <<'PI'
+#!/usr/bin/env bash
+printf '%s\n' "$*" > "$PI_ARGS_LOG"; echo "$FACTORY_DRIVE_WORKFLOW" >> "$PI_ARGS_LOG"
+echo "No findings. Critique result: approve" > .scratch/runner/contract-critique.md
+echo '{"type":"session"}'
+echo '{"type":"tool_execution_end","toolName":"subagent","isError":false,"result":{"content":[{"type":"text","text":"Workflow completed."}],"details":{"workflow":{"value":[{"key":"contract-critic","output":"approve"}]}}}}'
+PI
+chmod +x "$work/bin/fakepi"; mkdir -p "$work/pi dir"; cp "$work/bin/fakepi" "$work/pi dir/pi bin"
+out="$(PI_ARGS_LOG="$work/pi.args" FACTORY_PI_BIN="$work/pi dir/pi bin" bash scripts/factory/run.sh runner --no-preflight 2>&1)" || fail "run.sh contract" "$out"
+grep -q -- '-p --mode json' "$work/pi.args" && grep -q 'driver.mjs --model factory-driver/script' "$work/pi.args" && grep -q 'workflows/.*-contract.js' "$work/pi.args" \
+  && echo "$out" | grep -q '^STEP: approve' && echo "$out" | grep -q 'WAITING: human (approve)' \
+  && grep -q -- '--approve' "$work/pi.args" \
+  && t "run.sh: pi in JSON mode (path with spaces, project trusted so the guard loads) with the driver as the model runs the contract wave, then stops at G1 (D91)" || fail "run.sh pi-json" "$out
+$(cat "$work/pi.args")"
+bash scripts/factory/human.sh approve runner >/dev/null
+# The fake runner plays every agent from the wave file, as the real ones would write.
+ok_patch run.test.js 'ok' 2>/dev/null || printf 'diff --git a/tests/run.test.js b/tests/run.test.js\nnew file mode 100644\n--- /dev/null\n+++ b/tests/run.test.js\n@@ -0,0 +1 @@\n+ok\n' > "$work/run.test.js.patch"
+cat > "$work/bin/fakerun" <<'FAKE'
+#!/usr/bin/env bash
+set -euo pipefail
+wf="$1"; r=.scratch/runner; . scripts/factory/lib.sh; mkdir -p $r/verdicts
+bid() { node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const m=s.match(/const ITEMS = (\[[\s\S]*?\n\]);/);const it=JSON.parse(m[1]).find(i=>i.key===process.argv[2])||JSON.parse(m[1])[0];console.log((it.task.match(/brief-id: (\S+)/)||[])[1]||"")' "$wf" "$1"; }
+bcommit() { local sha t; for sha in $(grep -oE '[0-9a-f]{40}' "$wf" | sort -u); do for t in - ""; do [ "$(brief_id "$1" runner "$t" "$sha")" = "$2" ] && { echo "$sha"; return; }; done; done; }
+echo "$(basename "$wf")" >> "$FAKE_LOG"
+case "$wf" in
+  *-tickets*.js) printf '# 01 run\n**Size:** S\n## Covers\nVAL-RUN-001\n' > $r/issues/01-run.md; echo '{"output":"1 ticket"}' ;;
+  *-build-wave*.js)
+    if [ ! -f "$FAKE_STATE.429" ]; then touch "$FAKE_STATE.429"; echo '[{"ticket":"01-run","patch":null,"ok":false,"error":"429 Too Many Requests: rate limit"}]'
+    else echo "[{\"ticket\":\"01-run\",\"patch\":\"$FAKE_PATCH\",\"ok\":true}]"; fi ;;
+  *-review-wave*.js)
+    printf '# Verdict: 01-run\n**Result:** PASS\n**Commit:** %s\n**Brief:** %s\n\n## Assertions\n- VAL-RUN-001: PASS — tests/run.test.js "runs"\n' "$(ticket_marker runner 01-run)" "$(bid 01-run)" > $r/verdicts/01-run-code.md
+    echo '[{"ticket":"01-run","output":"PASS"}]' ;;
+  *-validate*.js)
+    printf '# Verdict: behavior\n**Result:** PASS\n**Commit:** %s\n**Brief:** %s\n\n## Assertions\n- VAL-RUN-001: PASS — tests/run.test.js\n' "$(bcommit validator "$(bid behavior)")" "$(bid behavior)" > $r/verdicts/behavior.md
+    echo '{"output":"PASS"}' ;;
+  *-steward*.js)
+    { printf '# Verdict: health\n**Result:** PASS\n**Commit:** %s\n**Brief:** %s\n\n## Bar\n' "$(bcommit code-steward "$(bid code-steward)")" "$(bid code-steward)"
+      for q in QB-SAFE-01 QB-CLEAR-01 QB-TEST-01 QB-PRED-01; do echo "- $q: PASS — tests/run.test.js reviewed"; done
+      printf '\n## Explanations\n### tests/run.test.js\nWhat, how, what can go wrong.\n\n## Findings\n- none\n'; } > $r/verdicts/health.md
+    echo '{"output":"PASS"}' ;;
+  *) echo "unexpected wave $wf"; exit 1 ;;
+esac
+FAKE
+chmod +x "$work/bin/fakerun"
+export FAKE_LOG="$work/fake.log" FAKE_STATE="$work/fake" FAKE_PATCH="$work/run.test.js.patch"
+out="$(FACTORY_RUNNER=fake FACTORY_FAKE_RUNNER="$work/bin/fakerun" bash scripts/factory/run.sh runner --no-preflight 2>&1)" || fail "run.sh tickets" "$out"
+echo "$out" | grep -q 'WAITING: human (approve-tickets)' && [ -f $r/issues/01-run.md ] && t "run.sh: tickets wave, then stops for the human's approval" || fail "run.sh tickets" "$out"
+bash scripts/factory/human.sh approve runner tickets >/dev/null
+rc=0; out="$(FACTORY_RUNNER=fake FACTORY_FAKE_RUNNER="$work/bin/fakerun" bash scripts/factory/run.sh runner --no-preflight 2>&1)" || rc=$?
+[ "$rc" = 3 ] && [ -f $r/state/PAUSED.md ] && [ ! -f $r/verdicts/01-run-code.md ] && echo "$out" | grep -q 'provider error' \
+  && t "run.sh: a 429 from a worker pauses the mission, no round, exit 3 (D58)" || fail "run.sh provider" "rc=$rc $out"
+out="$(FACTORY_RUNNER=fake FACTORY_FAKE_RUNNER="$work/bin/fakerun" bash scripts/factory/run.sh runner --no-preflight 2>&1)" || fail "run.sh to pr" "$out"
+echo "$out" | grep -q '^STEP: pr' && echo "$out" | grep -q 'WAITING: human (pr)' && [ -f tests/run.test.js ] \
+  && grep -q 'review-wave' "$FAKE_LOG" && grep -q 'validate' "$FAKE_LOG" && grep -q 'steward' "$FAKE_LOG" \
+  && t "run.sh: resumes, builds, integrates, reviews, validates, checks health and stewards up to the MR, unattended" || fail "run.sh to pr" "$out"
+runlogs="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/runs/runner"
+! compgen -G "$r/logs/*.jsonl" >/dev/null && ! compgen -G "$r/logs/*.result.json" >/dev/null && [ -z "$(git ls-files $r | grep -E 'jsonl|result\.json|\.err$')" ] && ls "$runlogs"/*-contract.jsonl >/dev/null 2>&1 && ls "$runlogs"/*-review-wave.result.json >/dev/null 2>&1 \
+  && t "run.sh keeps raw runner output in the git folder, never in the committed mission folder" || fail "run logs" "$(ls -R $r "$runlogs" 2>&1 | head -40)"
+pe() { bash -c '. scripts/factory/lib.sh; provider_error_line "$1"' _ "$1"; }
+[ -n "$(pe 'Error: 429 Too Many Requests')" ] && [ -n "$(pe 'HTTP 503 Service Unavailable')" ] && [ -n "$(pe 'rate limit exceeded')" ] \
+  && [ -z "$(pe 'Tests: 500 passed, 2 failed')" ] && [ -z "$(pe 'expected 500, got 404')" ] \
+  && t "provider errors are recognised by their shape, not by any 429 or 5xx in the text" || fail "provider_error_line"
+bash scripts/factory/gate.sh mission runner >"$work/gate.log" 2>&1 && t "the mission run.sh drove passes the gates (G1-G5)" || fail "run.sh gate" "$(cat "$work/gate.log")"
+out="$(FACTORY_RUNNER=fake FACTORY_FAKE_RUNNER=/bin/false bash scripts/factory/run.sh runner --no-preflight --max-steps 0 2>&1)" && fail "run.sh must stop past --max-steps"
+echo "$out" | grep -q 'more than 0 steps' && t "run.sh: a step budget stops a loop that would not end" || fail "max steps" "$out"
+unset FAKE_LOG FAKE_STATE FAKE_PATCH
 
 # D92: install once per machine (P11). Models per machine, then a project on the package.
 echo "Install once (D92)"
