@@ -30,5 +30,5 @@ done
 
 decision_log "$feature" "$ticket" reset "reset the ticket to round 1" "${3:-reset by hand}"
 git add -- "$dir"
-git commit -q -m "chore($feature): reset $ticket" -- "$dir"
+git commit -q -m "chore($feature): reset $ticket" -m "Factory-Script: reset-ticket" -- "$dir"
 echo "Reset $ticket ($removed files): $(git rev-parse --short HEAD). Next build starts at round 1."

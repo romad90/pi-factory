@@ -22,6 +22,6 @@ git add -- "$dir"
 if git diff --cached --quiet -- "$dir"; then
   echo "State already committed."
 else
-  git commit -q -m "chore(factory): $name state" -- "$dir"
+  git commit -q -m "chore(factory): $name state" -m "Factory-Script: checkpoint" -- "$dir"
   echo "Committed state: $(git rev-parse --short HEAD)"
 fi

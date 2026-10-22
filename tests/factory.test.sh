@@ -40,7 +40,8 @@ bash "$root/scripts/factory/install-into.sh" "$repo" --pack api --pack batch >"$
 [ -f docs/factory/prompts/audit-gaps.md ] && [ -f docs/factory/prompts/security-audit.md ] && t "read-only prompts installed" || fail "prompts"
 [ -f docs/agents/factory.md ] && grep -q 'docs/agents/factory.md' AGENTS.md && ! grep -q 'END OF BRIEF' AGENTS.md \
   && t "AGENTS.md gets a pointer, the factory rules live in docs/agents/factory.md" || fail "AGENTS.md pointer" "$(cat AGENTS.md)"
-bash scripts/factory/brief.sh worker probe 01 HEAD | grep -q '^Read: docs/agents/factory.md' && ! bash scripts/factory/brief.sh worker probe 01 HEAD | grep -q 'AGENTS.md' \
+brief_out="$(bash scripts/factory/brief.sh worker probe 01 HEAD)"   # captured: grep -q closing the pipe early made this flaky
+grep -q '^Read: docs/agents/factory.md' <<<"$brief_out" && ! grep -q 'AGENTS.md' <<<"$brief_out" \
   && t "briefs name the factory rules, not AGENTS.md (already in context)" || fail "brief read list"
 [ -f docs/agents/contract-checklist-api.md ] && [ -f docs/agents/quality-bar-batch.md ] && [ ! -f docs/agents/contract-checklist-bots.md ] \
   && t "only the requested practice packs are installed" || fail "packs" "$(ls docs/agents)"
@@ -318,6 +319,13 @@ draft="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/draft
 git -C "$wt" switch -q -c not-a-worker
 [ "$(bash scripts/factory/locate-patch.sh demo 01-hello 2>/dev/null)" = "$draft" ] \
   && t "locate-patch falls back to the draft when no worktree is left (D73)" || fail "draft fallback" "$(bash scripts/factory/locate-patch.sh demo 01-hello 2>&1)"
+mkdir -p "$work/tmp/other-run"; echo 'diff --git a/x b/x' > "$work/tmp/other-run/01-hello.patch"; echo '{"cwd":"/elsewhere/repo"}' > "$work/tmp/other-run/meta.json"
+[ "$(TMPDIR="$work/tmp" bash scripts/factory/locate-patch.sh demo 01-hello 2>/dev/null)" = "$draft" ] \
+  && t "locate-patch ignores a temp patch from another checkout with the same mission name" || fail "foreign patch" "$(TMPDIR="$work/tmp" bash scripts/factory/locate-patch.sh demo 01-hello 2>&1)"
+printf '{"cwd":"%s"}' "$(git rev-parse --show-toplevel)" > "$work/tmp/other-run/meta.json"
+[ "$(TMPDIR="$work/tmp" bash scripts/factory/locate-patch.sh demo 01-hello 2>/dev/null)" = "$work/tmp/other-run/01-hello.patch" ] \
+  && t "locate-patch takes a temp patch whose run names this checkout" || fail "own patch" "$(TMPDIR="$work/tmp" bash scripts/factory/locate-patch.sh demo 01-hello 2>&1)"
+rm -rf "$work/tmp"
 git -C "$wt" switch -q pi-subagents/01-hello-abc123-s0-t0; git branch -q -D not-a-worker
 printf 'Tried the default export; ruled out a class (the test imports a function).\n' | (cd "$wt_project" && bash scripts/factory/journal.sh demo) >/dev/null \
   || fail "journal.sh" "worker could not write its journal"
@@ -448,7 +456,7 @@ echo 'export const count = (n) => n - 1;' > src/tools/count.js; git diff -- src 
 bash scripts/factory/integrate.sh demo 02-count "$work/02c.patch" >/dev/null 2>&1 || true
 [ ! -f $m/state/02-count.stuck ] && bash scripts/factory/integrate.sh demo 02-count "$work/02c.patch" >/dev/null 2>&1 || true
 [ -f $m/state/02-count.stuck ] && grep -q 'No progress' $m/verdicts/02-count-code.md \
-  && bash scripts/factory/next.sh demo | grep -q '02-count .*ESCALATE' \
+  && grep -q '02-count .*ESCALATE' <<<"$(bash scripts/factory/next.sh demo)" \
   && t "two rounds failing the same way escalate without a third (D84)" || fail "stuck" "$(ls $m/state; bash scripts/factory/next.sh demo | head -12)"
 git reset -q --hard "$head"
 cat > $m/verdicts/02-count-code.md <<V
@@ -513,6 +521,23 @@ grep -q '(3)' "$work/metrics.md" && grep -q 'patch guard | 1' "$work/metrics.md"
 grep -q 'factory-worker: gw/maker-1' "$work/metrics.md" && grep -q 'factory-worker-heavy: gw/maker-1' "$work/metrics.md" \
   && grep -q 'factory-contract-critic: gw/judge-1' "$work/metrics.md" \
   && t "metrics: models of every role, from the runs workflow.sh recorded (D77)" || fail "metrics models" "$(grep -i model "$work/metrics.md")"
+hand0="$(sed -n 's/^| Hand commits in the mission[^|]*| \([0-9]*\) |$/\1/p' "$work/metrics.md")"
+echo "// hand repair" >> src/tools/hello.js; git commit -qam "fix: hand repair"
+bash scripts/factory/metrics.sh demo > "$work/metrics2.md"; git revert --no-edit HEAD >/dev/null
+hand1="$(sed -n 's/^| Hand commits in the mission[^|]*| \([0-9]*\) |$/\1/p' "$work/metrics2.md")"
+[ -n "$hand0" ] && [ "$hand1" = $((hand0 + 1)) ] && t "metrics: a hand commit counts as an intervention; script commits carry Factory-Script (D89)" || fail "hand commits" "$hand0 → $hand1"
+# D87: the hook's dependency link never costs a round.
+ln -s "$work" node_modules; echo 'export const extra = 1;' > src/tools/extra.js
+git add -N node_modules src/tools/extra.js; git diff --relative > "$work/hook.patch"; git reset -q node_modules src/tools/extra.js; rm -f node_modules src/tools/extra.js
+node scripts/factory/patch-paths.mjs strip-hook "$work/hook.patch" "$work/hook.clean" "node_modules .venv" 2>"$work/strip.log"
+! grep -q node_modules "$work/hook.clean" && grep -q 'src/tools/extra.js' "$work/hook.clean" && grep -q 'dropped node_modules' "$work/strip.log" \
+  && bash scripts/factory/patch-guard.sh "$work/hook.clean" >/dev/null && ! bash scripts/factory/patch-guard.sh "$work/hook.patch" >/dev/null \
+  && t "a worktree's node_modules link is dropped from the patch before the guard; other links still block (D87)" || fail "strip hook" "$(cat "$work/strip.log" "$work/hook.clean")"
+# D88: a misspelled frozen-paths heading stops the mission.
+cp $m/spec.md "$work/spec.keep"; printf '\n## Frozen path\n- src/\n' >> $m/spec.md
+out="$(bash scripts/factory/next.sh demo)"; cp "$work/spec.keep" $m/spec.md
+echo "$out" | grep -q '^STEP: blocked' && echo "$out" | grep -q 'must be exactly "## Frozen paths"' \
+  && t "next.sh blocks a misspelled '## Frozen paths' heading (D88)" || fail "frozen heading" "$out"
 grep -q 'Tokens (usage.tsv, D85) | 1 runs' "$work/metrics.md" && t "metrics: tokens from usage.tsv" || fail "metrics tokens" "$(grep -i token "$work/metrics.md")"
 
 echo "Health ratchet"

@@ -471,6 +471,12 @@ Steps: **1 Assisted** (one agent, you hold the context), **2 Parallel** (~10 age
 **D85. Tokens per run are recorded.** `usage.sh` reads pi-subagents' per-run metadata (`*_meta.json`: usage, model, duration) and appends each factory run once to `.scratch/<mission>/usage.tsv`; integration and collection run it, and the metrics show the totals. Best effort: no metadata, no line.
 
 **D86. One command opens the merge request.** After mission 3 the human retyped a body from the terminal into GitLab. `mr.sh <mission>` takes `/pr`'s body (`.scratch/<mission>/pr.md`; its `# ` heading becomes the title), pushes the branch and opens the MR against `FACTORY_MR_TARGET`: with glab when it is logged in, else the GitLab API with the token named by `FACTORY_GITLAB_TOKEN_ENV`, else push options and the body to paste. Run again, it updates the open MR. It refuses the target branch itself, branches listed in `FACTORY_MR_BLOCKED_BRANCHES` (some branch names deploy when pushed) and a title that would skip CI. Opening the MR stays the human's act: the script is run by a person, never by the lead.
+
+**D87. The worktree hook's links never cost a round.** In mission 3, 3 of 18 rounds were blocked by the patch guard for a `node_modules` link: the hook links dependencies into each worktree (D65), and a link escapes a `node_modules/` ignore rule. `integrate.sh` now drops, before the guard, new links named like a `FACTORY_DEPS_LINKS` entry and `.env.factory`, and says so; any other link is still blocked.
+
+**D88. A misspelled frozen-paths heading stops the mission.** `## Frozen path` (singular) would have frozen nothing for a mission that is not maintenance. `next.sh` blocks on any heading starting with "Frozen" that is not exactly `## Frozen paths`.
+
+**D89. Hand commits are counted.** P8 counts a manual commit as an intervention, but the metrics only counted decisions: mission 3 showed 4 while four repairs were done by hand. Every commit a factory script makes now carries a `Factory-Script:` trailer; `metrics.sh` counts the others since the spec commit.
 ---
 
 ## 11. Path to Step 2

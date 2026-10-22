@@ -9,6 +9,10 @@
 //   node patch-paths.mjs project <in> <out> <prefix> <repo-root> <project-dir>
 //       rewrites root-relative paths to project-relative; exit 3 when a file
 //       is outside the project
+//   node patch-paths.mjs strip-hook <in> <out> "<names>"
+//       drops what the worktree hook added (D87): new symbolic links named
+//       like a dependency link (node_modules .venv ...) and .env.factory, at
+//       any depth; prints each dropped path on stderr
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
@@ -115,11 +119,30 @@ function project(inp, out, prefix, top, dir) {
   return 0;
 }
 
+function stripHook(inp, out, names) {
+  const keep = new Set(names.split(/\s+/).filter(Boolean));
+  const { lines, files } = parse(readFileSync(inp, "utf8"));
+  const base = (p) => (p || "").split("/").pop();
+  const drop = files.filter((f) => f.status === "A" && ((f.mode === "120000" && keep.has(base(f.new))) || base(f.new) === ".env.factory"));
+  if (!drop.length) { writeFileSync(out, lines.join("\n")); return 0; }
+  const starts = files.map((f) => f.header[0]);
+  const gone = new Set();
+  for (const f of drop) {
+    const i = files.indexOf(f), from = starts[i], to = i + 1 < starts.length ? starts[i + 1] : lines.length;
+    for (let k = from; k < to; k++) gone.add(k);
+    process.stderr.write(`dropped ${f.new} (added by the worktree hook, D65)\n`);
+  }
+  writeFileSync(out, lines.filter((_, k) => !gone.has(k)).join("\n"));
+  return 0;
+}
+
 const [cmd, ...args] = process.argv.slice(2);
 if (cmd === "list") {
   for (const f of parse(readFileSync(args[0], "utf8")).files) process.stdout.write([f.status, f.old ?? "", f.new ?? "", f.mode].join("\x1f") + "\n");
+} else if (cmd === "strip-hook") {
+  process.exit(stripHook(...args));
 } else if (cmd === "project") {
   process.exit(project(...args));
 } else if (cmd) {
-  console.error("usage: patch-paths.mjs list <patch> | project <in> <out> <prefix> <repo-root> <project-dir>"); process.exit(2);
+  console.error("usage: patch-paths.mjs list <patch> | project <in> <out> <prefix> <repo-root> <project-dir> | strip-hook <in> <out> <names>"); process.exit(2);
 }
