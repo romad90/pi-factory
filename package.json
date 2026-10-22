@@ -1,15 +1,32 @@
 {
   "name": "pi-factory",
-  "version": "1.4.0-rc.17",
+  "version": "1.4.0-rc.18",
   "description": "An agentic software factory on Pi: deterministic loop, gates and state in git; models, runtime and skills rented behind thin pinned adapters.",
   "license": "MIT",
   "private": true,
-  "keywords": ["pi-package", "pi", "agents", "software-factory"],
-  "bin": { "factory": "scripts/factory/factory.sh" },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "agents",
+    "software-factory"
+  ],
+  "bin": {
+    "factory": "scripts/factory/factory.sh"
+  },
   "pi": {
-    "extensions": [".pi/extensions/factory-guard.ts"],
-    "prompts": [".pi/prompts"],
-    "skills": [".pi/skills"],
-    "subagents": { "agents": [".pi/agents/factory"] }
+    "extensions": [
+      ".pi/extensions/factory-guard.ts"
+    ],
+    "prompts": [
+      ".pi/prompts"
+    ],
+    "skills": [
+      ".pi/skills"
+    ],
+    "subagents": {
+      "agents": [
+        ".pi/agents/factory"
+      ]
+    }
   }
 }
