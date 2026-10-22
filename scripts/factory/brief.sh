@@ -40,12 +40,14 @@ text="$(sed -e "s|{{FEATURE}}|$feature|g" -e "s|{{TICKET}}|$shown_ticket|g" \
     -e "s|{{BRIEF_ID}}|$id|g" "$template")"
 # The commands integration runs and the frozen paths (D61, D62). Commands may
 # hold | or &, so plain bash replacement (quoted: & stays literal).
-if [[ "$text" == *"{{LINT_CMD}}"* || "$text" == *"{{TEST_CMD}}"* || "$text" == *"{{FROZEN}}"* ]]; then
+if [[ "$text" == *"{{LINT_CMD}}"* || "$text" == *"{{TEST_CMD}}"* || "$text" == *"{{FROZEN}}"* || "$text" == *"{{FROZEN_TESTS}}"* ]]; then
   load_commands
   frozen="$(frozen_paths "$(mission_dir "$feature")/spec.md" | sed 's/.*/`&`/' | paste -sd, - | sed 's/,/, /g')"
   text="${text//"{{LINT_CMD}}"/"\`${FACTORY_LINT_CMD:-none configured}\`"}"
   text="${text//"{{TEST_CMD}}"/"\`${FACTORY_TEST_CMD:-none configured}\`"}"
   text="${text//"{{FROZEN}}"/"${frozen:-none}"}"
+  ftests="$(frozen_tests "$(mission_dir "$feature")/spec.md" | sed 's/.*/`&`/' | paste -sd, - | sed 's/,/, /g')"
+  text="${text//"{{FROZEN_TESTS}}"/"${ftests:-none}"}"
 fi
 printf '%s\n' "$text"
 printf '\nbrief-id: %s\n' "$id"

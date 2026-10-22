@@ -41,6 +41,7 @@ The goal is not more code, faster: it is the day correction and maintenance run 
 |---|---|---|---|---|
 | New behavior to build | **Feature mission** | `/grill-with-docs`, `/to-spec` (`**Intent:** feature`), `/factory <f>` | contract, tickets, tested and reviewed code, MR | available |
 | Legacy code nobody dares to change | **Maintenance mission** (characterization) | spec with `**Intent:** maintenance`, `/factory <f>` | tests that pin today's behavior, bugs included; glossary and docs. `src/` is frozen (D61) | available; a lane of its own is planned (proposal P3) |
+| Change the structure of code whose behavior is pinned; bring it under `AGENTS.md` | **Refactor mission** | spec with `**Intent:** refactor` and `## Frozen tests` (the characterization tests), `/factory <f>` | the same behavior, new structure, every `AGENTS.md` rule it applies cited; the frozen tests never change (D93) | available |
 | A small, contained fix | **Fix lane** | `/factory-fix <slug> start "<what>"` | one reviewed commit, at most 80 lines, no behavior path touched | available |
 | A change made by hand needs a second pair of eyes | **Light review** | `/factory-light <slug> <base>` | a verdict from another model family, checked by the MR gate | available |
 | You don't know where a repo is weak | **Audit and gaps** (read-only) | the `audit-gaps.md` prompt, with any agent | findings with evidence, the characterization test and acceptance criteria for each, questions | prompt available; becomes the discovery phase of proposal P3 |
@@ -55,8 +56,9 @@ The goal is not more code, faster: it is the day correction and maintenance run 
 Legacy code is where most of the work is, and where a fix most easily breaks something else. The lanes chain in a fixed order:
 
 ```text
-audit and gaps  →  you triage  →  characterization  →  fix missions  →  launch gate
-  (read-only)      (decisions)    (freeze behavior)    (red, then green)  (it runs)
+audit and gaps  →  you triage  →  characterization  →  refactor  →  fix missions  →  launch gate
+  (read-only)      (decisions)    (freeze behavior)    (new shape,  (red, then green)  (it runs)
+                                                      same tests)
 ```
 
 1. **Audit and gaps** finds the problems and proves each one with `file:line`. It changes nothing.

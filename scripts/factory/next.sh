@@ -36,8 +36,15 @@ step() {                                  # <code> <human explanation>
 if ! why="$(mission_guard "$feature")"; then step blocked "$why"; fi
 # D88: a misspelled "## Frozen paths" heading would silently unfreeze the code
 # the mission must not touch; stop before any step builds on it.
-if [ -f "$spec" ] && bad="$(grep -nE '^#{1,6}[[:space:]]*[Ff]rozen' "$spec" | grep -vE ':## Frozen paths[[:space:]]*$' | head -1)" && [ -n "$bad" ]; then
-  step blocked "spec.md line ${bad%%:*} reads \"${bad#*:}\": the heading must be exactly \"## Frozen paths\" or the patch guard freezes nothing. Fix it, then next.sh again"
+if [ -f "$spec" ] && bad="$(grep -nE '^#{1,6}[[:space:]]*[Ff]rozen' "$spec" | grep -vE ':## Frozen (paths|tests)[[:space:]]*$' | head -1)" && [ -n "$bad" ]; then
+  step blocked "spec.md line ${bad%%:*} reads \"${bad#*:}\": the heading must be exactly \"## Frozen paths\" or \"## Frozen tests\", or the patch guard freezes nothing. Fix it, then next.sh again"
+fi
+# D93: a refactor is only safe against tests that pin today's behavior.
+if [ -f "$spec" ] && [ "$(verdict_field "$spec" Intent)" = refactor ]; then
+  ft="$(frozen_tests "$spec")"
+  [ -n "$ft" ] || step blocked "a refactor needs the tests that pin today's behavior: list them under \"## Frozen tests\" in spec.md (e.g. - test/characterization/), then next.sh again"
+  missing=""; while IFS= read -r p; do case "$p" in *[*?]*) continue ;; esac; [ -e "$p" ] || missing="$missing $p"; done <<<"$ft"
+  [ -z "$missing" ] || step blocked "## Frozen tests names what doesn't exist here:$missing. Run the refactor on a branch that has the characterization tests"
 fi
 if [ -f "$dir/state/PAUSED.md" ]; then
   step paused "resume: scripts/factory/pause.sh resume $feature (shows where it stopped), then next.sh again"
