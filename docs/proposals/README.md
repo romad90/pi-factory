@@ -17,6 +17,7 @@ Status: **draft** (open for discussion) · **accepted** (in the roadmap) · **re
 | P9 | [Rounds that converge: reproduce first, carry what was learned, doubt the contract early](P9-converging-rounds.md) | draft | — |
 | P10 | [Front page: every subagent, at every stage, on one page](P10-front-page.md) | draft | — (P2 completes the events) |
 | P11 | [Install the factory once per machine; onboard a project with only what is its own](P11-install-once.md) | draft | — |
+| P12 | [A durable runner: the mission survives a closed laptop, and the human answers from anywhere](P12-durable-run.md) | draft | P2 |
 
 ## Why these four, in this order
 
@@ -44,3 +45,5 @@ The [assessment after mission 2](assessment-2026-10.md) sorts all of them and th
 P11 comes from mission 3's first day: a pulled branch brought another machine's models, two machines ran two factory versions, and every release was a 25-file diff in the project. The factory belongs to the machine; a project keeps what is its own.
 
 Smaller ideas seen in other tools, not yet proposals, are collected in [ideas to borrow](ideas.md).
+
+P12 answers P2's open question with Pi Durable, a library from Pi's authors that saves every step before running it: the mission keeps running when the laptop closes, questions wait as approvals any client can answer, and the cockpit gets a live feed. The files stay the source of truth, so the factory still works without it.
