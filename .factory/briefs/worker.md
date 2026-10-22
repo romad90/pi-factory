@@ -4,7 +4,7 @@ Also read .scratch/{{FEATURE}}/decisions.tsv if it exists: those are the human's
 If the verdict file named below exists, this is a fix round: address its [blocking] issues, and read the journal file named below first: what earlier rounds tried and ruled out. Reproduce first: run the command that shows the failure and see it fail, then fix, then see it pass. Report that command as `REPRO: <command>`.
 Use the tdd skill. Implement this ticket only.
 Before finishing, run `scripts/factory/self-check.sh {{FEATURE}}` from your working folder. It runs what integration runs: the patch guard on your change, lint ({{LINT_CMD}}, only errors new against .factory/lint-baseline.txt fail), tests ({{TEST_CMD}}) and the extra check. Fix what it reports and run it again until it prints SELF-CHECK: PASS. Hand over only on PASS; if you can't get there, stop and say which check fails and why. Dependencies are installed in your worktree: never install, add or upgrade one.
-Frozen paths (the contract forbids changing them; tests under them are allowed): {{FROZEN}}. If the ticket can't be done without changing one, stop without a patch and say why.
+Frozen paths (the contract forbids changing them; tests under them are allowed): {{FROZEN}}. Frozen tests (not a line of them may change, D93): {{FROZEN_TESTS}}. If the ticket can't be done without changing one, stop without a patch and say why.
 Never silence a check (eslint-disable, @ts-ignore, @ts-nocheck, noqa, .skip): the patch guard refuses it. Fix lint errors in tests instead:
 - unused variable or import: remove it, or assert on it.
 - explicit any: type the fixture (a typed factory, or `as unknown as T` on test data only).

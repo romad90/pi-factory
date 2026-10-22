@@ -158,6 +158,23 @@ pg_frozen deploy/values.yaml prefix; pg_frozen yarn.lock glob
 printf '# Frz\n**Intent:** maintenance\n\n## Frozen paths\n- none\n' > .scratch/frz/spec.md
 printf '%b' "$src_patch" > "$work/fz.patch"
 bash scripts/factory/patch-guard.sh "$work/fz.patch" --mission frz >/dev/null && t "frozen: '- none' unfreezes a maintenance mission" || fail "frozen none"
+# D93: a refactor changes the code, never the tests that pin its behavior.
+mkdir -p .scratch/refac
+printf '# Refac\n**Intent:** refactor\n\n## Validation contract\n' > .scratch/refac/spec.md
+out="$(bash scripts/factory/next.sh refac)"
+grep -q '^STEP: blocked' <<<"$out" && grep -q 'list them under "## Frozen tests"' <<<"$out" && t "a refactor without frozen tests does not start (D93)" || fail "refactor needs tests" "$out"
+printf '# Refac\n**Intent:** refactor\n\n## Frozen tests\n- `tests/missing/`\n\n## Validation contract\n' > .scratch/refac/spec.md
+out="$(bash scripts/factory/next.sh refac)"
+grep -q 'names what doesn.t exist here: tests/missing/' <<<"$out" && t "a refactor whose frozen tests are not on this branch does not start" || fail "refactor tests exist" "$out"
+mkdir -p tests/pinned; echo 'it("pins", () => {});' > tests/pinned/a.test.js
+printf '# Refac\n**Intent:** refactor\n\n## Frozen tests\n- `tests/pinned/`\n\n## Validation contract\n' > .scratch/refac/spec.md
+printf 'diff --git a/tests/pinned/a.test.js b/tests/pinned/a.test.js\n--- a/tests/pinned/a.test.js\n+++ b/tests/pinned/a.test.js\n@@ -1 +1 @@\n-it("pins", () => {});\n+it.todo("pins");\n' > "$work/rf.patch"
+if bash scripts/factory/patch-guard.sh "$work/rf.patch" --mission refac >"$work/pg.log"; then fail "refactor must refuse a change to a frozen test"; fi
+grep -q '^BLOCKED frozen-tests: tests/pinned/a.test.js' "$work/pg.log" && t "refactor: a frozen test can't change, though it is a test file (D93)" || fail "frozen tests" "$(cat "$work/pg.log")"
+printf '%b' "$src_patch" > "$work/rf.patch"
+bash scripts/factory/patch-guard.sh "$work/rf.patch" --mission refac >/dev/null && t "refactor: the code itself is free to change" || fail "refactor src" "$(bash scripts/factory/patch-guard.sh "$work/rf.patch" --mission refac)"
+grep -qF 'Frozen tests (not a line of them may change, D93): `tests/pinned/`' <<<"$(bash scripts/factory/brief.sh worker refac 01)" && t "the worker brief names the frozen tests" || fail "brief frozen tests"
+rm -rf .scratch/refac tests/pinned
 rm -rf .scratch/frz
 cmds0="$(git rev-parse HEAD)"; printf 'FACTORY_LINT_CMD="true"\nFACTORY_TEST_CMD="true"\n' > .factory/commands.env; git commit -qam "test: commands"
 if bash scripts/factory/integrate.sh maint 01-doc "$work/fz.patch" >"$work/int.log" 2>&1; then fail "integration must refuse a frozen path" "$(cat "$work/int.log")"; fi

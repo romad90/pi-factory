@@ -8,6 +8,7 @@
 #              (they may be the point of the fix), every other rule applies.
 #   --mission  also refuse the mission's frozen paths (D61); test files under
 #              them stay allowed (characterization tests live next to code).
+#              And its frozen tests (D93): no change at all, tests included.
 # Exit: 0 clean, 1 blocked (reasons on stdout, one per line).
 #
 # Blocks:
@@ -28,12 +29,13 @@ here="$(cd "$(dirname "$0")" && pwd)"
 
 usage="usage: patch-guard.sh <patch-file> [--human] [--mission <feature>]"
 patch="${1:?$usage}"; shift
-human=0; frozen=""; mission=""
+human=0; frozen=""; ftests=""; mission=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --human) human=1 ;;
     --mission) mission="${2:?$usage}"; shift
-               frozen="$(frozen_paths "$(mission_dir "$mission")/spec.md")" ;;
+               frozen="$(frozen_paths "$(mission_dir "$mission")/spec.md")"
+               ftests="$(frozen_tests "$(mission_dir "$mission")/spec.md")" ;;
     *) die "$usage" ;;
   esac
   shift
@@ -56,6 +58,8 @@ check_path() {                          # <path>
     block "paths: $f is in the instrument, hidden from workers (D21)"
   elif [ "$human" -eq 0 ] && [[ "$f" =~ $protected ]]; then
     block "paths: $f belongs to the factory, CI or hooks; agents never change them (a human does, through the fix lane)"
+  elif [ -n "$ftests" ] && is_frozen "$f" "$ftests"; then
+    block "frozen-tests: $f pins today's behavior for $mission (## Frozen tests in spec.md); a refactor never changes it. If it must change, this is not a refactor: stop and ask for an amendment"
   elif [ -n "$frozen" ] && ! is_test_file "$f" && is_frozen "$f" "$frozen"; then
     block "frozen: $f is frozen by the contract of $mission (## Frozen paths in spec.md); change tests or docs only, or ask for an amendment"
   fi

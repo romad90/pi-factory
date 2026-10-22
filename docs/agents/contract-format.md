@@ -5,7 +5,7 @@ Lives at the end of the mission's `spec.md`. Parsed by `scripts/factory/`; keep 
 The spec itself starts with an intent line, used by `metrics.sh` (D26):
 
 ```markdown
-**Intent:** feature | maintenance | bugfix | exploration
+**Intent:** feature | maintenance | refactor | bugfix | exploration
 ```
 
 A spec may freeze paths the mission must not change (D61). The patch guard refuses worker changes there before integration; test files under them stay allowed. A maintenance mission without this section freezes `src/`; write `- none` to freeze nothing.
@@ -17,6 +17,15 @@ A spec may freeze paths the mission must not change (D61). The patch guard refus
 ```
 
 `dir/` freezes everything under it; anything else is a glob (`*` crosses folders). Changing the list is a contract amendment.
+
+A refactor (D93) changes the code and must not change what it does. Its reference is the tests that pin today's behavior, usually written by an earlier maintenance mission; list them, and the factory refuses any change to them, tests included, and refuses to start without them:
+
+```markdown
+## Frozen tests
+- `test/characterization/`
+```
+
+A refactor's assertions are `Kind: code`: the structure it must reach, and each `AGENTS.md` rule it brings the code under, citing it with `- **Source:** AGENTS.md, <section>`. One `CROSS` assertion states that the frozen tests pass unchanged. A refactor writes no new behavior assertion: new behavior is a feature mission.
 
 ```markdown
 ## Validation contract

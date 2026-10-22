@@ -79,6 +79,16 @@ frozen_paths() {                       # <spec> → one pattern per line
     printf '%s\n' $FACTORY_FROZEN_MAINTENANCE
   fi
 }
+# Frozen tests (D93): in a refactor, the tests that pin today's behavior are
+# the reference, so not a line of them may change. Unlike frozen paths, the
+# test-file exception does not apply. From "## Frozen tests", same syntax.
+frozen_tests() {                       # <spec> → one pattern per line
+  [ -f "$1" ] && grep -q '^## Frozen tests' "$1" || return 0
+  awk '/^## Frozen tests/ { in_f = 1; next }
+       in_f && /^## /     { exit }
+       in_f && /^[-*][ \t]+/ { sub(/^[-*][ \t]+/, ""); gsub(/`/, ""); sub(/[ \t]+(—|-).*$/, "")
+                            if ($1 != "" && tolower($1) != "none") print $1 }' "$1"
+}
 is_frozen() {                          # <path> <patterns (newline-separated)>
   local p
   while IFS= read -r p; do
