@@ -308,7 +308,7 @@ project_apply() {                      # <git apply args...> <patch>
 # share: never committed, and it outlives the worker's worktree.
 draft_patch() {                        # <feature> <ticket>
   local common; common="$(git rev-parse --git-common-dir)"
-  case "$common" in /*) ;; *) common="$PWD/$common" ;; esac
+  case "$common" in /*) ;; *) common="$(cd "$PWD/$common" && pwd)" ;; esac   # no "../.." in a monorepo
   printf '%s/pi-factory/drafts/%s/%s.patch\n' "$common" "$1" "$2"
 }
 

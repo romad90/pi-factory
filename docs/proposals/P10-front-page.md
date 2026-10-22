@@ -1,6 +1,6 @@
 # P10. Front page: every subagent, at every stage, on one page
 
-**Status:** draft · **Effort:** M · **Depends on:** nothing to start; P2 makes the events complete
+**Status:** v1 built (D90): snapshot, page, zoom to the ticket; SSE, health thresholds and the phone view remain · **Effort:** M · **Depends on:** nothing to start; P2 makes the events complete
 
 ## Problem
 
