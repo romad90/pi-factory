@@ -75,35 +75,7 @@ put .factory/VERSION template
 mkdir -p "$dst/.factory/ci"
 # In a monorepo every project includes its own copy (D56): job names get the
 # project's slug, jobs run only when the project changed, from its folder.
-node - "$src/templates/gitlab/factory.gitlab-ci.yml" "$dst/.factory/ci/factory.gitlab-ci.yml" "$prefix" "$ci_mode" <<'NODE'
-const fs = require("fs");
-const [from, to, prefix, mode] = process.argv.slice(2);
-let y = fs.readFileSync(from, "utf8");
-const MR = /^(\s*)- if: \$CI_PIPELINE_SOURCE == "merge_request_event"$/gm;
-if (mode === "child") {
-  // D57: started by the parent's trigger job, which passes the MR's target
-  // and labels down; the parent already decides when this project changed.
-  const n = (y.match(MR) || []).length;
-  y = y.replace(MR, '$1- if: $CI_PIPELINE_SOURCE == "parent_pipeline" && $FACTORY_MR_TARGET');
-  if (!n || (y.match(/parent_pipeline/g) || []).length !== n) { console.error("CI template: child rules not rewritten; update install-into.sh"); process.exit(1); }
-}
-if (prefix) {
-  const slug = prefix.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");   // full path: two "bot" folders can't collide
-  const q = JSON.stringify(prefix);
-  const jobs = (y.match(/^[a-z][\w-]*:$/gm) || []).filter((k) => k !== "variables:").length;
-  y = y.replace(/^(factory-gate|factory-config|behavior-replay|factory-readiness):$/gm, `$1-${slug}:`)
-       .replace(MR, `$1- if: $CI_PIPELINE_SOURCE == "merge_request_event"\n$1  changes: [${JSON.stringify(prefix + "/**/*")}]`)
-       .replace(/^  script:\n/gm, `  script:\n    - cd ${q}\n`);
-  const renamed = (y.match(new RegExp(`^[a-z-]+-${slug}:$`, "gm")) || []).length;
-  const scoped = (y.match(/^\s+changes: \[/gm) || []).length + (y.match(/parent_pipeline/g) || []).length;
-  if (renamed !== jobs || scoped !== jobs) { console.error(`CI template: ${renamed}/${jobs} jobs renamed, ${scoped} scoped; update install-into.sh`); process.exit(1); }
-  y = `# Monorepo project: ${prefix}. Include from your CI with:\n#   include: [{ local: ${JSON.stringify(prefix + "/.factory/ci/factory.gitlab-ci.yml")} }]\n` + y;
-}
-if (mode === "child") {
-  y = `# Child pipeline (D57). The parent's trigger job must pass the MR down and wait for the result:\n#   variables: { FACTORY_MR_TARGET: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME, FACTORY_MR_LABELS: $CI_MERGE_REQUEST_LABELS }\n#   trigger: { include: <this project's CI file>, strategy: depend }\n` + y;
-}
-fs.writeFileSync(to, y);
-NODE
+node "$src/scripts/factory/project-files.cjs" ci "$src/templates/gitlab/factory.gitlab-ci.yml" "$dst/.factory/ci/factory.gitlab-ci.yml" "$prefix" "$ci_mode"
 for f in factory.md contract-format.md verdict-format.md bot-harness.md ticket-format.md; do
   put "docs/agents/$f" template
 done
@@ -127,26 +99,7 @@ mkdir -p "$dst/instrument/scenarios"
 [ -n "$(ls -A "$dst/instrument/scenarios")" ] || : > "$dst/instrument/scenarios/.gitkeep"
 
 # .pi/settings.json: add the factory's "subagents" block, keep everything else.
-node - "$src/.pi/settings.json" "$dst/.pi/settings.json" "$prefix" <<'NODE'
-const fs = require("fs");
-const [srcFile, dstFile, prefix] = process.argv.slice(2);
-const tpl = JSON.parse(fs.readFileSync(srcFile, "utf8"));
-const cur = fs.existsSync(dstFile) ? JSON.parse(fs.readFileSync(dstFile, "utf8")) : {};
-const had = !!cur.subagents;
-const { agentOverrides: _ignored, ...tplSub } = tpl.subagents;          // models live in agent frontmatter (D31)
-cur.subagents = { ...tplSub, ...(cur.subagents || {}) };
-// Retries on rate limits (mission 1: a shared quota of about 10 requests per
-// window); yours win if already set.
-if (tpl.retry && !cur.retry) cur.retry = tpl.retry;
-// In a monorepo the project is this folder, not the git root (D56).
-if (prefix) cur.subagents.projectRootResolution = "nearest";
-const ov = cur.subagents.agentOverrides || {};
-for (const k of Object.keys(ov)) if (k.startsWith("factory-")) delete ov[k];  // would crash pi-subagents
-if (cur.subagents.agentOverrides && !Object.keys(ov).length) delete cur.subagents.agentOverrides;
-fs.mkdirSync(require("path").dirname(dstFile), { recursive: true });
-fs.writeFileSync(dstFile, JSON.stringify(cur, null, 2) + "\n");
-console.log(`  .pi/settings.json: ${had ? "merged (your existing subagents values kept)" : "factory subagents block added"}${cur.retry ? ", retry on rate limits" : ""}`);
-NODE
+node "$src/scripts/factory/project-files.cjs" settings "$src/.pi/settings.json" "$dst/.pi/settings.json" "$prefix"
 
 # Health ratchet (D50): lock in the repo's current metrics once.
 if [ ! -f "$dst/.factory/health-baseline.json" ]; then

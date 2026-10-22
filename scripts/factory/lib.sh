@@ -15,9 +15,24 @@ if [ -z "${FACTORY_MAX_PARALLEL:-}" ] && [ -f .factory/commands.env ]; then
   FACTORY_MAX_PARALLEL="$(sed -n 's/^[[:space:]]*\(export[[:space:]]*\)\{0,1\}FACTORY_MAX_PARALLEL=["'"'"']\{0,1\}\([0-9][0-9]*\).*/\2/p' .factory/commands.env | tail -1)"
 fi
 FACTORY_MAX_PARALLEL="${FACTORY_MAX_PARALLEL:-4}"
-FACTORY_SKILLS_DIR="${FACTORY_SKILLS_DIR:-.pi/skills}"          # pinned skills (D36)
+# The factory's own files: in this project when it was copied in, else in the
+# package installed once per machine (P11, D92); scripts/factory is then a
+# local link to it.
+FACTORY_LIB_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+FACTORY_PACKAGE_ROOT="$(cd -P "$FACTORY_LIB_DIR/../.." && pwd)"
+# version_cmp a b → -1, 0 or 1 (x.y.z, a prerelease x.y.z-rc.N before x.y.z).
+version_cmp() {
+  node -e '
+const p = (v) => { const [core, pre] = String(v).replace(/^v/, "").split("-"); return [...core.split(".").map(Number), pre ? Number((pre.match(/\d+/) || [0])[0]) : Infinity]; };
+const a = p(process.argv[1]), b = p(process.argv[2]);
+for (let i = 0; i < 4; i++) if (a[i] !== b[i]) { console.log(a[i] < b[i] ? -1 : 1); process.exit(0); }
+console.log(0);' "$1" "$2"
+}
+factory_res() { if [ -e "$1" ]; then printf '%s' "$1"; else printf '%s' "$FACTORY_PACKAGE_ROOT/$1"; fi; }
+FACTORY_SKILLS_DIR="${FACTORY_SKILLS_DIR:-$(factory_res .pi/skills)}"   # pinned skills (D36)
 FACTORY_BRIEFS_DIR="${FACTORY_BRIEFS_DIR:-.factory/briefs}"     # brief templates (D32)
-FACTORY_AGENTS_DIR="${FACTORY_AGENTS_DIR:-.pi/agents/factory}"  # models live here (D31)
+# Agent files: $FACTORY_AGENTS_DIR, else .pi/agents/factory, else the installed
+# package's; models are resolved with the settings overrides (D31, D92).
 FACTORY_FIX_MAX_LINES="${FACTORY_FIX_MAX_LINES:-80}"            # fix-lane blast radius (D41)
 FACTORY_HEALTH_BASELINE="${FACTORY_HEALTH_BASELINE:-.factory/health-baseline.json}"  # ratchet (D50)
 # Source files the health checks and the steward look at (D49, D50).
@@ -143,12 +158,13 @@ verdict_history_count() {              # <verdict file> → count of <stem>.r<N>
   echo "$n"
 }
 
-# The model a factory agent is configured with (frontmatter). Verdicts carry
-# this, never the model's own guess about itself (D39).
+# The model a factory agent is configured with: its frontmatter, then the user's
+# and the project's agentOverrides, as pi-subagents resolves it (D92). Verdicts
+# carry this, never the model's own guess about itself (D39).
 agent_model() {                        # <agent name>
-  local f="$FACTORY_AGENTS_DIR/$1.md"
-  [ -f "$f" ] || { echo "unknown"; return 0; }
-  awk '/^---$/ { c++; next } c == 1 && /^model:/ { sub(/^model:[ \t]*/, ""); print; exit }' "$f"
+  local m
+  m="$(node "$FACTORY_LIB_DIR/effective-models.mjs" 2>/dev/null | awk -F'\t' -v n="$1" '$1 == n { print $2; exit }')"
+  echo "${m:-unknown}"
 }
 
 # record_verdict <file> <agent>: makes <file> the next round of its history.

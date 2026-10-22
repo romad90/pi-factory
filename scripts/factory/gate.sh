@@ -47,6 +47,11 @@ check_model() {                         # <file> <label> <agent>
   [ -f "$f" ] || return 0
   want="$(agent_model "$3")"; got="$(verdict_field "$f" Model)"
   [ "$got" = "none" ] && return 0
+  # D92: the configured model is resolved by effective-models.mjs; if that
+  # fails, say so rather than comparing against nothing.
+  node "$FACTORY_LIB_DIR/effective-models.mjs" >/dev/null 2>&1 \
+    || { bad "$label: can't resolve the configured models (node scripts/factory/effective-models.mjs fails)"; return 0; }
+  case "$want" in *'<'*) return 0 ;; esac   # D92: set per machine, not in the repo (package install)
   [ "$got" = "$want" ] || warn "$label: verdict model '${got:-none}' ≠ configured $3 model '$want' (model changed since?)"
 }
 

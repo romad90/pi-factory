@@ -1,6 +1,6 @@
 # P11. Install the factory once per machine; onboard a project with only what is its own
 
-**Status:** draft · **Effort:** M · **Depends on:** nothing to start; P2 and P10 fit on top
+**Status:** step 1 done, steps 2–5 shipped opt-in (D92) · **Effort:** M · **Depends on:** nothing to start; P2 and P10 fit on top
 
 ## Problem
 
@@ -66,8 +66,25 @@ A release that changes only the factory changes nothing in the projects.
 |---|---|
 | A factory release touches no project; project MRs show project changes only | A project no longer contains everything needed to run its missions; the package version is the contract (`.factory/VERSION`, checked at pre-flight and in CI) |
 | Models per machine, never pulled from another machine | Depends on pi-subagents applying `agentOverrides` to package agents; to verify on the pinned version before anything else |
-| Onboarding is one command, about 8 files | Migration of the projects already installed (bridge): a one-time `/factory-upgrade` that removes the copied factory files |
+| Onboarding is one command, about 8 files | Migration of the projects already installed: `factory onboard --migrate` removes the copied factory files (one MR) |
 | The cockpit (P10) and the scripted lead (P2) ship as extensions of the same package | Air-gapped or blocked-npm machines need a local or git install path; kept as an option |
+
+## Spike results (pi 1.3.0, pi-subagents 0.76.1)
+
+Read from pi-subagents' code (`src/agents/agents.js`), then checked against the installed packages with an isolated `PI_CODING_AGENT_DIR` and this repository as a local package (`"packages": ["<path>"]`):
+
+| Question | Answer | Evidence |
+|---|---|---|
+| Does a Pi package ship agents? | Yes: `pi.subagents.agents` (or a top-level `pi-subagents.agents`) in `package.json`, for packages in settings (`npm:`, `git:`, local path), under the agent dir's `npm/node_modules`, or in the global npm root | `discoverAgents` lists the 9 `factory-*` agents with `source: "package"` |
+| Prompts, skills, the guard extension? | Yes, from the `pi` manifest; dot-prefixed folders must be listed by path | Pi's `DefaultResourceLoader`: the 8 `factory*` prompts, 23 skills, `factory-guard.ts`, no diagnostics |
+| Do user `agentOverrides` apply to `factory-*` package agents? | Yes, model and thinking, over the frontmatter, placeholders included | `factory-worker` → `gw/maker-1`, thinking `medium`, from `~/.pi/agent/settings.json` |
+| And a project's? | Yes, and it wins over the user's | project `gw/project-model` over user `gw/maker-1` |
+| And on agents copied into the project? | Yes: the user override applies to project agents too | `source: "project"`, model from the user override |
+| Precedence of the same agent name | runtime > project > user > package > builtin | `effectiveAgentMatch` source ranks |
+
+The old restriction ("only builtin names in `agentOverrides`, `factory-*` crashes discovery") no longer holds on 0.76.1; `models-lint` stopped flagging it.
+
+Not resolved by the factory's own model readers: `agentOverridesByProvider` and `subagents.defaultModel`/`defaultThinking` (pi-subagents applies them; the factory's lint and records would not see them).
 
 ## Plan
 
@@ -76,7 +93,7 @@ A release that changes only the factory changes nothing in the projects.
 3. Models from the profile as user overrides; lint and probe read effective models. **S**
 4. Version check at pre-flight; CI through the pinned package. **S**
 5. `/factory-onboard` and `/factory-upgrade` (with the migration that removes copied files). **M**
-6. Migrate bridge after mission 3. **S**
+6. Migrate the projects already installed (`factory onboard --migrate`), one MR each. **S**
 
 ## Open questions
 

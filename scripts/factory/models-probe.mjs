@@ -17,8 +17,8 @@
 import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
+import { effectiveAgents } from "./effective-models.mjs";
 
-const AGENTS_DIR = ".pi/agents/factory";
 const STAMP = ".factory/models-probe.ok";
 import { homedir } from "node:os";
 const fallbackBase = (process.env.FACTORY_GATEWAY_URL || "").replace(/\/+$/, "");
@@ -31,11 +31,10 @@ const bad = (m) => { console.log(`  ✗ ${m}`); failed = true; };
 const warn = (m) => console.log(`  ! ${m}`);
 
 const field = (text, k) => (text.match(new RegExp(`^${k}:\\s*(.*)$`, "m")) || [])[1]?.trim();
-export function agentModels(dir = AGENTS_DIR) {
-  return readdirSync(dir).filter((f) => f.endsWith(".md")).map((f) => {
-    const fm = (readFileSync(join(dir, f), "utf8").match(/^---\n([\s\S]*?)\n---/) || [])[1] || "";
-    return { agent: field(fm, "name") || f, model: field(fm, "model") || "", thinking: field(fm, "thinking") || "off" };
-  });
+// Each agent's effective model (frontmatter, then user and project
+// agentOverrides, D92), from the project's agents or the installed package's.
+export function agentModels(dir) {
+  return effectiveAgents(dir).map((a) => ({ agent: a.name, model: a.model, thinking: a.thinking || "off" }));
 }
 // Hash of every (agent, model, thinking): the stamp is valid only for this set.
 // D79: the provider's URL is part of it, so moving a provider needs a new probe.
