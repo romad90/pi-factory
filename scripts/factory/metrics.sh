@@ -79,6 +79,17 @@ fi
 first="$(git log --reverse --format=%ct -- "$dir" | awk 'NR == 1')"
 last="$(git log -1 --format=%ct -- "$dir")"
 cycle="-"
+# D89: P8 counts a hand commit as an intervention. Every commit a factory
+# script makes carries a Factory-Script trailer; the others, from the
+# mission's first commit on, were made by hand (repairs, resets, merges).
+hand="-"
+start="$(git log --reverse --format=%H -- "$dir" | awk 'NR == 1')"
+if [ -n "$start" ]; then                 # after the spec commit, which is the human's by design
+  # first parent only: commits a merge from main brings in are nobody's repair
+  marked="$(git log --first-parent --no-merges --format='%(trailers:key=Factory-Script,valueonly)' "$start..HEAD" | grep -c . || true)"
+  total="$(git log --first-parent --no-merges --format=%H "$start..HEAD" | wc -l | tr -d ' ')"
+  if [ "$marked" -gt 0 ]; then hand=$(( total - marked )); else hand="not measured (mission started before D89)"; fi
+fi
 if [ -n "$first" ] && [ -n "$last" ]; then
   h=$(( (last - first) / 3600 ))
   cycle="$((h / 24))d $((h % 24))h"
@@ -104,6 +115,7 @@ cat <<EOF
 | Code steward, quality bar items (G5) | $steward |
 | Patches blocked by the patch guard | $guard |
 | Human decisions logged (target: 5 or fewer, P8) | $decisions |
+| Hand commits in the mission (each one an intervention, P8) | $hand |
 | Questions answered by the resolver (auto, unreviewed until a human reads them) | $auto |
 | Cycle time (first → last mission commit) | $cycle |
 | Tokens reported in verdicts | $( [ "$tokens" -gt 0 ] && echo "$tokens" || echo "not reported" ) |
