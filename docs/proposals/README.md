@@ -18,6 +18,7 @@ Status: **draft** (open for discussion) · **accepted** (in the roadmap) · **re
 | P10 | [Front page: every subagent, at every stage, on one page](P10-front-page.md) | draft | — (P2 completes the events) |
 | P11 | [Install the factory once per machine; onboard a project with only what is its own](P11-install-once.md) | draft | — |
 | P12 | [A durable runner: the mission survives a closed laptop, and the human answers from anywhere](P12-durable-run.md) | draft | P2 |
+| P13 | [Context repos: investigate across services, change only one](P13-context-repos.md) | draft | — |
 
 ## Why these four, in this order
 
@@ -47,3 +48,5 @@ P11 comes from mission 3's first day: a pulled branch brought another machine's 
 Smaller ideas seen in other tools, not yet proposals, are collected in [ideas to borrow](ideas.md).
 
 P12 answers P2's open question with Pi Durable, a library from Pi's authors that saves every step before running it: the mission keeps running when the laptop closes, questions wait as approvals any client can answer, and the cockpit gets a live feed. The files stay the source of truth, so the factory still works without it.
+
+P13 comes from a bug between an API and the two bots that keep it in sync. One mission still changes one repo; the others become read-only context, mapped by one fresh agent per repo, and an investigation step finds the cause and reproduces it in the repo being fixed before any contract is written.
