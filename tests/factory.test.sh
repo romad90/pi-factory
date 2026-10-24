@@ -876,6 +876,79 @@ out="$(FACTORY_RUNNER=fake FACTORY_FAKE_RUNNER=/bin/false bash scripts/factory/r
 echo "$out" | grep -q 'more than 0 steps' && t "run.sh: a step budget stops a loop that would not end" || fail "max steps" "$out"
 unset FAKE_LOG FAKE_STATE FAKE_PATCH
 
+# D98: the benchmark replays a real ticket with another model setup, scored by the gates.
+echo "Benchmark (D98)"
+head_before="$(git rev-parse HEAD)"; branch_before="$(git rev-parse --abbrev-ref HEAD)"
+cat > "$work/bin/fakebench" <<'FB'
+#!/usr/bin/env bash
+# <role> <case> <work-dir> <brief> <model> <thinking> <out-dir>
+set -euo pipefail
+role="$1" wd="$3" brief="$4" model="$5" thinking="$6" out="$7"
+echo "$role $2 $model $thinking" >> "$BENCH_LOG"
+grep -q 'brief-id:' "$brief" || { echo "no brief"; exit 1; }
+if [ "$role" = reviewer ]; then
+  m="${2%%--*}" tk="${2#*--}"; mkdir -p "$wd/.scratch/$m/verdicts"
+  printf '# Verdict: %s\n**Result:** %s\n' "$tk" "$([ "$model" = gw/judge-1 ] && echo PASS || echo FAIL)" > "$wd/.scratch/$m/verdicts/$tk-code.md"; exit 0
+fi
+[ "$role" = worker ] || exit 1
+case "$model" in
+  gw/maker-3) mkdir -p "$wd/.github"; echo x > "$wd/.github/ci.yml"; cost=0.1 ;;
+  gw/maker-2) mkdir -p "$wd/tests"; echo 'ok' > "$wd/tests/bench.test.js"; cost=0.2 ;;
+  *) mkdir -p "$wd/tests"; echo 'ok' > "$wd/tests/bench.test.js"; cost=0.5 ;;
+esac
+printf '{"turns":7,"input":1000,"output":200,"cost":%s}' "$cost" > "$out/usage.json"
+FB
+chmod +x "$work/bin/fakebench"
+export BENCH_LOG="$work/bench.log" FACTORY_BENCH_RUNNER="$work/bin/fakebench"
+printf '{"agents":{"factory-worker":{"model":"gw/maker-1","thinking":"medium"}}}' > "$work/p1.json"
+printf '{"agents":{"factory-worker":{"model":"gw/maker-2","thinking":"medium"}}}' > "$work/p2.json"
+printf '{"agents":{"factory-worker":{"model":"gw/maker-3","thinking":"high"}}}' > "$work/p3.json"
+int="$(git log --format='%H %s' | awk '$2 == "feat(runner):" && $3 == "01-run" { print $1 }' | tail -1)"
+bash scripts/factory/bench.sh add runner 01-run --area tooling --why "first ticket" >/dev/null
+c=.factory/bench/cases/runner--01-run
+[ "$(bash -c '. scripts/factory/lib.sh; awk -F"\t" "NR == 2 { print \$7, \$9, \$5, \$6 }" .factory/bench/cases.tsv')" = "easy $(git rev-parse "$int^") regression worker" ] \
+  && [ -f $c/issue.md ] && [ -f $c/spec.md ] && grep -q '"first_pass": true' $c/case.json \
+  && t "bench add: a case snapshots its ticket, starts before its first integration, easy because it passed first time" || fail "bench add" "$(cat .factory/bench/cases.tsv $c/case.json)"
+out="$(bash scripts/factory/bench.sh add runner 01-run 2>&1)" && fail "bench add must refuse a duplicate"
+out="$(bash scripts/factory/bench.sh run default --config "$work/p1.json" --label m1 2>&1)" || fail "bench run m1" "$out"
+grep -qP '^runner--01-run\teasy\ttooling\tyes\t-\t7\t1200\t0.5\t' .factory/bench/results/m1.tsv && grep -q 'worker runner--01-run gw/maker-1 medium' "$BENCH_LOG" \
+  && [ "$(git rev-parse HEAD)" = "$head_before" ] && [ "$(git rev-parse --abbrev-ref HEAD)" = "$branch_before" ] && [ ! -e tests/bench.test.js ] \
+  && [ -z "$(git worktree list | grep 'pi-factory/bench/wt-')" ] \
+  && t "bench run: the case passes the gates in a throwaway worktree; the real branch is untouched" || fail "bench run" "$out
+$(cat .factory/bench/results/m1.tsv)"
+bash scripts/factory/bench.sh run default --config "$work/p2.json" --label m2 >/dev/null 2>&1 || fail "bench run m2"
+out="$(bash scripts/factory/bench.sh run default --config "$work/p3.json" --label m3 2>&1)" || fail "bench run m3" "$out"
+grep -qP '^runner--01-run\teasy\ttooling\tno\tguard\t' .factory/bench/results/m3.tsv && echo "$out" | grep -q '0/1 passed' \
+  && t "bench run: a patch the guard refuses fails the case, with the gate named" || fail "bench gate" "$out"
+out="$(bash scripts/factory/bench.sh run default --config "$work/p1.json" --label dbg --case runner--01-run --debug 2>&1)" || fail "bench debug" "$out"
+kept="$(sed -n 's/^bench: kept \(.*\) (transcript.*/\1/p' <<<"$out")"
+[ -n "$kept" ] && [ -f "$kept/tests/bench.test.js" ] && git worktree remove --force "$(git -C "$kept" rev-parse --show-toplevel)" \
+  && t "bench run --case --debug: one case, worktree kept for inspection" || fail "bench debug" "$out"
+printf '{"agents":{"factory-worker":{"model":"gw/maker-1","thinking":"medium"},"factory-reviewer":{"model":"gw/judge-2"}}}' > "$work/p4.json"
+bash scripts/factory/bench.sh run default --config "$work/p4.json" --label rv --review >/dev/null 2>&1 || fail "bench review"
+grep -qP '^runner--01-run\teasy\ttooling\tno\treview\t' .factory/bench/results/rv.tsv && grep -q 'reviewer runner--01-run gw/judge-2' "$BENCH_LOG" \
+  && t "bench run --review: a case that passes the gates is reviewed; a FAIL verdict fails it" || fail "bench review" "$(cat .factory/bench/results/rv.tsv)"
+out="$(bash scripts/factory/bench.sh compare m1 m2 m3 --name trio 2>&1)" || fail "bench compare" "$out"
+head -1 <<<"$out" | grep -q '^3 configurations on suite default, 1 cases each, against the default m1; one variable changed in m2 (worker model: gw/maker-2)' \
+  && grep -q '^highest quality  m2' <<<"$out" && grep -q '^most efficient   m2' <<<"$out" && grep -q '^lowest cost      m3' <<<"$out" \
+  && grep -q '⚠ m3 differs from m1 by 2 variables (worker model, worker thinking)' <<<"$out" \
+  && node -e 'const c=require(process.argv[1]);process.exit(c.points.length===3&&c.points.find(p=>p.label==="m2").pareto&&!c.points.find(p=>p.label==="m1").pareto&&c.axes.includes("cost_per_trial")?0:1)' "$PWD/.factory/bench/compare/trio.json" \
+  && t "bench compare: the answer first, three recommendations, a warning when two variables changed, the cockpit's points" || fail "bench compare" "$out"
+if bash scripts/factory/bench.sh compare m1 m3 --strict >/dev/null 2>&1; then fail "compare --strict must refuse a two-variable comparison"; fi
+[ ! -f .factory/bench/compare/m1-vs-m3.json ] || fail "a refused comparison must write nothing"
+bash scripts/factory/status.sh --all --json > "$work/state-bench.json" 2>/dev/null
+node -e 'const s=require(process.argv[1]);const c=s.bench.find(b=>b.name==="trio");process.exit(c&&c.recommendations.length===3&&c.points.length===3?0:1)' "$work/state-bench.json" \
+  && t "the cockpit snapshot carries the comparisons for the Benchmarks view" || fail "bench in snapshot" "$(head -c 600 "$work/state-bench.json")"
+printf '# 02 follow-up\n**Size:** S\n## Covers\nVAL-RUN-001\nAdd a second line to the run file.\n' > "$work/02-followup.md"
+bash scripts/factory/bench.sh add-file "$work/02-followup.md" runner --area tooling >/dev/null
+out="$(bash scripts/factory/bench.sh probe default --config "$work/p2.json" 2>&1)" || fail "bench probe" "$out"
+lab="probe-$(git rev-parse --short HEAD)-p2"
+grep -qP '^runner--02-followup\tmedium\ttooling\tyes\t' ".factory/bench/results/$lab.tsv" && ! grep -q 'runner--01-run' ".factory/bench/results/$lab.tsv" \
+  && grep -q '"probe": true' ".factory/bench/results/$lab.json" \
+  && t "bench probe: follow-up cases run on today's code (how easy it is to change), regression cases don't" || fail "bench probe" "$out"
+git add .factory/bench; git commit -qm "test: bench data"
+unset BENCH_LOG FACTORY_BENCH_RUNNER
+
 # D92: install once per machine (P11). Models per machine, then a project on the package.
 echo "Install once (D92)"
 mkdir -p "$PI_CODING_AGENT_DIR"

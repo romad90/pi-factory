@@ -62,6 +62,13 @@ th{color:var(--soft);font-weight:600;font-size:12px}
 .empty{color:var(--dim);font-style:italic}
 .err{color:var(--red);padding:20px}
 .dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.recs{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+.rec .k{color:var(--soft);font-size:12px;text-transform:uppercase;letter-spacing:.8px}
+.rec .v{font-size:16px;font-weight:650;margin:4px 0}
+.warn{color:var(--amber);margin:6px 0}
+select{background:#12151B;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px 6px;font:inherit}
+.scatter text{fill:var(--soft);font-size:11px}
+.scatter .pt text{fill:var(--ink);font-size:12px}
 </style>
 </head>
 <body>
@@ -69,7 +76,7 @@ th{color:var(--soft);font-weight:600;font-size:12px}
   <h1>Factory Cockpit</h1>
   <nav class="crumbs" id="crumbs"></nav>
   <span class="spacer"></span>
-  <span class="keys"><b>L</b> leads · <b>M</b> mission · <b>R</b> rounds · <b>↑↓</b> ticket · <b>Enter</b> open · <b>Esc</b> up</span>
+  <span class="keys"><b>B</b> benchmarks · <b>L</b> leads · <b>M</b> mission · <b>R</b> rounds · <b>↑↓</b> ticket · <b>Enter</b> open · <b>Esc</b> up</span>
   <span class="age" id="age"></span>
 </header>
 <main id="app"><p class="muted">Loading state.json…</p></main>
@@ -78,7 +85,7 @@ th{color:var(--soft);font-weight:600;font-size:12px}
 let state = null, sel = 0, lastOk = 0;
 const $ = (s) => document.querySelector(s);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const route = () => { const p = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent); return { m: p[0] === "m" ? p[1] : "", t: p[2] === "t" ? p[3] : "" }; };
+const route = () => { const p = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent); return { m: p[0] === "m" ? p[1] : "", t: p[2] === "t" ? p[3] : "", b: p[0] === "bench" ? (p[1] || "-") : "" }; };
 const go = (m, t) => { location.hash = m ? `#/m/${encodeURIComponent(m)}${t ? `/t/${encodeURIComponent(t)}` : ""}` : "#/"; };
 const STATE_LABEL = { pass: "PASS", review: "review", build: "build", escalate: "ESCALATE", blocked: "blocked" };
 const pill = (s) => `<span class="pill s-${esc(s)}">${esc(STATE_LABEL[s] || s)}</span>`;
@@ -187,9 +194,52 @@ function ticketView(m, t) {
   </div>`;
 }
 
+// D98: Benchmarks, the factory engineer's view (bench.sh compare writes the files).
+const AXES = { pass_rate: "pass rate", cost_per_trial: "cost per trial", median_turns: "median turns", mean_seconds: "seconds per case", mean_rounds: "rounds" };
+let axX = "cost_per_trial", axY = "pass_rate";
+const fmtAx = (k, v) => k === "pass_rate" ? `${Math.round(v * 1000) / 10}%` : k === "cost_per_trial" ? `$${Number(v).toFixed(2)}` : String(Math.round(v * 10) / 10);
+function scatter(c) {
+  const W = 640, H = 320, P = 48, xs = c.points.map((p) => p[axX]), ys = c.points.map((p) => p[axY]);
+  const lo = (a) => Math.min(...a), hi = (a) => Math.max(...a);
+  const sx = (v) => P + (hi(xs) === lo(xs) ? (W - 2 * P) / 2 : (v - lo(xs)) / (hi(xs) - lo(xs)) * (W - 2 * P));
+  const sy = (v) => H - P - (hi(ys) === lo(ys) ? (H - 2 * P) / 2 : (v - lo(ys)) / (hi(ys) - lo(ys)) * (H - 2 * P));
+  return `<svg class="scatter" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="max-width:100%;height:auto" role="img" aria-label="${esc(AXES[axY])} versus ${esc(AXES[axX])}">
+    <line x1="${P}" y1="${H - P}" x2="${W - P / 2}" y2="${H - P}" stroke="#262B35"/><line x1="${P}" y1="${P / 2}" x2="${P}" y2="${H - P}" stroke="#262B35"/>
+    <text x="${W - P / 2}" y="${H - P + 30}" text-anchor="end">${esc(AXES[axX])} →</text><text x="${P - 8}" y="${P / 2}" text-anchor="end">↑</text>
+    ${c.points.map((p) => `<g class="pt"><circle cx="${sx(p[axX])}" cy="${sy(p[axY])}" r="6" fill="${p.label === c.default ? "#9AA3B2" : p.pareto ? "#3DD68C" : "#6CB4FF"}"/>
+      <text x="${sx(p[axX]) + (sx(p[axX]) > W / 2 ? -9 : 9)}" y="${sy(p[axY]) - 8}" text-anchor="${sx(p[axX]) > W / 2 ? "end" : "start"}">${esc(p.label)} · ${fmtAx(axY, p[axY])} · ${fmtAx(axX, p[axX])}</text></g>`).join("")}
+  </svg>`;
+}
+function benchView(name) {
+  const list = state.bench || [];
+  if (!list.length) return `<div class="panel"><h2>Benchmarks</h2><p class="empty">No comparison yet. bench.sh add, bench.sh run (one config per run), then bench.sh compare (D98).</p></div>`;
+  const c = list.find((x) => x.name === name) || list[0];
+  const opts = (sel) => Object.entries(AXES).map(([k, v]) => `<option value="${k}"${k === sel ? " selected" : ""}>${esc(v)}</option>`).join("");
+  const tbl = (key) => { const rows = c.breakdown?.[key] || []; if (!rows.length) return ""; const labels = c.points.map((p) => p.label);
+    return `<table><tr><th>${esc(key)}</th>${labels.map((l) => `<th>${esc(l)}</th>`).join("")}</tr>${rows.map((r) => `<tr><td>${esc(r[key])}</td>${labels.map((l) => `<td>${esc(r[l])}</td>`).join("")}</tr>`).join("")}</table>`; };
+  return `<div class="grid" style="gap:16px">
+    <div class="panel"><div class="row"><h2 style="margin:0">Benchmark · ${esc(c.name)}</h2>
+      ${list.length > 1 ? `<select id="bsel">${list.map((x) => `<option${x.name === c.name ? " selected" : ""}>${esc(x.name)}</option>`).join("")}</select>` : ""}</div>
+      <p style="margin:12px 0 4px">${esc(c.summary)}</p>${(c.warnings || []).map((w) => `<div class="warn">⚠ ${esc(w)}</div>`).join("")}</div>
+    <div class="grid recs">${c.recommendations.map((r) => `<div class="panel rec"><div class="k">${esc(r.kind)}</div><div class="v">${esc(r.label)}</div>
+      <div class="stat"><span><b>${fmtAx("pass_rate", r.pass_rate)}</b> pass</span><span><b>${fmtAx("cost_per_trial", r.cost_per_trial)}</b>/trial</span></div></div>`).join("")}</div>
+    <div class="panel"><div class="row"><h2 style="margin:0">Configurations</h2><span><select id="axy">${opts(axY)}</select> vs <select id="axx">${opts(axX)}</select></span></div>
+      ${scatter(c)}<p class="muted" style="font-size:12px">Grey: the default. Green: no other configuration is both better and cheaper.</p></div>
+    <div class="panel"><h2>By difficulty</h2>${tbl("difficulty") || `<p class="empty">No tiers.</p>`}</div>
+    <div class="panel"><h2>By area</h2>${tbl("area") || `<p class="empty">No areas.</p>`}</div>
+  </div>`;
+}
+
 function render() {
   if (!state) return;
   const r = route(), m = r.m && mission(r.m), t = m && r.t && m.tickets.find((x) => x.name === r.t);
+  if (r.b) {
+    $("#crumbs").innerHTML = `<a href="#/">Leads</a><span>·</span><span>Factory</span><span>›</span><a href="#/bench">Benchmarks</a>`;
+    $("#app").innerHTML = benchView(r.b === "-" ? "" : r.b);
+    const bs = $("#bsel"); if (bs) bs.onchange = () => { location.hash = `#/bench/${encodeURIComponent(bs.value)}`; };
+    const ax = $("#axx"), ay = $("#axy"); if (ax) ax.onchange = () => { axX = ax.value; render(); }; if (ay) ay.onchange = () => { axY = ay.value; render(); };
+    return;
+  }
   const crumbs = [`<a href="#/">Leads</a>`];
   if (m) crumbs.push(`<span>›</span><a href="#/m/${encodeURIComponent(m.name)}">${esc(m.name)}</a>`);
   if (t) crumbs.push(`<span>›</span><span>${esc(t.name)}</span>`);
@@ -209,10 +259,11 @@ async function poll() {
 }
 
 document.addEventListener("keydown", (e) => {
-  if (!state || e.metaKey || e.ctrlKey || e.target.tagName === "INPUT") return;
+  if (!state || e.metaKey || e.ctrlKey || e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
   const r = route(), m = r.m && mission(r.m);
   const items = m ? m.tickets : state.missions;
-  if (e.key === "l" || e.key === "L") { sel = 0; go(""); }
+  if (e.key === "b" || e.key === "B") { location.hash = "#/bench"; }
+  else if (e.key === "l" || e.key === "L") { sel = 0; go(""); }
   else if (e.key === "m" || e.key === "M") { const name = m ? m.name : (state.missions[sel] || state.missions[0])?.name; if (name) go(name); }
   else if ((e.key === "r" || e.key === "R") && m) { const t = r.t ? m.tickets.find((x) => x.name === r.t) : (m.tickets[sel] || active(m)); if (t) go(m.name, t.name); }
   else if (e.key === "Escape") { if (r.t) go(r.m); else if (r.m) go(""); }

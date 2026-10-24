@@ -190,4 +190,12 @@ for (const raw of fs.readFileSync(0, "utf8").split("\n")) {
   if (l[0] === "M") { cur = { name: l[1], lines: [] }; groups.push(cur); } else if (cur) cur.lines.push(l);
 }
 const missions = groups.map((g) => mission(g.name, g.lines));
-process.stdout.write(JSON.stringify({ generated: new Date().toISOString(), factoryDir: root, missions }, null, 1) + "\n");
+// D98: the factory engineer's benchmarks, newest comparison first (bench.sh compare).
+const benchDir = env.FACTORY_BENCH_DIR || ".factory/bench";
+let bench = [];
+try {
+  bench = fs.readdirSync(path.join(benchDir, "compare")).filter((f) => f.endsWith(".json"))
+    .map((f) => { try { return JSON.parse(read(path.join(benchDir, "compare", f))); } catch { return null; } })
+    .filter(Boolean).sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 10);
+} catch {}
+process.stdout.write(JSON.stringify({ generated: new Date().toISOString(), factoryDir: root, missions, bench }, null, 1) + "\n");
