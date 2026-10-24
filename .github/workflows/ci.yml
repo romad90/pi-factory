@@ -17,7 +17,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
       - name: shellcheck
         run: shellcheck -S warning scripts/factory/*.sh scripts/dev/*.sh tests/*.sh
       - name: node syntax

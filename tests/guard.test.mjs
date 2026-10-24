@@ -322,7 +322,10 @@ test("D101: one redaction for the archive and the guard log, raw and JSON-escape
   assert.equal(redact("BASE_URL=http://localhost:3000 password=$PW npm test"), "BASE_URL=http://localhost:3000 password=$PW npm test");
 });
 
-test("D101: the extension keeps the keep list out of project files and logs refusals redacted", () => {
+// Loading the TypeScript extension needs Node's type stripping (22.6+).
+const [major, minor] = process.versions.node.split(".").map(Number);
+const stripTypes = major > 22 || (major === 22 && minor >= 6);
+test("D101: the extension keeps the keep list out of project files and logs refusals redacted", { skip: !stripTypes && "needs Node 22.6+ to load the TypeScript extension" }, () => {
   const proj = mkdtempSync(join(tmpdir(), "guard-ext-"));
   execFileSync("git", ["init", "-q", proj]);
   mkdirSync(join(proj, ".factory"));
