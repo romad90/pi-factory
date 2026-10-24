@@ -824,11 +824,62 @@ git ls-remote --heads "$work/origin.git" "$cur" | grep -q . && grep -qx 'product
   && t "mr.sh pushes the branch and opens the MR with glab; heading becomes the title, the rest the description (D86)" || fail "mr glab create" "$(cat "$work/mr.log" "$work/glab.log")"
 git remote remove origin; rm -f $m/pr.md $m/mr.url
 
+# D96: new tests must disagree with the code before the change, as the intent says.
+echo "Test on base (D96)"
+tob0="$(git rev-parse HEAD)"
+printf 'FACTORY_LINT_CMD="true"\nFACTORY_TEST_CMD='"'"'for f in tests/tob/*.check; do [ -e "$f" ] || continue; sh "$f" || exit 1; done'"'"'\n' > .factory/commands.env
+mkdir -p src/tob tests/tob; echo 1 > src/tob/value.txt
+for i in feature bugfix maintenance refactor; do
+  mkdir -p .scratch/tob-$i/issues
+  printf '# Tob\n**Intent:** %s\n\n## Frozen paths\n- none\n\n## Validation contract\n' "$i" > .scratch/tob-$i/spec.md
+  printf '# 01 a\n## Covers\nVAL-T-001\n' > .scratch/tob-$i/issues/01-a.md
+done
+printf '# 01 a\n## Covers\nVAL-T-001\n\n## Test on base: skip — the fixture regenerates a snapshot\n' > .scratch/tob-feature/issues/02-b.md
+git add -A; git commit -qm "test: test-on-base missions"; tobbase="$(git rev-parse HEAD)"
+tob_patch() {   # <name> <expected value in the test> [new value in the code]
+  { printf 'diff --git a/tests/tob/%s.check b/tests/tob/%s.check\nnew file mode 100644\n--- /dev/null\n+++ b/tests/tob/%s.check\n@@ -0,0 +1 @@\n+grep -qx %s src/tob/value.txt\n' "$1" "$1" "$1" "$2"
+    [ -z "${3:-}" ] || printf 'diff --git a/src/tob/value.txt b/src/tob/value.txt\n--- a/src/tob/value.txt\n+++ b/src/tob/value.txt\n@@ -1 +1 @@\n-1\n+%s\n' "$3"; } > "$work/tob-$1.patch"; }
+tob_int() { git reset -q --hard "$tobbase"; bash scripts/factory/integrate.sh "tob-$1" "${3:-01-a}" "$work/tob-$2.patch" > "$work/tob.log" 2>&1; }
+tob_patch adds 2 2; tob_patch pins 1; tob_patch wrong 3
+tob_int feature adds && grep -q 'test on base: as expected (fails before the change)' "$work/tob.log" \
+  && t "feature: a new test that fails on the code before the change integrates (D96)" || fail "tob feature ok" "$(cat "$work/tob.log")"
+if tob_int feature pins; then fail "feature: a test passing before the change must be refused" "$(cat "$work/tob.log")"; fi
+[ "$(bash -c '. scripts/factory/lib.sh; verdict_field .scratch/tob-feature/verdicts/01-a-code.md Brief')" = test-on-base ] \
+  && grep -q "pass on the code before the change (feature mission): they don't test the ticket" .scratch/tob-feature/verdicts/01-a-code.md \
+  && [ ! -e tests/tob/pins.check ] && t "feature: a new test that already passes before the change is a failed round, nothing applied" || fail "tob feature refuse" "$(cat "$work/tob.log" .scratch/tob-feature/verdicts/01-a-code.md 2>&1)"
+if tob_int bugfix pins; then fail "bugfix: a test passing before the fix must be refused" "$(cat "$work/tob.log")"; fi
+t "bugfix: the same rule (the test must reproduce the bug first)"
+tob_int maintenance pins && grep -q "passes on today's code" "$work/tob.log" || fail "tob maintenance ok" "$(cat "$work/tob.log")"
+if tob_int maintenance wrong; then fail "maintenance: a test failing on today's code must be refused" "$(cat "$work/tob.log")"; fi
+grep -q "fail on today's code (maintenance mission): a characterization test must describe current behavior" .scratch/tob-maintenance/verdicts/01-a-code.md \
+  && t "maintenance: a characterization test must pass on today's code" || fail "tob maintenance refuse" "$(cat .scratch/tob-maintenance/verdicts/01-a-code.md)"
+tob_int refactor pins || fail "tob refactor ok" "$(cat "$work/tob.log")"
+if tob_int refactor wrong; then fail "refactor: a test failing on today's code must be refused" "$(cat "$work/tob.log")"; fi
+t "refactor: new tests must pass on the code before the refactor"
+tob_int feature pins 02-b && grep -q 'skipped by the ticket (the fixture regenerates a snapshot)' "$work/tob.log" \
+  && grep -qP '\t02-b\ttest-on-base\t.*\tYes: the fixture regenerates a snapshot\t' .scratch/tob-feature/decisions.tsv \
+  && t "a ticket can opt out with a reason, recorded as a decision" || fail "tob opt-out" "$(cat "$work/tob.log" .scratch/tob-feature/decisions.tsv 2>&1)"
+git reset -q --hard "$tobbase"
+out="$(bash scripts/factory/test-on-base.sh tob-feature 01-a "$work/tob-pins.patch" "$tobbase")" && fail "test-on-base.sh must exit 1 on a mismatch" "$out"
+bash scripts/factory/test-on-base.sh tob-feature 01-a "$work/tob-adds.patch" "$tobbase" | grep -q 'as expected' \
+  && { bash scripts/factory/test-on-base.sh tob-feature 01-a "$work/none.patch" >/dev/null 2>&1; [ $? -eq 2 ]; } \
+  && [ "$(git rev-parse HEAD)" = "$tobbase" ] && [ -z "$(git status --porcelain --untracked-files=no)" ] \
+  && t "test-on-base.sh: the same check on its own (exit 0, 1, 2), the branch untouched" || fail "tob script" "$out"
+FACTORY_TEST_ON_BASE=0 bash scripts/factory/integrate.sh tob-feature 01-a "$work/tob-pins.patch" > "$work/tob.log" 2>&1 && grep -q 'test on base: off' "$work/tob.log" \
+  && t "FACTORY_TEST_ON_BASE=0 turns the check off" || fail "tob off" "$(cat "$work/tob.log")"
+git reset -q --hard "$tobbase"
+git worktree add -q -b pi-subagents/01-a-tob-s0-t0 "$work/tob-wt" "$tobbase"
+tob_sub="$(git rev-parse --show-prefix)"
+( cd "$work/tob-wt/${tob_sub}" && mkdir -p tests/tob && echo 'grep -qx 1 src/tob/value.txt' > tests/tob/w.check && bash scripts/factory/self-check.sh tob-feature ) > "$work/tob-sc.log" 2>&1 && fail "self-check must refuse a test passing before the change" "$(cat "$work/tob-sc.log")"
+grep -q '^SELF-CHECK: FAIL test-on-base' "$work/tob-sc.log" && t "self-check runs the same check, so the worker sees it before handing over" || fail "tob self-check" "$(cat "$work/tob-sc.log")"
+git worktree remove --force "$work/tob-wt"; git branch -q -D pi-subagents/01-a-tob-s0-t0
+git reset -q --hard "$tob0"
+
 # D91: the scripted lead runs a mission's loop with no LLM lead.
 echo "Scripted lead (run.sh)"
 r=.scratch/runner; mkdir -p $r/issues
 printf '# Runner\n**Intent:** feature\n\nA run file.\n\n## Validation contract\n\n### VAL-RUN-001: runs\n**Kind:** code\nGiven the tool, when it runs, then it returns ok.\n' > $r/spec.md
-printf 'FACTORY_LINT_CMD="true"\nFACTORY_TEST_CMD="true"\n' > .factory/commands.env
+printf 'FACTORY_LINT_CMD="true"\nFACTORY_TEST_CMD="true"\nFACTORY_TEST_ON_BASE=0\n' > .factory/commands.env   # "true" can't fail on base (D96 is tested on its own)
 git add -A; git commit -qm "test: runner mission"
 mkdir -p "$work/bin"
 # A pi stand-in: checks how run.sh calls it, plays the contract wave, prints pi's JSON events.

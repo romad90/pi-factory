@@ -6,6 +6,7 @@
 # Runs, in order, stopping at the first failure:
 #   1. the patch guard on the worker's change (frozen paths, silenced checks,
 #      skipped or deleted tests, links, secrets), the hook's links left out;
+#   1b. the new tests against the code before the change (D96);
 #   2. lint, failing only on errors new against the baseline (D62);
 #   3. tests; 4. the extra check (.factory/commands.env).
 # Changes nothing: the change is read through a temporary index.
@@ -54,6 +55,12 @@ if [ -n "$draft" ]; then
   GIT_INDEX_FILE="$idx" git diff --cached --binary HEAD -- . > "$draft.tmp" && mv "$draft.tmp" "$draft"
 fi
 bash "$here/patch-guard.sh" "$tmp/change.patch" --mission "$feature" > "$tmp/guard.out" 2>&1 || fail guard "$tmp/guard.out"
+
+# 1b. New tests against the code before the change (D96), as integration checks them.
+if ticket="$(worker_ticket "$feature")"; then
+  test_on_base "$feature" "$ticket" "$tmp/change.patch" "$tmp/base.out" > "$tmp/base.line" || {
+    cat "$tmp/base.line" "$tmp/base.out" > "$tmp/base.fail"; fail test-on-base "$tmp/base.fail"; }
+fi
 
 # 2. Lint, new errors only.
 if [ -n "$FACTORY_LINT_CMD" ]; then

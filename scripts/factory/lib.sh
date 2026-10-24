@@ -553,6 +553,71 @@ changed_code_files() {                 # <base> <commit>
   return 0     # the last file being a test must not fail the caller under set -e
 }
 
+# --- test on base (D96) ---------------------------------------------------------
+# A new test proves something only if it disagrees with the code before the
+# change: in a feature or bugfix mission it must fail there (it tests what the
+# ticket adds); in a maintenance or refactor mission it must pass there (it
+# pins today's behavior). The patch's test files alone are applied to a
+# temporary checkout of HEAD, the test command runs once, and the result is
+# compared with what the intent expects. Costs one extra test run per ticket
+# with tests. Call after load_commands, from the project folder.
+#
+# test_on_base <feature> <ticket> <project-relative patch> <log file> [base]
+#   base: the commit the tests run on (default HEAD, the ticket's base at
+#   integration and in a worker's worktree). Prints one line; returns 0 (as expected, or not checked), 1 (mismatch).
+#   A ticket opts out with "## Test on base: skip — <reason>": the line then
+#   reads "test on base: skipped by the ticket (<reason>)".
+test_on_base() {
+  local feature="$1" ticket="$2" patch="$3" log="$4" base="${5:-HEAD}" dir intent want issue opt why tmp wt prefix top f n d rc
+  dir="$(mission_dir "$feature")"
+  if [ "${FACTORY_TEST_ON_BASE:-1}" = 0 ]; then echo "test on base: off (FACTORY_TEST_ON_BASE=0)"; return 0; fi
+  if [ -z "${FACTORY_TEST_CMD:-}" ]; then echo "test on base: no test command"; return 0; fi
+  intent="$(verdict_field "$dir/spec.md" Intent)"
+  case "$intent" in
+    feature|bugfix) want=fail ;;
+    maintenance|refactor) want=pass ;;
+    *) echo "test on base: not checked for intent '${intent:-none}'"; return 0 ;;
+  esac
+  issue="$dir/issues/$ticket.md"
+  if [ -f "$issue" ] && opt="$(grep -m1 -iE '^## Test on base: *skip' "$issue")"; then
+    why="$(printf '%s' "$opt" | sed -E 's/^## [Tt]est on base: *[Ss]kip *(—|-|:)? *//')"
+    echo "test on base: skipped by the ticket (${why:-no reason given})"; return 0
+  fi
+  tmp="$(mktemp -d)"
+  while IFS=$'\x1f' read -r _ f n _; do
+    for d in "$f" "$n"; do [ -n "$d" ] && is_test_file "$d" && printf '%s\n' "$d"; done
+  done < <(node "$FACTORY_SCRIPTS/patch-paths.mjs" list "$patch") | sort -u > "$tmp/tests"
+  if [ ! -s "$tmp/tests" ]; then rm -rf "$tmp"; echo "test on base: the change has no test files"; return 0; fi
+  node "$FACTORY_SCRIPTS/patch-paths.mjs" keep "$patch" "$tmp/tests.patch" "$tmp/tests"
+  top="$(git rev-parse --show-toplevel)"; prefix="$(project_prefix)"; wt="$tmp/wt"
+  # The instrument stays hidden, as in a worker's worktree (D21).
+  git worktree add -q --detach --no-checkout "$wt" "$base"
+  git -C "$wt" sparse-checkout set --no-cone '/*' "!/${prefix:+$prefix/}${FACTORY_INSTRUMENT_DIR}/" >/dev/null 2>&1 || true
+  git -C "$wt" checkout -q --detach "$base"
+  local dirarg=(); [ -z "$prefix" ] || dirarg=(--directory="$prefix")
+  if ! git -C "$wt" apply "${dirarg[@]}" "$tmp/tests.patch" 2>"$log"; then
+    git worktree remove --force "$wt" >/dev/null 2>&1 || true; rm -rf "$tmp"
+    echo "test on base: the tests don't apply on $base alone; not checked"; return 0
+  fi
+  for d in ${prefix:+"$prefix"} ""; do           # the installed dependencies, as the worktree hook links them (D65)
+    for n in ${FACTORY_DEPS_LINKS:-node_modules .venv}; do
+      if [ -e "$top/${d:+$d/}$n" ] && [ ! -e "$wt/${d:+$d/}$n" ]; then ln -s "$top/${d:+$d/}$n" "$wt/${d:+$d/}$n"; fi
+    done
+  done
+  if (cd "$wt/$prefix" && bash -c "$FACTORY_TEST_CMD") >"$log" 2>&1; then rc=0; else rc=1; fi
+  git worktree remove --force "$wt" >/dev/null 2>&1 || true; git worktree prune >/dev/null 2>&1 || true; rm -rf "$tmp"
+  if [ "$want" = fail ] && [ "$rc" -eq 0 ]; then
+    echo "test on base: the new tests pass on the code before the change ($intent mission): they don't test the ticket. Write a test that fails without the change, then make it pass"
+    return 1
+  fi
+  if [ "$want" = pass ] && [ "$rc" -ne 0 ]; then
+    echo "test on base: the new tests fail on today's code ($intent mission): a characterization test must describe current behavior. Pin what the code does now"
+    return 1
+  fi
+  echo "test on base: as expected ($( [ "$want" = fail ] && echo "fails before the change" || echo "passes on today's code"))"
+  return 0
+}
+
 # --- ticket state (D33, D34) --------------------------------------------------
 # Per ticket: built and integrated by integrate.sh (marker = integration
 # commit), then reviewed. A verdict reviews one integration commit.
