@@ -127,6 +127,8 @@ You type `/factory <feature>` once. The lead loops on `scripts/factory/next.sh`,
 | `factory-contract-critic` | Attacks the contract before you approve it | Frontier, **family ≠ author** | fresh |
 | `factory-designer` | Writes the program design (call stacks, files, signatures, slices) after G1, for feature and refactor missions | Frontier, family A | fresh |
 | `factory-ticket-writer` | Drafts sized, ordered tickets (and fix tickets from findings); you approve | Frontier, any family | fresh |
+| `factory-explorer` | Maps one repo's side of a cross-service bug, or answers one question about it; read-only (D99) | Efficient | fresh |
+| `factory-investigator` | Reasons from the explorers' briefs: hypotheses, questions, a reproduction ticket, where the fix belongs (D99) | Frontier | fresh |
 | `factory-worker` | Implements one ticket with TDD, in its own worktree | Efficient, family C | fresh |
 | `factory-worker-heavy` | Takes over a ticket from round 2 | Frontier, family ≠ judges | fresh |
 | `factory-reviewer` | Reviews one integration commit; never fixes | Frontier, **family ≠ workers** | fresh |

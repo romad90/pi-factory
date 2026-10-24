@@ -5,7 +5,8 @@
 #
 # Usage: scripts/factory/brief.sh <role> <feature|slug> [ticket] [commit] [base]
 #   roles: contract-author contract-critic designer ticket-writer worker reviewer
-#          validator code-steward light-reviewer
+#          validator code-steward light-reviewer explorer investigator
+#   For explorer, [ticket] is the target: a context repo, home, or Q<n>.
 #   commit defaults to HEAD. For ticket-writer, [ticket] is the task:
 #   all | fix-behavior | fix-health.
 set -euo pipefail
@@ -34,10 +35,33 @@ if [ "$role" = ticket-writer ]; then
   esac
 fi
 
-shown_ticket="$ticket"; [ "$role" = ticket-writer ] && shown_ticket="$task"
+# D99: an explorer's target (a context repo, home, or a question), and the
+# investigator's round.
+d="$(mission_dir "$feature")"
+if [ "$role" = explorer ]; then
+  case "$ticket" in
+    home) task="Target: the home repo (this project): its side of every interaction with the context repos. Write .scratch/$feature/context/home.md." ;;
+    Q[0-9]*)
+      q="$(open_questions "$d" | awk -F'\t' -v id="$ticket" '$1 == id')"
+      [ -n "$q" ] || die "no open question $ticket in $d/investigation.md"
+      repo="$(cut -f2 <<<"$q")"; where=".factory/context/$repo/"; [ "$repo" = home ] && where="this project"
+      task="Target: answer $ticket about $repo ($where): $(cut -f3- <<<"$q"). Write .scratch/$feature/context/answers/$ticket.md." ;;
+    *)
+      line="$(context_repos "$d/spec.md" | awk -F'\t' -v n="$ticket" '$1 == n')"
+      [ -n "$line" ] || die "no context repo '$ticket' in $d/spec.md"
+      task="Target: context repo $ticket at .factory/context/$ticket/ ($(cut -f4 <<<"$line")). Write .scratch/$feature/context/$ticket.md." ;;
+  esac
+elif [ "$role" = investigator ]; then
+  task="This is round $(investigation_rounds "$d") of $FACTORY_INVESTIGATE_ROUNDS."
+fi
+
+shown_ticket="$ticket"
+case "$role" in ticket-writer) shown_ticket="$task" ;; explorer|investigator) shown_ticket="{{TICKET}}" ;; esac
 text="$(sed -e "s|{{FEATURE}}|$feature|g" -e "s|{{TICKET}}|$shown_ticket|g" \
     -e "s|{{COMMIT}}|$commit|g"   -e "s|{{BASE}}|$base|g" \
     -e "s|{{BRIEF_ID}}|$id|g" "$template")"
+# A question's text may hold | or &: plain bash replacement, quoted (D99).
+case "$role" in explorer|investigator) text="${text//"{{TICKET}}"/"$task"}" ;; esac
 # The commands integration runs and the frozen paths (D61, D62). Commands may
 # hold | or &, so plain bash replacement (quoted: & stays literal).
 if [[ "$text" == *"{{LINT_CMD}}"* || "$text" == *"{{TEST_CMD}}"* || "$text" == *"{{FROZEN}}"* || "$text" == *"{{FROZEN_TESTS}}"* ]]; then

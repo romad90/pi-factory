@@ -1,6 +1,6 @@
 # P13. Context repos: investigate across services, change only one
 
-**Status:** draft · **Effort:** M · **Depends on:** nothing to start; P9 (reproduce first) fits on top
+**Status:** steps 1–3 implemented (D99); step 4, the first real use, is next · **Effort:** M · **Depends on:** nothing to start; P9 (reproduce first) fits on top
 
 ## Problem
 

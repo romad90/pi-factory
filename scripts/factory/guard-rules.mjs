@@ -7,6 +7,7 @@
 //
 // check({ tool, input, cwd, home }) → null | { rule, reason }
 import { existsSync, readFileSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 
 // Bash commands that are never an agent's to run. Each: [rule, regex, reason].
@@ -48,6 +49,11 @@ const BASH_RULES = [
   ["publish", /\b(gh|glab)\s+(pr|mr)\s+merge\b|\bgh\s+release\s+create\b|\bglab\s+release\s+create\b/, "merging or releasing"],
   // The guard itself
   ["guard", /FACTORY_GUARD\s*=/, "changing the guard"],
+  // Context repos (D99): read them, never act in them. The clones are also
+  // read-only on disk; this catches git and redirections before they try.
+  ["context", /\bgit\s+(-C\s+|--git-dir[=\s]+|--work-tree[=\s]+)["']?[^\s"']*\.factory\/context\b/, "git in a context repo (read them with read/grep; they change through their own team)"],
+  ["context", /\bcd\s+["']?[^\s"';&|]*\.factory\/context\b[^;&|]*(&&|;|\|\|)\s*git\b/, "git in a context repo (read them with read/grep; they change through their own team)"],
+  ["context", />>?\s*["']?[^\s"']*\.factory\/context\//, "writing into a context repo"],
   // Mission records: scripts write them, nobody deletes them (D71)
   ["records", /\brm\b[^;&|]*\.scratch\//, "deleting mission files in .scratch/ (they are the record; the scripts change them)"],
 ];
@@ -138,6 +144,9 @@ const PROTECTED_WRITE = /^(\.git\/|\.factory\/|scripts\/factory\/|\.pi\/|\.githu
 const SECRET_READ = /(^|\/)\.pi\/agent\/(models|auth)\.json$|^\/(var\/)?run\/secrets(\/|$)|(^|\/)\.(ssh|aws|gnupg|kube|netrc|npmrc|pypirc)(\/|$)|(^|\/)\.env(\.[a-z]+)?$|(^|\/)id_(rsa|ed25519|ecdsa)(\.pub)?$/;
 const SECRET_READ_OK = /(^|\/)\.env\.(example|sample|template|factory)$/;
 
+const TEMP_DIRS = [...new Set([tmpdir(), "/tmp", "/var/tmp"].map((d) => d.replace(/\/+$/, "")))];
+const isTemp = (abs) => TEMP_DIRS.some((d) => abs === d || abs.startsWith(d + "/"));
+
 function rel(p, cwd, root = cwd) {      // resolve from the agent's cwd, report from the project root
   const abs = isAbsolute(p) ? p : resolve(cwd, p);
   return abs.startsWith(root + "/") ? abs.slice(root.length + 1) : abs;
@@ -187,11 +196,20 @@ export function check({ tool, input = {}, cwd = process.cwd() }) {
   const path = input.path ?? input.file_path ?? input.filePath;
   if (!path) return null;
   const r = rel(String(path), resolve(cwd), projectRoot(cwd) ?? resolve(cwd));
+  if ((tool === "write" || tool === "edit") && /^\.factory\/context\//.test(r)) {
+    return { rule: "context", reason: `${r} is in a context repo: read-only, it changes through its own team (D99): blocked by the factory guard` };
+  }
   if ((tool === "write" || tool === "edit") && isWorker(cwd) && WORKER_WRITE_DEPS.test(r)) {
     return { rule: "deps", reason: `${r} is in the shared dependency folder (the main checkout's, linked into the worker): blocked by the factory guard` };
   }
   if ((tool === "write" || tool === "edit") && PROTECTED_WRITE.test(r)) {
     return { rule: "paths", reason: `${r} belongs to the factory, CI or hooks: blocked by the factory guard` };
+  }
+  // D99: a mission changes one project. Inside a factory project, nothing is
+  // written outside it (a sibling repo, a sibling project of a monorepo, $HOME).
+  // The temp folder stays writable: scratch files (a PR body, a plan) are not a change.
+  if ((tool === "write" || tool === "edit") && isAbsolute(r) && projectRoot(cwd) && !isTemp(r)) {
+    return { rule: "outside", reason: `${r} is outside the project ${projectRoot(cwd)}: a mission changes one repo (D99): blocked by the factory guard` };
   }
   if (SECRET_READ.test(r) && !SECRET_READ_OK.test(r)) {
     return { rule: "secrets", reason: `${r} holds credentials: blocked by the factory guard` };

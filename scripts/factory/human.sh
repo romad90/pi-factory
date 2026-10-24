@@ -7,6 +7,7 @@
 #   human.sh approve           <feature> [note]        G1: the contract
 #   human.sh approve           <feature> tickets       the tickets the ticket writer proposed
 #   human.sh approve           <feature> design [note] G1b: the program design (D94)
+#   human.sh approve           <feature> conclusion    an investigation's conclusion (D99)
 #   human.sh ask               <feature> <ticket|-> <question>      (lead, when relaying)
 #   human.sh ask               <feature> <ticket|-> --stdin < question
 #   human.sh decide            <feature> <answer> [why...]
@@ -61,6 +62,19 @@ case "$cmd" in
       decision_log "$feature" - approve-tickets "Approve the tickets ($task)" "approved: ${#list[@]} ticket(s)" tickets
       bash "$here/checkpoint.sh" "$feature" >/dev/null
       echo "Tickets approved (${#list[@]} in issues/). Coverage (G2) runs next."
+      exit 0
+    fi
+    if [ "${1:-}" = conclusion ]; then
+      inv="$dir/investigation.md"
+      grep -q '^## Conclusion' "$inv" 2>/dev/null || die "no '## Conclusion' in $inv yet"
+      belongs="$(fix_belongs "$inv")"
+      tmp="$(mktemp)"
+      awk -v d="$(date +%F)" 'index($0, "**Conclusion approved:**") == 1 { next }
+        { print } /^## Conclusion/ && !done { print ""; print "**Conclusion approved:** " d; done = 1 }' "$inv" > "$tmp"
+      mv "$tmp" "$inv"
+      decision_log "$feature" - approve-conclusion "Approve the investigation's conclusion" "approved: the fix belongs ${belongs:-here}" investigation
+      bash "$here/checkpoint.sh" "$feature" >/dev/null
+      echo "Conclusion approved (the fix belongs ${belongs:-here})."
       exit 0
     fi
     if [ "${1:-}" = design ]; then

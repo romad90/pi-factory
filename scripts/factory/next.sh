@@ -3,7 +3,8 @@
 # The first output line is machine-readable for the lead (/factory):
 #   STEP: <code>
 # Codes (human steps marked *, they notify you):
-#   paused* grill* contract approve* design approve-design* decide* tickets approve-tickets* coverage*
+#   paused* grill* context-sync investigate approve-conclusion* handoff* report*
+#   contract approve* design approve-design* decide* tickets approve-tickets* coverage*
 #   setup* build review escalate* blocked* validate behavior-fix
 #   behavior-stale health health-fix steward unverified* pr*
 #
@@ -20,7 +21,7 @@ critique="$dir/contract-critique.md"
 STATUS=""
 shopt -s nullglob
 
-HUMAN_STEPS=" paused grill approve approve-design decide approve-tickets coverage setup escalate blocked unverified pr "
+HUMAN_STEPS=" paused grill approve-conclusion handoff report approve approve-design decide approve-tickets coverage setup escalate blocked unverified pr "
 
 step() {                                  # <code> <human explanation>
   local code="$1"; shift
@@ -54,6 +55,53 @@ if [ -f "$dir/state/open-question.md" ]; then
   step decide "human: answer with /factory-decide $feature <your answer, and why>. Irreversible choices never default (D47)."
 fi
 [ -f "$spec" ] || step grill "human, main session: /grill-with-docs, then /to-spec → $spec"
+
+# D99: a bug between services is investigated before any contract. Context
+# repos are cloned read-only; explorers map one repo each, fresh; the
+# investigator concludes where the fix belongs and how to reproduce it.
+if investigation_applies "$spec"; then
+  inv="$dir/investigation.md"; intent="$(verdict_field "$spec" Intent)"
+  if ! out="$(bash "$here/context.sh" check "$feature" 2>&1)"; then
+    STATUS="$out"$'\n'
+    step context-sync "scripts/factory/context.sh sync $feature (clone the context repos read-only, record the commits read)"
+  fi
+  rounds="$(investigation_rounds "$dir")"; limit="$FACTORY_INVESTIGATE_ROUNDS"
+  need=""
+  maps=""; while IFS= read -r n; do [ -s "$dir/context/$n.md" ] || maps+=" $n"; done < <(context_repos "$spec" | cut -f1; echo home)
+  [ -z "$maps" ] || need="briefs for$maps"
+  [ -n "$need" ] || [ -f "$inv" ] || need="the investigator's first pass"
+  open="$(open_questions "$dir")"
+  [ -n "$need" ] || [ -z "$open" ] || [ "$rounds" -ge "$limit" ] || need="answers to $(cut -f1 <<<"$open" | tr '\n' ' ' | sed 's/ $//')"
+  if [ -z "$need" ] && ! grep -q '^## Conclusion' "$inv"; then need="a conclusion"; fi
+  belongs="$(fix_belongs "$inv")"
+  if [ -z "$need" ] && [ -z "$belongs" ]; then need="**Fix belongs:** in the conclusion (here, or a context repo)"; fi
+  if [ -z "$need" ] && [ "$belongs" != here ] && ! context_repos "$spec" | cut -f1 | grep -qxF "$belongs"; then
+    need="a **Fix belongs:** that names here or a context repo (it says $belongs)"
+  fi
+  if [ -z "$need" ] && [ "$belongs" != here ] && [ ! -s "$dir/finding-for-$belongs.md" ]; then
+    need="the finding for $belongs (finding-for-$belongs.md)"
+  fi
+  if [ -z "$need" ] && [ "$belongs" = here ] && [ "$intent" = bugfix ]; then
+    repro=""; for t in "$dir"/issues/*-reproduce-*.md; do [ -f "$t" ] && [ -n "$(verdict_field "$t" Test)" ] && repro="$t"; done
+    [ -n "$repro" ] || need="a reproduction ticket (issues/01-reproduce-<slug>.md with a **Test:** line)"
+  fi
+  if [ -n "$need" ]; then
+    STATUS="Investigation round $rounds of $limit"$'\n'
+    if [ "$rounds" -lt "$limit" ]; then
+      step investigate "scripts/factory/workflow.sh investigate $feature (missing: $need; explorers fresh, one repo each, then the investigator)"
+    fi
+    step escalate "human: the investigation used its $limit rounds and still lacks $need. Read $inv; add context to the spec, or raise FACTORY_INVESTIGATE_ROUNDS and run next.sh again"
+  fi
+  if ! grep -qE '^\*\*Conclusion approved:\*\* [0-9]{4}-[0-9]{2}-[0-9]{2}' "$inv"; then
+    step approve-conclusion "human: read $inv (and the reproduction ticket, if any), then /factory-approve $feature conclusion, or edit the spec and next.sh again"
+  fi
+  if [ "$belongs" != here ]; then
+    step handoff "human: the fix belongs in $belongs. Send $dir/finding-for-$belongs.md to that repo's team. This mission changes nothing here; it ends at this step"
+  fi
+  if [ "$intent" = exploration ]; then
+    step report "human: the approved investigation is the deliverable: $inv. Nothing is built; the mission ends here"
+  fi
+fi
 pending_amendment=""
 for a in "$dir"/amendments/*.md; do
   [ -f "$a" ] && grep -q '^\*\*Status:\*\* pending' "$a" && pending_amendment="$a"
@@ -84,7 +132,11 @@ if [ -f "$dir/state/tickets.pending" ]; then
   STATUS="$(cat "$dir/state/tickets.pending")"$'\n'"Tickets now: $(ls "$dir/issues" 2>/dev/null | tr '\n' ' ')"$'\n'
   step approve-tickets "human: review .scratch/$feature/issues/ (edit, split or delete freely), then /factory-approve $feature tickets"
 fi
-[ ${#tickets[@]} -gt 0 ] || step tickets "scripts/factory/workflow.sh tickets $feature all (ticket writer, fresh; you approve the result). Or write them by hand per docs/agents/ticket-format.md."
+# D99: an investigation's reproduction ticket alone doesn't replace the ticket writer.
+only_repro=1; for t in "${tickets[@]}"; do [[ "$(basename "$t")" == *-reproduce-* ]] || only_repro=0; done
+if [ ${#tickets[@]} -eq 0 ] || { [ "$only_repro" = 1 ] && ! grep -q $'\tapprove-tickets\t' "$dir/decisions.tsv" 2>/dev/null; }; then
+  step tickets "scripts/factory/workflow.sh tickets $feature all (ticket writer, fresh; you approve the result). Or write them by hand per docs/agents/ticket-format.md."
+fi
 
 if ! out="$(bash "$here/coverage.sh" "$feature" 2>&1)"; then
   STATUS="$out"$'\n'
