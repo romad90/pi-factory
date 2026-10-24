@@ -70,6 +70,24 @@ Keys, as in Mission Control: `L` leads, `M` mission, `W` workers, `R` rounds, `T
 
 The mockup is the "Factory Cockpit" canvas (desktop and phone boards).
 
+### Design principle: two users, both served efficiently
+
+The page has two users with different questions, and neither may pay for the other's views:
+
+| | Product engineer (follows and steers the work) | Factory engineer (tunes the factory) |
+|---|---|---|
+| Question on arrival | What needs me now? Where is my work, and is it moving? | Where does the factory lose time, money or quality, and did my last change help? |
+| Unit | a mission, a ticket, a decision | a role, a model, a pattern, a factory version |
+| Time scale | now, today | across missions, weeks |
+| First screen | Inbox (needs-you across repos), then leads → mission → ticket | Dashboard: cost per merged MR, human decisions per MR, first-pass rate, trend since the last factory change |
+| Typical action | answer, approve, open the MR | read a pattern, run a benchmark, compare configs, merge an improvement |
+
+Rules that follow:
+- **Two entry points, one data set.** The same snapshot and files feed both; nothing is entered twice, and every number links to the runs behind it.
+- **Each first screen answers its user's question without a click.** The product engineer never scrolls past metrics to find a pending decision; the factory engineer never opens missions one by one to see a trend.
+- **Crossing over is one click, in context.** A failed round in a ticket links to the pattern it belongs to; a pattern links to the runs and tickets that show it.
+- **The same person wears both hats,** often in one day (today, the user is both): the switch is a top-level toggle, remembered per viewer, not a separate tool.
+
 ### 5. Factory engineering views (from Warp Factories' interface)
 
 The user's look at Warp Factories (October 2026) shows a second audience for the page: not the person following a mission, but the person tuning the factory. Its navigation is the map:
