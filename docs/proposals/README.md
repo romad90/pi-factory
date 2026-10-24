@@ -19,6 +19,7 @@ Status: **draft** (open for discussion) · **accepted** (in the roadmap) · **re
 | P11 | [Install the factory once per machine; onboard a project with only what is its own](P11-install-once.md) | draft | — |
 | P12 | [A durable runner: the mission survives a closed laptop, and the human answers from anywhere](P12-durable-run.md) | draft | P2 |
 | P13 | [Context repos: investigate across services, change only one](P13-context-repos.md) | draft | — |
+| P14 | [Measure and improve: a run archive, a benchmark from our own tickets, scoring](P14-measure-and-improve.md) | draft | — (P5 builds on it) |
 
 ## Why these four, in this order
 
@@ -50,3 +51,5 @@ Smaller ideas seen in other tools, not yet proposals, are collected in [ideas to
 P12 answers P2's open question with Pi Durable, a library from Pi's authors that saves every step before running it: the mission keeps running when the laptop closes, questions wait as approvals any client can answer, and the cockpit gets a live feed. The files stay the source of truth, so the factory still works without it.
 
 P13 comes from a bug between an API and the two bots that keep it in sync. One mission still changes one repo; the others become read-only context, mapped by one fresh agent per repo, and an investigation step finds the cause and reproduces it in the repo being fixed before any contract is written.
+
+P14 makes the factory measurable: keep every run, replay real tickets as a benchmark across models and factory versions, score runs for failure modes tests cannot see, and aggregate cost per merged MR across missions. It is what lets P5 prove an improvement before it is merged, and what gives the pilot its numbers.
