@@ -140,6 +140,23 @@ Warp's founder (talk, transcript provided by the user) and Google Cloud AI Resea
 
 Not taken: an LLM "foreman" that delegates (our loop stays in code, D91); letting a model edit guardrails (Harness² edits its guardrails file; ours are code: patch guard, command guard); hosted infrastructure. Warp's own figures (cost per PR from $55 to $15 in six weeks, 40% more PRs, fewer reverts) are a vendor's, unaudited.
 
+## From HumanLayer's "Why Software Factories Fail" (Dex Horthy, AI Engineer World's Fair 2026)
+
+An essay against lights-off factories ([wsff.md](https://github.com/humanlayer/advanced-context-engineering-for-coding-agents/blob/main/wsff.md), [where does the time go](https://github.com/humanlayer/advanced-context-engineering-for-coding-agents/blob/main/side-quests/where-does-the-time-go.md), and the SlopCodeBench write-ups in the same repo). Its argument: coding was 25–50% of shipping; models are trained on "tests pass" with no penalty for bad design, so they erode maintainability; review agents raise the floor, not the ceiling; front-load alignment and keep reading the code, for 2–3x safely rather than 10–100x with incidents.
+
+| Idea | For us | Fits |
+|---|---|---|
+| **Program design** before coding: call-stack diffs, file-tree diffs, key types and signatures, drafted by the model and argued by a human | A design step between contract and tickets, approved like the contract | D94 |
+| **Vertical slices** (tracer bullets), not horizontal layers | Ticket writer rule: each ticket delivers something that runs end to end | D95 |
+| The MR's reviewer reviews the spec and the design before code exists | The plan names its reviewer; review then confirms instead of discovering | D95 |
+| SWE-bench grading: discard the agent's test edits, apply held-out tests | Our instrument hidden from workers (D21) already does this | done |
+| Penalize new tests that don't fail on the code before the change (Frontier Code) | New tests must fail on the base commit in feature and bugfix missions, pass on it in characterization and refactor missions | D96 |
+| Measure maintainability by having a small model attempt the next change on the code left behind | A changeability probe in the benchmark: follow-up tickets on a cheap worker, before and after a refactor | D98 |
+| Of 41 deterministic quality metrics, only max complexity and cloned-code share separated models | Weight those two in the health ratchet | docs |
+| Expected pain = P(rework) × cost of rework; most of it goes in the first minutes of planning | Size the up-front work to the task: fix lane and light review for small, full design for large | cheat sheet |
+
+Bias: HumanLayer sells planning and review tooling. The incident data (Faros) is correlation, not proof.
+
 ## What to watch for
 
 Each of these tools keeps something we don't want to give away: the runtime (OpenCode Swarm needs OpenCode), the hosted control plane and its data (Factory, Port), or a maintainer we depend on. The test for anything we take: does it keep working if that vendor disappears tomorrow?
