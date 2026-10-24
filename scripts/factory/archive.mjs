@@ -1,23 +1,14 @@
 #!/usr/bin/env node
 // Helpers for archive.sh (D97). No dependencies.
-//   node archive.mjs collect <out-dir> <mission-dir> <head> [guard.log]   (meta paths on stdin)
+//   node archive.mjs collect <out-dir> <mission-dir> <head> [guard.log] [root...]   (meta paths on stdin)
+//     root: this checkout's folders (top level, worktrees, git common dir)
 //   node archive.mjs list <out-dir>
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
-import { join, dirname, basename } from "node:path";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, realpathSync } from "node:fs";
+import { join, dirname, basename, isAbsolute, resolve } from "node:path";
 
-// The patch guard's secret patterns (patch-guard.sh, "secrets"), applied to
-// whole text instead of added lines.
-export const SECRET = new RegExp([
-  "-----BEGIN ([A-Z]+ )?PRIVATE KEY-----[\\s\\S]*?-----END ([A-Z]+ )?PRIVATE KEY-----",
-  "-----BEGIN ([A-Z]+ )?PRIVATE KEY-----",
-  "AKIA[0-9A-Z]{16}",
-  "gh[pousr]_[A-Za-z0-9]{36}",
-  "glpat-[A-Za-z0-9_-]{20}",
-  "xox[baprs]-[A-Za-z0-9-]{10,}",
-  "sk-[A-Za-z0-9]{32,}",
-  "(password|passwd|secret|api_?key|token)[\"']?\\s*[:=]\\s*[\"'][^\"'$<{ ]{8,}[\"']",
-].join("|"), "gi");
-export const redact = (s) => s.replace(SECRET, "[REDACTED]");
+// Redaction is shared with the guard's refusal log (redact.mjs, D101).
+import { redact } from "./redact.mjs";
+export { redact };
 
 const read = (f) => { try { return readFileSync(f, "utf8"); } catch { return null; } };
 const field = (text, name) => (text.match(new RegExp(`^\\*\\*${name}:\\*\\*\\s*(.*)$`, "m")) || [])[1]?.trim() ?? "";
@@ -46,15 +37,41 @@ function thinkingOf(missionDir, agent) {   // runs.tsv (D77): date workflow key 
   return th;
 }
 
+// D101: a run belongs to this checkout when the meta file or a path it holds
+// (transcript, execution folder) is under one of the checkout's folders, or
+// when its brief id is one the mission recorded (a workflow file, a verdict).
+// A run of another clone, another project or another user's mission sharing
+// the temp folder is not archived here.
+const real = (p) => { try { return realpathSync(p); } catch { return resolve(p); } };
+const under = (p, roots) => { const a = [resolve(p), real(p)];
+  return roots.some((r) => a.some((x) => x === r || x.startsWith(r.endsWith("/") ? r : r + "/"))); };
+function pathsIn(v, out = []) {
+  if (typeof v === "string") { if (isAbsolute(v)) out.push(v); }
+  else if (Array.isArray(v)) v.forEach((x) => pathsIn(x, out));
+  else if (v && typeof v === "object") Object.values(v).forEach((x) => pathsIn(x, out));
+  return out;
+}
+function missionText(dir, acc = []) {     // every text the mission recorded, for brief ids
+  let entries = []; try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return acc; }
+  for (const e of entries) {
+    const p = join(dir, e.name);
+    if (e.isDirectory()) missionText(p, acc);
+    else if (/\.(md|js|tsv|json|txt)$|\.integrated$|\.pending$/.test(e.name)) { const t = read(p); if (t) acc.push(t); }
+  }
+  return acc;
+}
+
 const [cmd, ...args] = process.argv.slice(2);
 if (cmd === "collect") {
-  const [out, missionDir, head, guardLog = ""] = args;
+  const [out, missionDir, head, guardLog = "", ...rootArgs] = args;
+  const roots = [...new Set(rootArgs.filter(Boolean).flatMap((r) => [resolve(r), real(r)]))];
+  const recorded = missionText(missionDir).join("\n");
   // The guard's refusals (factory-guard.ts): ISO date, rule, tool, input, cwd.
   const refusals = (read(guardLog) || "").split("\n").filter(Boolean).map((l) => l.split("\t"))
     .map(([date, rule, tool, input, cwd]) => ({ t: Date.parse(date), date, rule, tool, input: redact(input || ""), cwd: cwd || "" }))
     .filter((r) => !Number.isNaN(r.t));
   const metas = readFileSync(0, "utf8").split("\n").filter(Boolean);
-  let added = 0, redacted = 0;
+  let added = 0, redacted = 0, foreign = 0;
   for (const meta of metas) {
     let j; try { j = JSON.parse(readFileSync(meta, "utf8")); } catch { continue; }
     const base = basename(meta).replace(/_meta\.json$/, "");
@@ -62,6 +79,12 @@ if (cmd === "collect") {
     const runId = String(j.runId || (i > 0 ? base.slice(0, i) : base));
     const agent = String(j.agent || (i > 0 ? base.slice(i + 1) : "?")).replace(/_\d+$/, "");
     if (!agent.startsWith("factory-")) continue;
+    if (roots.length) {
+      const input = read(join(dirname(meta), `${basename(meta).replace(/_meta\.json$/, "")}_input.md`)) || "";
+      const id = (input.match(/^brief-id:\s*(\S+)/m) || [])[1] || "";
+      const ours = under(meta, roots) || pathsIn(j).some((p) => under(p, roots)) || (id.length >= 6 && recorded.includes(id));
+      if (!ours) { foreign++; continue; }
+    }
     const key = `${runId}_${agent}`.replace(/[^\w.-]/g, "_");
     const dest = join(out, key);
     const known = existsSync(join(dest, "run.json"));   // archived before: add what was missing, refresh the outcome
@@ -96,7 +119,7 @@ if (cmd === "collect") {
     if (next !== prev) writeFileSync(join(dest, "run.json"), next);
     if (!known) added++;
   }
-  console.log(`archive: ${added} run(s) added to ${out}${redacted ? ` (${redacted} file(s) redacted)` : ""}`);
+  console.log(`archive: ${added} run(s) added to ${out}${redacted ? ` (${redacted} file(s) redacted)` : ""}${foreign ? `; ${foreign} run(s) of another checkout ignored` : ""}`);
 } else if (cmd === "list") {
   const [out] = args;
   if (!existsSync(out)) process.exit(0);

@@ -30,6 +30,13 @@
 # ({ "turns", "input", "output", "cost" }). Unset: pi in JSON mode with the
 # driver (as run.sh does), the role's model and thinking set as project
 # agentOverrides in the throwaway worktree.
+#
+# Guarded like workers (D101): agents run with FACTORY_ROLE=worker, so the
+# factory guard applies the worker rules (no network, no shared dependencies);
+# a case worktree without .pi/extensions/factory-guard.ts is refused, never
+# run unguarded. Pi loads project extensions only for a trusted project: trust
+# this repo in Pi once (pi asks the first time it starts here) before a run.
+# Case worktrees are removed on any exit, error or interrupt, unless --debug.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib.sh
@@ -125,6 +132,19 @@ profile_role() {   # <profile> <role> → "model<TAB>thinking"
     process.stdout.write((a.model||"")+"\t"+(a.thinking||""))' "$1" "$2"
 }
 
+# The current case's worktree, removed on any exit or signal unless --debug (D101).
+BENCH_WT=""; BENCH_TOP=""; BENCH_KEEP=0
+bench_cleanup() {
+  [ -n "$BENCH_WT" ] || return 0
+  if [ "$BENCH_KEEP" = 1 ]; then echo "bench: kept $BENCH_WT" >&2
+  else git -C "$BENCH_TOP" worktree remove --force "$BENCH_WT" >/dev/null 2>&1 || rm -rf "$BENCH_WT"
+    git -C "$BENCH_TOP" worktree prune >/dev/null 2>&1 || true; fi
+  BENCH_WT=""
+}
+trap bench_cleanup EXIT
+trap 'bench_cleanup; exit 130' INT
+trap 'bench_cleanup; exit 143' TERM
+
 pi_runner() {      # same arguments as FACTORY_BENCH_RUNNER
   local role="$1" id="$2" wd="$3" brief="$4" model="$5" thinking="$6" out="$7" wf raw
   read -r -a pi_cmd <<<"${FACTORY_PI_CMD:-pi}"; [ -z "${FACTORY_PI_BIN:-}" ] || pi_cmd=("$FACTORY_PI_BIN")
@@ -140,7 +160,7 @@ pi_runner() {      # same arguments as FACTORY_BENCH_RUNNER
     s.subagents.agentOverrides["factory-"+process.argv[2]]=Object.assign(s.subagents.agentOverrides["factory-"+process.argv[2]]||{},o);
     fs.mkdirSync(require("path").dirname(f),{recursive:true});fs.writeFileSync(f,JSON.stringify(s,null,2))' "$wd/.pi/settings.json" "$role" "$model" "$thinking"
   raw="$out/pi.jsonl"
-  ( cd "$wd" && FACTORY_DRIVE_WORKFLOW="./$wf" "${pi_cmd[@]}" -p --mode json --no-session --approve \
+  ( cd "$wd" && FACTORY_ROLE=worker FACTORY_DRIVE_WORKFLOW="./$wf" "${pi_cmd[@]}" -p --mode json --no-session --approve \
       -e "$here/driver.mjs" --model factory-driver/script "run the workflow" </dev/null >"$raw" 2>"$raw.err" ) || true
   node -e 'const fs=require("fs");const lines=fs.readFileSync(process.argv[1],"utf8").split("\n").filter(Boolean);let end=null;
     for(const l of lines){try{const e=JSON.parse(l);if(e.type==="tool_execution_end"&&e.toolName==="subagent")end=e;}catch{}}
@@ -153,7 +173,7 @@ run_role() {       # <role> <id> <wd> <brief> <profile> <out>
   local mt model thinking
   mt="$(profile_role "$5" "$1")"; model="${mt%%$'\t'*}"; thinking="${mt#*$'\t'}"
   if [ -n "${FACTORY_BENCH_RUNNER:-}" ]; then
-    "$FACTORY_BENCH_RUNNER" "$1" "$2" "$3" "$4" "$model" "$thinking" "$6"
+    FACTORY_ROLE=worker "$FACTORY_BENCH_RUNNER" "$1" "$2" "$3" "$4" "$model" "$thinking" "$6"
   else
     pi_runner "$1" "$2" "$3" "$4" "$model" "$thinking" "$6"
   fi
@@ -171,7 +191,11 @@ one_case() {
   local root; root="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/bench"
   wt="$root/wt-$label-$id-$$"; out="$root/out/$label/$id"; rm -rf "$out"; mkdir -p "$out"
   git -C "$top" worktree add -q --detach "$wt" "$base" >/dev/null 2>&1 || die "could not create a worktree at $base"
+  BENCH_WT="$wt"; BENCH_TOP="$top"; BENCH_KEEP="$debug"
   wd="$wt${prefix:+/$prefix}"
+  # D101: never an unguarded agent.
+  [ -f "$wd/.pi/extensions/factory-guard.ts" ] || [ -f "$wt/.pi/extensions/factory-guard.ts" ] \
+    || die "case $id: no .pi/extensions/factory-guard.ts at $base: bench won't run agents without the factory guard"
   # The worktree gets what a worker's would (D21, D27, D65): instrument hidden,
   # its port, the dependencies linked.
   printf '{"repoRoot":"%s","worktreePath":"%s","agentCwd":"%s","index":0}' "$top" "$wt" "$wd" \
@@ -218,8 +242,8 @@ one_case() {
     read -r turns tokens cost < <(node -e 'const u=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
       console.log((u.turns||0)+" "+((u.input||0)+(u.output||0))+" "+(u.cost||0))' "$out/usage.json")
   fi
-  if [ "$debug" = 1 ]; then echo "bench: kept $wd (transcript and logs: $out)" >&2
-  else git -C "$top" worktree remove --force "$wt" >/dev/null 2>&1 || rm -rf "$wt"; git -C "$top" worktree prune; fi
+  if [ "$debug" = 1 ]; then echo "bench: kept $wd (transcript and logs: $out)" >&2; BENCH_WT=""
+  else bench_cleanup; fi
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t1\n' "$id" "$(case_field "$id" difficulty)" "$(case_field "$id" area)" \
     "$([ -z "$gate" ] && echo yes || echo no)" "${gate:--}" "$turns" "$tokens" "$cost" "$secs"
 }
