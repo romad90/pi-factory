@@ -24,6 +24,11 @@
 # Runs come from pi-subagents' per-run artifacts ({run}_{agent}_meta.json and
 # its siblings), found where usage.sh looks (FACTORY_USAGE_DIRS), newer than
 # the mission's spec. Best effort: nothing found, nothing archived.
+# Only this checkout's runs (D101): a run counts when its meta file or a path
+# it records is under the checkout (top level, a git worktree, the git common
+# dir, where the benchmark's worktrees live), or when its brief id is one the
+# mission recorded. Another clone's or another user's runs in a shared temp
+# folder are ignored.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib.sh
@@ -45,8 +50,10 @@ case "$cmd" in
     existing=()
     for r in "${roots[@]}"; do [ -d "$r" ] && existing+=("$r"); done
     [ ${#existing[@]} -gt 0 ] || { echo "archive: nothing to collect"; exit 0; }
+    owned=("$(git rev-parse --show-toplevel)" "$(git rev-parse --path-format=absolute --git-common-dir)")
+    while IFS= read -r w; do owned+=("$w"); done < <(git worktree list --porcelain | sed -n 's/^worktree //p')
     find "${existing[@]}" -maxdepth 7 -type f -name '*_meta.json' -newer "$dir/spec.md" 2>/dev/null \
-      | node "$here/archive.mjs" collect "$out" "$dir" "$(git rev-parse HEAD 2>/dev/null || echo none)" "$(dirname "$(archive_root)")/guard.log"
+      | node "$here/archive.mjs" collect "$out" "$dir" "$(git rev-parse HEAD 2>/dev/null || echo none)" "$(dirname "$(archive_root)")/guard.log" "${owned[@]}"
     ;;
   list)
     feature="${1:?$usage}"

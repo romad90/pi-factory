@@ -104,10 +104,16 @@ check_mission() {                       # <feature>
   if [ -f "$dir/contract-critique.md" ]; then ok "G1: contract critique present"
   else bad "G1: contract critique missing (run /contract-critic)"; fi
 
+  if [ -f "$dir/investigation.md" ] && grep -q '^## Conclusion' "$dir/investigation.md"; then   # D99, D101
+    if conclusion_approved "$dir/investigation.md"; then ok "G0: investigation conclusion approved"
+    else bad "G0: investigation conclusion not approved by /factory-approve <mission> conclusion"; fi
+  fi
   if contract_approved "$spec"; then ok "G1: contract approved"
+  elif approval_unrecorded "$spec" Contract approve; then bad "G1: the approval line has no /factory-approve record in decisions.tsv (D101)"
   else bad "G1: contract not approved (or amended and awaiting re-approval)"; fi
   if design_needed "$spec"; then        # D94
     if design_approved "$dir/design.md"; then ok "G1b: program design approved"
+    elif approval_unrecorded "$dir/design.md" Design approve-design; then bad "G1b: the design's approval line has no /factory-approve record in decisions.tsv (D101)"
     else bad "G1b: program design missing or not approved (/factory-approve <mission> design)"; fi
   fi
 
