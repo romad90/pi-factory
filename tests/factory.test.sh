@@ -204,6 +204,7 @@ mkdir -p $m/issues
 cat > $m/spec.md <<'SPEC'
 # Demo
 **Intent:** feature
+**Reviewer:** jdoe
 
 Users get a greeting.
 
@@ -232,8 +233,30 @@ bash scripts/factory/workflow.sh contract demo >"$work/wf.log"
 wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
 [ -f "$wf" ] && grep -q 'const ITEMS' "$wf" && t "contract wave written to a file ($(basename "$wf"))" || fail "workflow file"
 grep -q '^\*\*Status:\*\* sent' $m/amendments/*.md && t "amendment marked sent" || fail "amendment status"
-bash scripts/factory/human.sh approve demo >/dev/null
+FACTORY_APPROVER="Test Human" bash scripts/factory/human.sh approve demo >/dev/null
+grep -qE '^\*\*Contract approved:\*\* [0-9-]+ — by Test Human' $m/spec.md && t "the approval line records who approved (D95)" || fail "approver" "$(grep 'Contract approved' $m/spec.md)"
+# D94: a feature mission gets a program design after G1, approved before tickets.
+expect_step design "feature mission, G1 approved, no design"
+bash scripts/factory/workflow.sh design demo >"$work/wf.log"
+wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
+grep -q '"agent": "factory-designer"' "$wf" && grep -q 'design-format.md' "$wf" && grep -q '.scratch/demo/design.md' "$wf" \
+  && t "the design wave runs the designer on the approved contract" || fail "design wave" "$(cat "$wf")"
+printf '# Design: demo\n\n## Call stacks\n```diff\n+greet  # VAL-HELLO-001\n```\n\n## Slices\n1. hello end to end — VAL-HELLO-001\n' > $m/design.md
+git add -A; git commit -qm "test: design draft"
+out="$(bash scripts/factory/next.sh demo)"
+grep -q '^STEP: approve-design' <<<"$out" && grep -q 'and jdoe, who will review the MR' <<<"$out" \
+  && t "an unapproved design waits for the human and the MR's reviewer (G1b)" || fail "approve-design" "$out"
+FACTORY_APPROVER="Test Human" bash scripts/factory/human.sh approve demo design >/dev/null
+sed -n 2p $m/design.md | grep -qE '^\*\*Design approved:\*\* [0-9-]+ — by Test Human' && grep -q $'\tapprove-design\t' $m/decisions.tsv \
+  && [ -z "$(git status --porcelain -- .scratch)" ] && t "/factory-approve <f> design writes the line under the title, logs it, checkpoints" || fail "approve design" "$(head -3 $m/design.md)"
 expect_step tickets "approved, no tickets"
+grep -q 'design.md if it exists (approved' <<<"$(bash scripts/factory/brief.sh ticket-writer demo all)" && grep -q 'Write vertical slices' <<<"$(bash scripts/factory/brief.sh ticket-writer demo all)" \
+  && grep -q 'design.md exists, it is approved' <<<"$(bash scripts/factory/brief.sh reviewer demo 01-hello)" \
+  && t "ticket writer follows the design in vertical slices; the reviewer checks commits against it (D94, D95)" || fail "design briefs"
+dn() { bash -c '. scripts/factory/lib.sh; f="$(mktemp)"; printf "%b" "$1" > "$f"; design_needed "$f" && echo yes || echo no' _ "$1"; }
+[ "$(dn '**Intent:** feature\n')" = yes ] && [ "$(dn '**Intent:** refactor\n')" = yes ] && [ "$(dn '**Intent:** maintenance\n')" = no ] \
+  && [ "$(dn '**Intent:** bugfix\n')" = no ] && [ "$(dn '**Intent:** bugfix\n**Design:** yes\n')" = yes ] && [ "$(dn '**Intent:** feature\n**Design:** no\n')" = no ] \
+  && t "design: feature and refactor by default, maintenance and bugfix skip it, **Design:** overrides" || fail "design_needed"
 bash scripts/factory/workflow.sh tickets demo all >"$work/wf.log"
 wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
 grep -q '"agent": "factory-ticket-writer"' "$wf" && grep -q 'write the mission' "$wf" && t "tickets come from the ticket writer" || fail "ticket writer wave" "$(cat "$wf")"
@@ -776,7 +799,7 @@ out="$(FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo --dry-run 2>
 echo "$out" | grep -q 'run /pr first' && t "mr.sh refuses without a PR body" || fail "mr no body" "$out"
 printf '# test(demo): characterize the hello tools\n\n## Summary\n\nTwo tools pinned.\n' > $m/pr.md
 out="$(FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo --dry-run 2>&1)"
-echo "$out" | grep -q "→ production" && echo "$out" | grep -q 'title: test(demo): characterize the hello tools' \
+echo "$out" | grep -q "→ production" && echo "$out" | grep -q 'title: test(demo): characterize the hello tools' && echo "$out" | grep -q 'reviewer: jdoe' \
   && t "mr.sh: title from the body's heading, target from FACTORY_MR_TARGET" || fail "mr dry" "$out"
 cur="$(git rev-parse --abbrev-ref HEAD)"
 out="$(FACTORY_MR_TARGET=production FACTORY_MR_BLOCKED_BRANCHES="other/* ${cur%%/*}*" bash scripts/factory/mr.sh demo --dry-run 2>&1)" && fail "mr.sh must refuse a blocked branch"
@@ -801,11 +824,62 @@ git ls-remote --heads "$work/origin.git" "$cur" | grep -q . && grep -qx 'product
   && t "mr.sh pushes the branch and opens the MR with glab; heading becomes the title, the rest the description (D86)" || fail "mr glab create" "$(cat "$work/mr.log" "$work/glab.log")"
 git remote remove origin; rm -f $m/pr.md $m/mr.url
 
+# D96: new tests must disagree with the code before the change, as the intent says.
+echo "Test on base (D96)"
+tob0="$(git rev-parse HEAD)"
+printf 'FACTORY_LINT_CMD="true"\nFACTORY_TEST_CMD='"'"'for f in tests/tob/*.check; do [ -e "$f" ] || continue; sh "$f" || exit 1; done'"'"'\n' > .factory/commands.env
+mkdir -p src/tob tests/tob; echo 1 > src/tob/value.txt
+for i in feature bugfix maintenance refactor; do
+  mkdir -p .scratch/tob-$i/issues
+  printf '# Tob\n**Intent:** %s\n\n## Frozen paths\n- none\n\n## Validation contract\n' "$i" > .scratch/tob-$i/spec.md
+  printf '# 01 a\n## Covers\nVAL-T-001\n' > .scratch/tob-$i/issues/01-a.md
+done
+printf '# 01 a\n## Covers\nVAL-T-001\n\n## Test on base: skip — the fixture regenerates a snapshot\n' > .scratch/tob-feature/issues/02-b.md
+git add -A; git commit -qm "test: test-on-base missions"; tobbase="$(git rev-parse HEAD)"
+tob_patch() {   # <name> <expected value in the test> [new value in the code]
+  { printf 'diff --git a/tests/tob/%s.check b/tests/tob/%s.check\nnew file mode 100644\n--- /dev/null\n+++ b/tests/tob/%s.check\n@@ -0,0 +1 @@\n+grep -qx %s src/tob/value.txt\n' "$1" "$1" "$1" "$2"
+    [ -z "${3:-}" ] || printf 'diff --git a/src/tob/value.txt b/src/tob/value.txt\n--- a/src/tob/value.txt\n+++ b/src/tob/value.txt\n@@ -1 +1 @@\n-1\n+%s\n' "$3"; } > "$work/tob-$1.patch"; }
+tob_int() { git reset -q --hard "$tobbase"; bash scripts/factory/integrate.sh "tob-$1" "${3:-01-a}" "$work/tob-$2.patch" > "$work/tob.log" 2>&1; }
+tob_patch adds 2 2; tob_patch pins 1; tob_patch wrong 3
+tob_int feature adds && grep -q 'test on base: as expected (fails before the change)' "$work/tob.log" \
+  && t "feature: a new test that fails on the code before the change integrates (D96)" || fail "tob feature ok" "$(cat "$work/tob.log")"
+if tob_int feature pins; then fail "feature: a test passing before the change must be refused" "$(cat "$work/tob.log")"; fi
+[ "$(bash -c '. scripts/factory/lib.sh; verdict_field .scratch/tob-feature/verdicts/01-a-code.md Brief')" = test-on-base ] \
+  && grep -q "pass on the code before the change (feature mission): they don't test the ticket" .scratch/tob-feature/verdicts/01-a-code.md \
+  && [ ! -e tests/tob/pins.check ] && t "feature: a new test that already passes before the change is a failed round, nothing applied" || fail "tob feature refuse" "$(cat "$work/tob.log" .scratch/tob-feature/verdicts/01-a-code.md 2>&1)"
+if tob_int bugfix pins; then fail "bugfix: a test passing before the fix must be refused" "$(cat "$work/tob.log")"; fi
+t "bugfix: the same rule (the test must reproduce the bug first)"
+tob_int maintenance pins && grep -q "passes on today's code" "$work/tob.log" || fail "tob maintenance ok" "$(cat "$work/tob.log")"
+if tob_int maintenance wrong; then fail "maintenance: a test failing on today's code must be refused" "$(cat "$work/tob.log")"; fi
+grep -q "fail on today's code (maintenance mission): a characterization test must describe current behavior" .scratch/tob-maintenance/verdicts/01-a-code.md \
+  && t "maintenance: a characterization test must pass on today's code" || fail "tob maintenance refuse" "$(cat .scratch/tob-maintenance/verdicts/01-a-code.md)"
+tob_int refactor pins || fail "tob refactor ok" "$(cat "$work/tob.log")"
+if tob_int refactor wrong; then fail "refactor: a test failing on today's code must be refused" "$(cat "$work/tob.log")"; fi
+t "refactor: new tests must pass on the code before the refactor"
+tob_int feature pins 02-b && grep -q 'skipped by the ticket (the fixture regenerates a snapshot)' "$work/tob.log" \
+  && grep -qP '\t02-b\ttest-on-base\t.*\tYes: the fixture regenerates a snapshot\t' .scratch/tob-feature/decisions.tsv \
+  && t "a ticket can opt out with a reason, recorded as a decision" || fail "tob opt-out" "$(cat "$work/tob.log" .scratch/tob-feature/decisions.tsv 2>&1)"
+git reset -q --hard "$tobbase"
+out="$(bash scripts/factory/test-on-base.sh tob-feature 01-a "$work/tob-pins.patch" "$tobbase")" && fail "test-on-base.sh must exit 1 on a mismatch" "$out"
+bash scripts/factory/test-on-base.sh tob-feature 01-a "$work/tob-adds.patch" "$tobbase" | grep -q 'as expected' \
+  && { bash scripts/factory/test-on-base.sh tob-feature 01-a "$work/none.patch" >/dev/null 2>&1; [ $? -eq 2 ]; } \
+  && [ "$(git rev-parse HEAD)" = "$tobbase" ] && [ -z "$(git status --porcelain --untracked-files=no)" ] \
+  && t "test-on-base.sh: the same check on its own (exit 0, 1, 2), the branch untouched" || fail "tob script" "$out"
+FACTORY_TEST_ON_BASE=0 bash scripts/factory/integrate.sh tob-feature 01-a "$work/tob-pins.patch" > "$work/tob.log" 2>&1 && grep -q 'test on base: off' "$work/tob.log" \
+  && t "FACTORY_TEST_ON_BASE=0 turns the check off" || fail "tob off" "$(cat "$work/tob.log")"
+git reset -q --hard "$tobbase"
+git worktree add -q -b pi-subagents/01-a-tob-s0-t0 "$work/tob-wt" "$tobbase"
+tob_sub="$(git rev-parse --show-prefix)"
+( cd "$work/tob-wt/${tob_sub}" && mkdir -p tests/tob && echo 'grep -qx 1 src/tob/value.txt' > tests/tob/w.check && bash scripts/factory/self-check.sh tob-feature ) > "$work/tob-sc.log" 2>&1 && fail "self-check must refuse a test passing before the change" "$(cat "$work/tob-sc.log")"
+grep -q '^SELF-CHECK: FAIL test-on-base' "$work/tob-sc.log" && t "self-check runs the same check, so the worker sees it before handing over" || fail "tob self-check" "$(cat "$work/tob-sc.log")"
+git worktree remove --force "$work/tob-wt"; git branch -q -D pi-subagents/01-a-tob-s0-t0
+git reset -q --hard "$tob0"
+
 # D91: the scripted lead runs a mission's loop with no LLM lead.
 echo "Scripted lead (run.sh)"
 r=.scratch/runner; mkdir -p $r/issues
 printf '# Runner\n**Intent:** feature\n\nA run file.\n\n## Validation contract\n\n### VAL-RUN-001: runs\n**Kind:** code\nGiven the tool, when it runs, then it returns ok.\n' > $r/spec.md
-printf 'FACTORY_LINT_CMD="true"\nFACTORY_TEST_CMD="true"\n' > .factory/commands.env
+printf 'FACTORY_LINT_CMD="true"\nFACTORY_TEST_CMD="true"\nFACTORY_TEST_ON_BASE=0\n' > .factory/commands.env   # "true" can't fail on base (D96 is tested on its own)
 git add -A; git commit -qm "test: runner mission"
 mkdir -p "$work/bin"
 # A pi stand-in: checks how run.sh calls it, plays the contract wave, prints pi's JSON events.
@@ -834,6 +908,7 @@ bid() { node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");cons
 bcommit() { local sha t; for sha in $(grep -oE '[0-9a-f]{40}' "$wf" | sort -u); do for t in - ""; do [ "$(brief_id "$1" runner "$t" "$sha")" = "$2" ] && { echo "$sha"; return; }; done; done; }
 echo "$(basename "$wf")" >> "$FAKE_LOG"
 case "$wf" in
+  *-design*.js) printf '# Design: runner\n\n## Slices\n1. run end to end — VAL-RUN-001\n' > $r/design.md; echo '{"output":"design"}' ;;
   *-tickets*.js) printf '# 01 run\n**Size:** S\n## Covers\nVAL-RUN-001\n' > $r/issues/01-run.md; echo '{"output":"1 ticket"}' ;;
   *-build-wave*.js)
     if [ ! -f "$FAKE_STATE.429" ]; then touch "$FAKE_STATE.429"; echo '[{"ticket":"01-run","patch":null,"ok":false,"error":"429 Too Many Requests: rate limit"}]'
@@ -854,6 +929,9 @@ esac
 FAKE
 chmod +x "$work/bin/fakerun"
 export FAKE_LOG="$work/fake.log" FAKE_STATE="$work/fake" FAKE_PATCH="$work/run.test.js.patch"
+out="$(FACTORY_RUNNER=fake FACTORY_FAKE_RUNNER="$work/bin/fakerun" bash scripts/factory/run.sh runner --no-preflight 2>&1)" || fail "run.sh design" "$out"
+echo "$out" | grep -q 'WAITING: human (approve-design)' && [ -f $r/design.md ] && t "run.sh: design wave, then stops for G1b (D94)" || fail "run.sh design" "$out"
+bash scripts/factory/human.sh approve runner design >/dev/null
 out="$(FACTORY_RUNNER=fake FACTORY_FAKE_RUNNER="$work/bin/fakerun" bash scripts/factory/run.sh runner --no-preflight 2>&1)" || fail "run.sh tickets" "$out"
 echo "$out" | grep -q 'WAITING: human (approve-tickets)' && [ -f $r/issues/01-run.md ] && t "run.sh: tickets wave, then stops for the human's approval" || fail "run.sh tickets" "$out"
 bash scripts/factory/human.sh approve runner tickets >/dev/null
@@ -1000,7 +1078,7 @@ git -C "$work/ci" checkout -q -- .
 (cd "$work/ci/apps/svc" && FACTORY_PACKAGE_GIT="$root" bash -c "$fetch" >/dev/null 2>&1) && [ -L "$work/ci/apps/svc/scripts/factory" ] \
   && [ "$(git -C "$(cd -P "$work/ci/apps/svc/scripts/factory/../.." && pwd)" rev-parse HEAD)" = "$(git -C "$root" rev-parse HEAD)" ] \
   && t "CI fetches the factory from FACTORY_PACKAGE_GIT at the recorded commit, into a directory of its own, then links it" || fail "CI fetch" "$(ls -la "$work/ci/apps/svc/scripts" 2>&1)"
-[ "$(node scripts/factory/effective-models.mjs | wc -l | tr -d ' ')" = 9 ] && node scripts/factory/models-lint.mjs --per-machine-ok >/dev/null \
+[ "$(node scripts/factory/effective-models.mjs | wc -l | tr -d ' ')" = 10 ] && node scripts/factory/models-lint.mjs --per-machine-ok >/dev/null \
   && t "agents come from the package; CI accepts models set per machine" || fail "package agents" "$(node scripts/factory/effective-models.mjs; node scripts/factory/models-lint.mjs --per-machine-ok)"
 cp .pi/settings.json "$work/svc-settings"; node -e 'const f=".pi/settings.json",s=require("./"+f);s.subagents.disableBuiltins=false;require("fs").writeFileSync(f,JSON.stringify(s))'
 out="$(node scripts/factory/models-lint.mjs --per-machine-ok 2>&1)" && fail "per-machine lint must still check the settings" "$out"

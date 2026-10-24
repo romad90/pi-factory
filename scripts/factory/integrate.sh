@@ -59,6 +59,23 @@ if ! guard_out="$(bash "$here/patch-guard.sh" "$patch" --mission "$feature")"; t
   exit 1
 fi
 
+# D96: new tests must disagree with the code before the change the way the
+# mission's intent says: fail there (feature, bugfix) or pass there
+# (maintenance, refactor). Checked before anything is applied here.
+mkdir -p "$dir/logs"
+if ! tob="$(test_on_base "$feature" "$ticket" "$patch" "$dir/logs/$ticket-test-on-base.log")"; then
+  write_fail_verdict "$feature" "$ticket" test-on-base \
+    "${tob#test on base: } (the tests alone, run on $(git rev-parse --short HEAD): $dir/logs/$ticket-test-on-base.log)"
+  bash "$here/checkpoint.sh" "$feature" >/dev/null
+  echo "  ✗ $tob; recorded as a failed round in $dir/verdicts/$ticket-code.md"
+  exit 1
+fi
+echo "  - $tob"
+case "$tob" in "test on base: skipped by the ticket ("*)   # the opt-out is a decision: recorded once
+  why="${tob#test on base: skipped by the ticket (}"; why="${why%)}"
+  grep -qF "$(printf '%s\ttest-on-base' "$ticket")" "$dir/decisions.tsv" 2>/dev/null \
+    || decision_log "$feature" "$ticket" test-on-base "Skip the test-on-base check (D96)?" "Yes: $why" ticket "issue file" ;;
+esac
 if ! project_apply --check --index "$patch" 2>/dev/null; then
   if ! project_apply --check --3way --index "$patch" 2>/dev/null; then
     write_fail_verdict "$feature" "$ticket" integrate \

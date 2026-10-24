@@ -106,6 +106,10 @@ check_mission() {                       # <feature>
 
   if contract_approved "$spec"; then ok "G1: contract approved"
   else bad "G1: contract not approved (or amended and awaiting re-approval)"; fi
+  if design_needed "$spec"; then        # D94
+    if design_approved "$dir/design.md"; then ok "G1b: program design approved"
+    else bad "G1b: program design missing or not approved (/factory-approve <mission> design)"; fi
+  fi
 
   cov="$(mktemp)"
   if bash "$here/coverage.sh" "$feature" >"$cov" 2>&1; then ok "G2: coverage"
