@@ -88,6 +88,7 @@ cp "$src"/docs/prompts/*.md "$dst/docs/factory/prompts/"
 
 # Repo-owned: created once, then yours.
 put .factory/commands.env repo
+put_tree .factory/scoring repo                # D97: yours to sharpen; add a file per failure mode
 put .factory/behavior-paths repo
 put docs/agents/quality-bar.md repo
 # Practice packs: content for a kind of software, repo-owned once copied (D54).

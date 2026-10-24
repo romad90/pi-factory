@@ -246,6 +246,9 @@ If the merge left your branch's dependency versions, take the target's `package.
 | `scripts/factory/doctor.sh [--quick]` | after install or a model change / before a run |
 | `scripts/factory/gate.sh mission <f>` | the gate CI will run |
 | `scripts/factory/metrics.sh <f>` | numbers for the MR |
+| `scripts/factory/metrics.sh --all` | every mission and the total: cost per MR, interventions per MR, first pass, scores (D97) |
+| `scripts/factory/archive.sh list\|export <f>` | the mission's archived runs (transcripts, briefs, guard refusals), outside the repo (D97) |
+| `scripts/factory/score.sh <f> [--dimension x] [--sample n]` | a judge of another family checks archived runs for failure modes in `.factory/scoring/` (D97) |
 | `scripts/factory/health.sh metrics` | today's health metrics for the repo |
 | `scripts/factory/readiness.sh` | what the repo still lacks for Step 2 |
 | `scripts/factory/skills-pin.sh verify\|check-global` | skills drifted or shadowed? |

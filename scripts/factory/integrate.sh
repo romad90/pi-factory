@@ -139,6 +139,7 @@ if check_lint && run_check tests "$FACTORY_TEST_CMD" \
   journal_collect "$feature" "$ticket" "integrated $(git rev-parse --short HEAD)"   # D84
   rm -f "$(draft_patch "$feature" "$ticket")" "$(draft_patch "$feature" "$ticket").status"   # D73: the draft is spent
   bash "$here/usage.sh" "$feature" >/dev/null 2>&1 || true   # D85
+  bash "$here/archive.sh" collect "$feature" >/dev/null 2>&1 || true   # D97
   echo "  ✓ committed $(git rev-parse --short "$(cat "$dir/state/$ticket.integrated")"); ready for review"
 else
   project_apply -R --index "$patch"

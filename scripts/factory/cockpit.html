@@ -106,9 +106,22 @@ function interventions(m) {
   return `<span>decisions <b style="color:${over ? "var(--red)" : "var(--ink)"}">${i.human}</b>/${i.target}</span><span>auto-answered <b>${i.auto}</b></span>`;
 }
 
+// D97: the factory engineer's line, across every mission (metrics.sh --all).
+function factoryLine() {
+  const f = state.factory; if (!f || !f.missions) return "";
+  const pct = (a, b) => (b ? Math.round((100 * a) / b) + "%" : "-");
+  const v = (x) => (x === null || x === undefined ? "-" : x);
+  return `<div class="panel" style="margin-bottom:16px"><h2>Factory · all missions</h2><div class="stat">
+    <span><b>${f.missions}</b> missions</span><span><b>${f.mrs}</b> MRs</span>
+    <span>cost per MR <b>${v(f.costPerMr)}</b></span><span>interventions per MR <b>${v(f.decisionsPerMr)}</b></span>
+    <span>first pass <b>${pct(f.firstPass, f.reviewed)}</b></span>
+    <span>rounds per ticket <b>${f.reviewed ? (f.rounds / f.reviewed).toFixed(1) : "-"}</b></span>
+    <span>scored runs <b>${f.scored}</b> (${f.scoreFails} fail)</span></div></div>`;
+}
+
 function leads() {
   if (!state.missions.length) return `<p class="empty">No mission under ${esc(state.factoryDir)}/ yet.</p>`;
-  return `<div class="grid leads">${state.missions.map((m, i) => `
+  return factoryLine() + `<div class="grid leads">${state.missions.map((m, i) => `
     <div class="panel card${i === sel ? " sel" : ""}" data-m="${esc(m.name)}">
       <div class="row"><span class="mono muted">${esc(m.name)}</span>${stepPill(m)}</div>
       <div class="title">${esc(m.title || m.name)}</div>
