@@ -68,6 +68,14 @@ else
 fi
 
 runs="${FACTORY_RUN_DIRS:-${TMPDIR:-/tmp}/pi-subagents-uid-$(id -u)/async-subagent-runs}"
+# D97: the leads level carries the factory's totals across missions (cost per
+# MR, interventions per MR, first pass, scores), for the factory engineer.
+# FACTORY_STATUS_METRICS=0 leaves them out.
+metrics=""
+if [ -n "$all" ] && [ "${FACTORY_STATUS_METRICS:-1}" != 0 ] && [ ${#missions[@]} -gt 0 ]; then
+  metrics="$(mktemp)"; trap 'rm -f "$metrics"' EXIT
+  bash "$here/metrics.sh" --all --json > "$metrics" 2>/dev/null || : > "$metrics"
+fi
 {
   for f in "${missions[@]}"; do printf 'M\t%s\n' "$f"; mission_lines "$f"; done
-} | FACTORY_DIR="$FACTORY_DIR" RUN_DIRS="$runs" ALL="$all" QUIET_MIN="${FACTORY_QUIET_MIN:-10}" node "$here/status.mjs"
+} | FACTORY_DIR="$FACTORY_DIR" RUN_DIRS="$runs" ALL="$all" METRICS="$metrics" QUIET_MIN="${FACTORY_QUIET_MIN:-10}" node "$here/status.mjs"

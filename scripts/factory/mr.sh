@@ -13,6 +13,8 @@
 #         matches a pattern in $FACTORY_MR_BLOCKED_BRANCHES (space-separated
 #         globs, e.g. "chore/*" where such branches deploy).
 #
+# Reviewer: $FACTORY_MR_REVIEWER, else the spec's **Reviewer:** line (a GitLab
+#         username): the person who approved the contract and design (D95).
 # How the MR is created, first that works:
 #   1. glab, if installed and logged in
 #   2. the GitLab API, with the token in the variable $FACTORY_GITLAB_TOKEN_ENV
@@ -54,6 +56,10 @@ for g in $(conf FACTORY_MR_BLOCKED_BRANCHES); do
   case "$branch" in $g) die "branch $branch matches FACTORY_MR_BLOCKED_BRANCHES ($g): push it under another name" ;; esac
 done
 
+# D95: the reviewer who approved the plan reviews the MR (a GitLab username).
+reviewer="$(conf FACTORY_MR_REVIEWER)"
+[ -n "$reviewer" ] || reviewer="$(verdict_field "$dir/spec.md" Reviewer 2>/dev/null | sed 's/^@//; s/[[:space:]].*//' || true)"
+
 title="$(sed -n 's/^# \{1,\}//p' "$body_file" | head -1)"
 [ -n "$title" ] || title="$(git log -1 --format=%s)"
 case "$title" in *'[skip ci]'*|*'[ci skip]'*) die "the title would skip CI: $title" ;; esac
@@ -65,6 +71,7 @@ awk 'done || !/^# /{print; next} {done=1}' "$body_file" | sed '/./,$!d' > "$desc
 echo "MR: $branch → $target"
 echo "    title: $title"
 echo "    body:  $body_file"
+[ -z "$reviewer" ] || echo "    reviewer: $reviewer"
 if [ -n "$dry" ]; then echo "(dry run: nothing pushed)"; exit 0; fi
 
 url_file="$dir/mr.url"
@@ -81,7 +88,7 @@ if command -v glab >/dev/null 2>&1 && glab auth status >/dev/null 2>&1; then
     echo "updated MR !$existing"
   else
     out="$(glab mr create --source-branch "$branch" --target-branch "$target" --title "$title" \
-      --description "$(cat "$desc")" --yes 2>&1)" || die "glab: $out"
+      --description "$(cat "$desc")" ${reviewer:+--reviewer "$reviewer"} --yes 2>&1)" || die "glab: $out"
     record "$(printf '%s\n' "$out" | grep -o 'https://[^ ]*merge_requests/[0-9]*' | head -1)"
   fi
   exit 0
@@ -95,7 +102,7 @@ if [ -n "$token" ]; then
   remote="$(git remote get-url origin)"
   api="$(conf FACTORY_GITLAB_API)"
   # shellcheck disable=SC2016
-  res="$(TITLE="$title" SRC="$branch" TGT="$target" REMOTE="$remote" API="$api" TOKEN="$token" DESC_FILE="$desc" node -e '
+  res="$(REVIEWER="$reviewer" TITLE="$title" SRC="$branch" TGT="$target" REMOTE="$remote" API="$api" TOKEN="$token" DESC_FILE="$desc" node -e '
 const fs = require("fs"); const e = process.env;
 const m = e.REMOTE.match(/^(?:https?:\/\/(?:[^@\/]+@)?([^\/]+)\/|(?:ssh:\/\/)?[^@]+@([^:\/]+)(?::\d+)?[:\/])(.+?)(?:\.git)?\/?$/);
 if (!m) { console.log("ERR cannot read the project from the remote " + e.REMOTE.replace(/\/\/[^@]*@/, "//")); process.exit(0); }
@@ -108,6 +115,10 @@ const body = { source_branch: e.SRC, target_branch: e.TGT, title: e.TITLE, descr
   let r = await fetch(q, { headers: h });
   if (!r.ok) { console.log(`ERR GitLab ${r.status} on ${base.replace(/\/merge_requests$/, "")}`); return; }
   const open = await r.json();
+  if (e.REVIEWER && !open[0]) {        // D95: username → id; an unknown name is skipped, not fatal
+    const u = await fetch(`${base.replace(/\/projects\/.*$/, "")}/users?username=${encodeURIComponent(e.REVIEWER)}`, { headers: h }).then(x => x.ok ? x.json() : []).catch(() => []);
+    if (u[0]) body.reviewer_ids = [u[0].id];
+  }
   r = open[0]
     ? await fetch(`${base}/${open[0].iid}`, { method: "PUT", headers: h, body: JSON.stringify({ title: body.title, description: body.description }) })
     : await fetch(base, { method: "POST", headers: h, body: JSON.stringify(body) });

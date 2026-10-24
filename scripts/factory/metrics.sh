@@ -3,13 +3,28 @@
 # Paste the output into the MR's Evidence section via /pr. Across missions,
 # these are the numbers that show whether Step 2 is real (ADR-001 §10).
 #
-# Usage: scripts/factory/metrics.sh <feature>
+# Usage: scripts/factory/metrics.sh <feature> [--json]
+#        scripts/factory/metrics.sh --all [--json]   every mission in the repo, and the total (D97)
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib.sh
 . "$here/lib.sh"
 
-feature="${1:?usage: metrics.sh <feature>}"
+# D97 (P14): across missions. Each mission's numbers come from this same
+# script in JSON; the totals and cost per MR are computed from them.
+if [ "${1:-}" = --all ]; then
+  shopt -s nullglob
+  rows=()
+  for s in "$FACTORY_DIR"/*/spec.md; do
+    m="$(basename "$(dirname "$s")")"
+    rows+=("$(bash "$0" "$m" --json)")
+  done
+  printf '%s\n' "${rows[@]}" | node "$here/metrics-all.mjs" "${2:-}"
+  exit 0
+fi
+
+feature="${1:?usage: metrics.sh <feature> [--json] | --all [--json]}"
+json="${2:-}"
 dir="$(mission_dir "$feature")"
 spec="$dir/spec.md"
 [ -f "$spec" ] || die "no spec at $spec"
@@ -97,6 +112,31 @@ fi
 
 pct() { [ "$2" -gt 0 ] && echo "$(( 100 * $1 / $2 ))%" || echo "-"; }
 
+# D97: what scoring found (scores.tsv), and the mission's numbers as JSON.
+scores_line="-"
+if [ -s "$dir/scores.tsv" ]; then
+  scores_line="$(awk -F'\t' 'NR > 1 { n++; if ($7 == "fail") { f++; d[$6]++ } }
+    END { printf "%d judged, %d fail", n, f; s = ""; for (k in d) s = s (s ? ", " : "") k " " d[k]; if (s) printf " (%s)", s }' "$dir/scores.tsv")"
+fi
+if [ "$json" = --json ]; then
+  hours=null; [ -n "$first" ] && [ -n "$last" ] && hours=$(( (last - first) / 3600 ))
+  FEATURE="$feature" INTENT="$intent" TICKETS="$tickets" REVIEWED="$reviewed" FIRST="$first_pass" ROUNDS="$rounds" DET="$det_fail" \
+  DECISIONS="$decisions" AUTO="$auto" HAND="$hand" HOURS="$hours" GUARD="$guard" \
+  USAGE="$dir/usage.tsv" SCORES="$dir/scores.tsv" MRURL="$dir/mr.url" node -e '
+    const fs = require("fs"), e = process.env, num = (v) => (/^\d+$/.test(v || "") ? Number(v) : null);
+    const rd = (f) => { try { return fs.readFileSync(f, "utf8"); } catch { return ""; } };
+    const u = rd(e.USAGE).split("\n").slice(1).filter(Boolean).map((l) => l.split("\t"));
+    const sc = rd(e.SCORES).split("\n").slice(1).filter(Boolean).map((l) => l.split("\t"));
+    console.log(JSON.stringify({ mission: e.FEATURE, intent: e.INTENT || null, tickets: num(e.TICKETS), reviewed: num(e.REVIEWED),
+      firstPass: num(e.FIRST), rounds: num(e.ROUNDS), deterministicFails: num(e.DET), guardBlocks: num(e.GUARD),
+      decisions: num(e.DECISIONS), autoAnswered: num(e.AUTO), handCommits: num(e.HAND), cycleHours: e.HOURS === "null" ? null : Number(e.HOURS),
+      runs: u.length, tokensIn: u.reduce((a, c) => a + Number(c[4] || 0), 0), tokensOut: u.reduce((a, c) => a + Number(c[5] || 0), 0),
+      cost: Math.round(u.reduce((a, c) => a + Number(c[8] || 0), 0) * 100) / 100,
+      scored: sc.length, scoreFails: sc.filter((c) => c[6] === "fail").length,
+      mr: rd(e.MRURL).trim() || null }));'
+  exit 0
+fi
+
 cat <<EOF
 ### Factory metrics: $feature
 
@@ -121,4 +161,5 @@ cat <<EOF
 | Tokens reported in verdicts | $( [ "$tokens" -gt 0 ] && echo "$tokens" || echo "not reported" ) |
 | Models used (role: model ×runs) | ${models_list:--} |
 | Tokens (usage.tsv, D85) | $usage_line |
+| Scored runs (scores.tsv, D97) | $scores_line |
 EOF
