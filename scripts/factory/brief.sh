@@ -4,7 +4,7 @@
 # verbatim; anything appended after the end marker is flagged by the child.
 #
 # Usage: scripts/factory/brief.sh <role> <feature|slug> [ticket] [commit] [base]
-#   roles: contract-author contract-critic ticket-writer worker reviewer
+#   roles: contract-author contract-critic designer ticket-writer worker reviewer
 #          validator code-steward light-reviewer
 #   commit defaults to HEAD. For ticket-writer, [ticket] is the task:
 #   all | fix-behavior | fix-health.
