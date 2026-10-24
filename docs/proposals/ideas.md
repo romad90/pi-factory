@@ -123,6 +123,47 @@ Read from the [announcement](https://factory.com/news/missions) and the screensh
 
 Not taken: the hosted control plane, OpenTelemetry export, enterprise admin. Same test as below: it must keep working if the vendor disappears.
 
+## From Warp's "What a software factory actually is" and Google's Harness² (October 2026)
+
+Warp's founder (talk, transcript provided by the user) and Google Cloud AI Research's Harness² (open source, Apache 2.0; read from its coverage) both treat the factory as a system you measure and tune.
+
+| Idea | Source | For us | Fits |
+|---|---|---|---|
+| Agent run transcripts are the factory's most valuable data: keep them, on your own systems | Warp | A run archive outside the MRs; we throw transcripts away today | P14 |
+| A benchmark from your own tasks, replayed across models and harnesses, gives a cost-versus-correctness curve and drives model routing | Warp | Replay real tickets at their base commit; our gates are the verifier | P14 |
+| Score stored runs with an LLM judge on a sample, dimensions defined in code ("redundant tests") | Warp | Dimensions for our failure modes: settled questions asked, checks silenced, no reproduction | P14 |
+| Agents find repeated failures and open PRs on the factory definition | Warp, Factory Missions | P5's strategist, each proposal backed by a benchmark run | P5, P14 |
+| Keep a harness edit only if it changes behavior for the better on the same task; a weaker model with a better harness beats a stronger one | Harness² | Same rule, with tests instead of behavioral contrast | P14, P5 |
+| The factory declared in one versioned file: agents, models, skills, repos, triggers | Warp | One manifest instead of agent files, commands.env, the models profile and the skills pin | P11 |
+| Flow metrics across work: human interactions per PR, time to ship, cost per PR, revert rate | Warp | `metrics.sh --all`, the cockpit's leads level | P14, P10 |
+| Product engineering goes through the factory; factory engineering tunes it | Warp | The role the pilot creates | deck |
+
+Not taken: an LLM "foreman" that delegates (our loop stays in code, D91); letting a model edit guardrails (Harness² edits its guardrails file; ours are code: patch guard, command guard); hosted infrastructure. Warp's own figures (cost per PR from $55 to $15 in six weeks, 40% more PRs, fewer reverts) are a vendor's, unaudited.
+
+## From HumanLayer's "Why Software Factories Fail" (Dex Horthy, AI Engineer World's Fair 2026)
+
+An essay against lights-off factories ([wsff.md](https://github.com/humanlayer/advanced-context-engineering-for-coding-agents/blob/main/wsff.md), [where does the time go](https://github.com/humanlayer/advanced-context-engineering-for-coding-agents/blob/main/side-quests/where-does-the-time-go.md), and the SlopCodeBench write-ups in the same repo). Its argument: coding was 25–50% of shipping; models are trained on "tests pass" with no penalty for bad design, so they erode maintainability; review agents raise the floor, not the ceiling; front-load alignment and keep reading the code, for 2–3x safely rather than 10–100x with incidents.
+
+| Idea | For us | Fits |
+|---|---|---|
+| **Program design** before coding: call-stack diffs, file-tree diffs, key types and signatures, drafted by the model and argued by a human | A design step between contract and tickets, approved like the contract | D94 |
+| **Vertical slices** (tracer bullets), not horizontal layers | Ticket writer rule: each ticket delivers something that runs end to end | D95 |
+| The MR's reviewer reviews the spec and the design before code exists | The plan names its reviewer; review then confirms instead of discovering | D95 |
+| SWE-bench grading: discard the agent's test edits, apply held-out tests | Our instrument hidden from workers (D21) already does this | done |
+| Penalize new tests that don't fail on the code before the change (Frontier Code) | New tests must fail on the base commit in feature and bugfix missions, pass on it in characterization and refactor missions | D96 |
+| Measure maintainability by having a small model attempt the next change on the code left behind | A changeability probe in the benchmark: follow-up tickets on a cheap worker, before and after a refactor | D98 |
+| Of 41 deterministic quality metrics, only max complexity and cloned-code share separated models | Weight those two in the health ratchet | docs |
+| Expected pain = P(rework) × cost of rework; most of it goes in the first minutes of planning | Size the up-front work to the task: fix lane and light review for small, full design for large | cheat sheet |
+
+Bias: HumanLayer sells planning and review tooling. The incident data (Faros) is correlation, not proof.
+
+### Warp Factories' interface (screenshot from a talk, October 2026)
+
+- **Navigation as a model of factory engineering:** Inbox, Runs, MCPs and apps, Secrets across factories; per factory: Dashboard, Agents, Automations, Scorers, Self-improvement (with a count of open items), Benchmarks, Factory definition, Settings. Our cockpit v2 (P10 §5).
+- **A benchmark suite distilled from real runs** ("WarpBench"): self-contained tasks, tiered easy, medium, hard and extra-hard, spread over areas (configuration, client UI, server logic, cross-cutting), scoped to one agent type (implementation only, independent of the others). Our D98 cases get a difficulty (from their known rounds), an area and a role.
+- **Several factories side by side** (product, marketing): one per product surface. Ours: one per repo or project, at the leads level.
+- **A benchmark run's result page:** a written summary, then "highest quality", "most efficient" and "lowest cost" recommendations with cost per trial, and a correctness-versus-cost scatter with selectable axes. Every configuration differs from the default by one variable (the model), so the comparison is controlled. In their run, a cheap open-weight flash model was both the most efficient and the cheapest (about $2 a trial) at 93% correctness, against 95% for the most expensive. The speaker's point: a benchmark built from your own runs, with your gates as reward, is an RL environment you own. P14.
+
 ## What to watch for
 
 Each of these tools keeps something we don't want to give away: the runtime (OpenCode Swarm needs OpenCode), the hosted control plane and its data (Factory, Port), or a maintainer we depend on. The test for anything we take: does it keep working if that vendor disappears tomorrow?

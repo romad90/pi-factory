@@ -171,11 +171,11 @@ $nxt"
     paused)
       if [ "$steps" = 1 ]; then must pause.sh resume "$feature"; continue; fi
       printf '%s\n' "$nxt"; stop 3 "the mission paused itself" ;;
-    grill|approve|decide|approve-tickets|coverage|setup|escalate|blocked|unverified)
+    grill|approve|approve-design|decide|approve-tickets|coverage|setup|escalate|blocked|unverified)
       printf '%s\n' "$nxt"; echo "WAITING: human ($step)"; exit 0 ;;
-    contract|validate|steward)
+    contract|design|validate|steward)
       wave "$step" "$feature"; [ "$WAVE_OK" = 1 ] || stop 2 "the $step wave failed: $RESULT"
-      [ "$step" = contract ] || must collect.sh "$feature" ;;
+      case "$step" in contract|design) ;; *) must collect.sh "$feature" ;; esac ;;
     behavior-stale)
       wave validate "$feature"; [ "$WAVE_OK" = 1 ] || stop 2 "the validate wave failed: $RESULT"
       must collect.sh "$feature" ;;
