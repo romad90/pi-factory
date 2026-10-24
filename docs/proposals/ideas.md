@@ -123,6 +123,23 @@ Read from the [announcement](https://factory.com/news/missions) and the screensh
 
 Not taken: the hosted control plane, OpenTelemetry export, enterprise admin. Same test as below: it must keep working if the vendor disappears.
 
+## From Warp's "What a software factory actually is" and Google's Harness² (October 2026)
+
+Warp's founder (talk, transcript provided by the user) and Google Cloud AI Research's Harness² (open source, Apache 2.0; read from its coverage) both treat the factory as a system you measure and tune.
+
+| Idea | Source | For us | Fits |
+|---|---|---|---|
+| Agent run transcripts are the factory's most valuable data: keep them, on your own systems | Warp | A run archive outside the MRs; we throw transcripts away today | P14 |
+| A benchmark from your own tasks, replayed across models and harnesses, gives a cost-versus-correctness curve and drives model routing | Warp | Replay real tickets at their base commit; our gates are the verifier | P14 |
+| Score stored runs with an LLM judge on a sample, dimensions defined in code ("redundant tests") | Warp | Dimensions for our failure modes: settled questions asked, checks silenced, no reproduction | P14 |
+| Agents find repeated failures and open PRs on the factory definition | Warp, Factory Missions | P5's strategist, each proposal backed by a benchmark run | P5, P14 |
+| Keep a harness edit only if it changes behavior for the better on the same task; a weaker model with a better harness beats a stronger one | Harness² | Same rule, with tests instead of behavioral contrast | P14, P5 |
+| The factory declared in one versioned file: agents, models, skills, repos, triggers | Warp | One manifest instead of agent files, commands.env, the models profile and the skills pin | P11 |
+| Flow metrics across work: human interactions per PR, time to ship, cost per PR, revert rate | Warp | `metrics.sh --all`, the cockpit's leads level | P14, P10 |
+| Product engineering goes through the factory; factory engineering tunes it | Warp | The role the pilot creates | deck |
+
+Not taken: an LLM "foreman" that delegates (our loop stays in code, D91); letting a model edit guardrails (Harness² edits its guardrails file; ours are code: patch guard, command guard); hosted infrastructure. Warp's own figures (cost per PR from $55 to $15 in six weeks, 40% more PRs, fewer reverts) are a vendor's, unaudited.
+
 ## What to watch for
 
 Each of these tools keeps something we don't want to give away: the runtime (OpenCode Swarm needs OpenCode), the hosted control plane and its data (Factory, Port), or a maintainer we depend on. The test for anything we take: does it keep working if that vendor disappears tomorrow?
