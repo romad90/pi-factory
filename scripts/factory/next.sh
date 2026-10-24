@@ -18,6 +18,8 @@ feature="${1:?usage: next.sh <feature>}"
 dir="$(mission_dir "$feature")"
 spec="$dir/spec.md"
 critique="$dir/contract-critique.md"
+# D101: an approval line with no human.sh row in decisions.tsv approves nothing.
+UNRECORDED="The approval line has no /factory-approve record in decisions.tsv (written by hand or by an agent): it does not count. Approve with /factory-approve."
 STATUS=""
 shopt -s nullglob
 
@@ -92,8 +94,9 @@ if investigation_applies "$spec"; then
     fi
     step escalate "human: the investigation used its $limit rounds and still lacks $need. Read $inv; add context to the spec, or raise FACTORY_INVESTIGATE_ROUNDS and run next.sh again"
   fi
-  if ! grep -qE '^\*\*Conclusion approved:\*\* [0-9]{4}-[0-9]{2}-[0-9]{2}' "$inv"; then
-    step approve-conclusion "human: read $inv (and the reproduction ticket, if any), then /factory-approve $feature conclusion, or edit the spec and next.sh again"
+  if ! conclusion_approved "$inv"; then
+    hint=""; approval_unrecorded "$inv" Conclusion approve-conclusion && hint=" $UNRECORDED"
+    step approve-conclusion "human: read $inv (and the reproduction ticket, if any), then /factory-approve $feature conclusion, or edit the spec and next.sh again.$hint"
   fi
   if [ "$belongs" != here ]; then
     step handoff "human: the fix belongs in $belongs. Send $dir/finding-for-$belongs.md to that repo's team. This mission changes nothing here; it ends at this step"
@@ -112,6 +115,7 @@ fi
 if ! contract_approved "$spec"; then
   hint=""
   grep -q '\[blocking\]' "$critique" && hint=" The critique has [blocking] findings: rerun 'workflow.sh contract' to amend, then re-read."
+  approval_unrecorded "$spec" Contract approve && hint="$hint $UNRECORDED"
   who="$(verdict_field "$spec" Reviewer)"
   step approve "G1, human${who:+ (and $who, who will review the MR)}: read the contract and $critique, then /factory-approve $feature (or /factory-amend $feature \"<change>\").$hint"
 fi
@@ -121,8 +125,9 @@ if design_needed "$spec"; then
   design="$dir/design.md"
   [ -f "$design" ] || step design "scripts/factory/workflow.sh design $feature (designer, fresh: call stacks, files, types and slices, per docs/agents/design-format.md)"
   if ! design_approved "$design"; then
-    who="$(verdict_field "$spec" Reviewer)"
-    step approve-design "G1b, human${who:+ (and $who, who will review the MR)}: read $design, then /factory-approve $feature design. To change it, edit it or delete it and run next.sh (the designer writes it again)."
+    who="$(verdict_field "$spec" Reviewer)"; hint=""
+    approval_unrecorded "$design" Design approve-design && hint=" $UNRECORDED"
+    step approve-design "G1b, human${who:+ (and $who, who will review the MR)}: read $design, then /factory-approve $feature design. To change it, edit it or delete it and run next.sh (the designer writes it again).$hint"
   fi
 fi
 

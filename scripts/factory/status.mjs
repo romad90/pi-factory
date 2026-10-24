@@ -172,7 +172,10 @@ function mission(name, lines) {
   return {
     name, title: heading(spec), intent: firstWord(field(spec, "Intent")), step, next, human: get("H") === "1", otherBranch: get("O"),
     paused: exists(path.join(dir, "state", "PAUSED.md")),
-    contract: { total: Object.keys(assertions).length, approved: /^\*\*Contract approved:\*\*/m.test(spec) },
+    contract: { total: Object.keys(assertions).length, approved: (() => {   // D101: the line and its human.sh row
+      const d = (spec.match(/^\*\*Contract approved:\*\* (\d{4}-\d{2}-\d{2})/m) || [])[1];
+      const last = decisions.filter((r) => r.kind === "approve" || r.kind === "amend").pop();
+      return !!d && last?.kind === "approve" && last.date === d; })() },
     counts: tickets.reduce((c, t) => ((c[t.state] = (c[t.state] || 0) + 1), c), { total: tickets.length }),
     tickets, behavior, health,
     interventions: { human: human.length, auto: decisions.length - human.length, target: 5 },

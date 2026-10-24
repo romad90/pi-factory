@@ -6,7 +6,9 @@
 # Usage: scripts/factory/test-on-base.sh <mission> <ticket> <patch> [base]
 #   patch: project-relative, as integration sees it; base: default HEAD.
 # Exit: 0 as expected or not checked (the line says which), 1 mismatch
-# (the reason on stdout), 2 error. The test output goes to the mission's logs.
+# (the reason on stdout), 2 error or inconclusive (the tests don't apply on
+# the base, no temporary worktree, the test command can't start, the base is
+# already red; D101). The test output goes to the mission's logs.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib.sh
@@ -21,7 +23,5 @@ dir="$(mission_dir "$feature")"
 git rev-parse --verify -q "$base^{commit}" >/dev/null || { echo "factory: unknown base $base" >&2; exit 2; }
 load_commands
 mkdir -p "$dir/logs"
-if line="$(test_on_base "$feature" "$ticket" "$patch" "$dir/logs/$ticket-test-on-base.log" "$base")"; then
-  echo "$line"; exit 0
-fi
-echo "$line"; exit 1
+rc=0; line="$(test_on_base "$feature" "$ticket" "$patch" "$dir/logs/$ticket-test-on-base.log" "$base")" || rc=$?
+echo "$line"; exit "$rc"

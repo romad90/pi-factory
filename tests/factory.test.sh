@@ -221,6 +221,15 @@ SPEC
 expect_step contract "contract without critique"
 echo "No findings. Critique result: approve" > $m/contract-critique.md
 expect_step approve "critique present, not approved"
+# D101: an approval line typed by hand (or by an agent) has no decisions.tsv row: it approves nothing.
+cp $m/spec.md "$work/spec.bak"; printf '\n**Contract approved:** %s\n' "$(date +%F)" >> $m/spec.md
+out="$(bash scripts/factory/next.sh demo 2>&1)"
+gate_out="$(bash scripts/factory/gate.sh mission demo 2>&1 || true)"
+[ "$(head -1 <<<"$out")" = "STEP: approve" ] && grep -q 'no /factory-approve record in decisions.tsv' <<<"$out" \
+  && grep -q 'G1: the approval line has no /factory-approve record' <<<"$gate_out" \
+  && ! bash scripts/factory/workflow.sh design demo >/dev/null 2>&1 \
+  && t "a hand-written approval line counts nowhere: next.sh, gate.sh and workflow.sh agree (D101)" || fail "self-approval" "$out$gate_out"
+cp "$work/spec.bak" $m/spec.md
 bash scripts/factory/human.sh approve demo >/dev/null
 grep -qE '^\*\*Contract approved:\*\* [0-9]{4}-' $m/spec.md && t "/factory-approve writes the approval line" || fail "approve line"
 [ -z "$(git status --porcelain -- .scratch)" ] && t "approval is checkpointed" || fail "approval not committed"
@@ -246,6 +255,11 @@ git add -A; git commit -qm "test: design draft"
 out="$(bash scripts/factory/next.sh demo)"
 grep -q '^STEP: approve-design' <<<"$out" && grep -q 'and jdoe, who will review the MR' <<<"$out" \
   && t "an unapproved design waits for the human and the MR's reviewer (G1b)" || fail "approve-design" "$out"
+cp $m/design.md "$work/design.bak"; printf '**Design approved:** %s\n' "$(date +%F)" | cat - "$work/design.bak" > $m/design.md
+out="$(bash scripts/factory/next.sh demo)"
+grep -q '^STEP: approve-design' <<<"$out" && grep -q 'no /factory-approve record' <<<"$out" \
+  && t "a hand-written design approval waits for /factory-approve (D101)" || fail "design self-approval" "$out"
+cp "$work/design.bak" $m/design.md
 FACTORY_APPROVER="Test Human" bash scripts/factory/human.sh approve demo design >/dev/null
 sed -n 2p $m/design.md | grep -qE '^\*\*Design approved:\*\* [0-9-]+ — by Test Human' && grep -q $'\tapprove-design\t' $m/decisions.tsv \
   && [ -z "$(git status --porcelain -- .scratch)" ] && t "/factory-approve <f> design writes the line under the title, logs it, checkpoints" || fail "approve design" "$(head -3 $m/design.md)"
@@ -591,6 +605,16 @@ printf '%s\tpush\tbash\t{"command":"git push"}\t%s\n' "2001-01-01T00:00:00.000Z"
 FACTORY_USAGE_DIRS="$work/usage" bash scripts/factory/archive.sh collect demo >/dev/null
 node -e 'const r=require(process.argv[1]+"/run.json"); process.exit(r.guard.length===1 && r.guard[0].rule==="push" && !/glpat-/.test(r.guard[0].input) ? 0 : 1)' "$arch" \
   && t "archive: the guard's refusals during the run are kept with it, redacted (audit trail)" || fail "archive guard" "$(cat "$arch/run.json")"
+# D101: only this checkout's runs: another clone's run in a shared folder is ignored, one under a worktree of ours is kept.
+printf '{"model":"gw/maker-1","usage":{"turns":2},"durationMs":1000,"transcriptPath":"/srv/other-clone/.pi/subagents/r9zzz.jsonl"}' > "$work/usage/run/r9zzz_factory-worker_meta.json"
+printf 'Role: factory-worker. Mission demo, ticket 01-hello.\n\nbrief-id: 0123456789abcdef\n' > "$work/usage/run/r9zzz_factory-worker_input.md"
+printf '{"model":"gw/maker-1","usage":{"turns":2},"durationMs":1000,"execution":{"cwd":"%s/src"}}' "$PWD" > "$work/usage/run/r8own_factory-worker_meta.json"
+printf 'Role: factory-worker.\n\nbrief-id: fedcba9876543210\n' > "$work/usage/run/r8own_factory-worker_input.md"
+out="$(FACTORY_USAGE_DIRS="$work/usage" bash scripts/factory/archive.sh collect demo)"
+adir="$(dirname "$arch")"
+[ ! -e "$adir/r9zzz_factory-worker" ] && [ -f "$adir/r8own_factory-worker/run.json" ] && grep -q '1 run(s) of another checkout ignored' <<<"$out" \
+  && t "archive collect keeps only this checkout's runs: a foreign run is ignored (D101)" || fail "archive foreign" "$out $(ls "$adir")"
+rm -f "$work/usage/run/r9zzz_"* "$work/usage/run/r8own_"*; rm -rf "$adir/r8own_factory-worker"
 printf '#!/usr/bin/env bash\necho "$1" >> "%s"\nif grep -q "^# Failure mode" "$2" && grep -q "^# Tried to silence" "$2"; then echo "SCORE: fail"; echo "EVIDENCE: \\"added eslint-disable\\""; else echo "SCORE: pass"; echo "EVIDENCE: \\"none\\""; fi\n' "$work/judges.log" > "$work/judge.sh"; chmod +x "$work/judge.sh"
 FACTORY_JUDGE_BIN="$work/judge.sh" FACTORY_JUDGE_MODELS="gw/maker-9 gw/judge-1" bash scripts/factory/score.sh demo >"$work/score.log" 2>&1 || fail "score" "$(cat "$work/score.log")"
 grep -qx 'gw/judge-1' "$work/judges.log" && ! grep -q maker "$work/judges.log" \
@@ -910,6 +934,39 @@ bash scripts/factory/test-on-base.sh tob-feature 01-a "$work/tob-adds.patch" "$t
   && { bash scripts/factory/test-on-base.sh tob-feature 01-a "$work/none.patch" >/dev/null 2>&1; [ $? -eq 2 ]; } \
   && [ "$(git rev-parse HEAD)" = "$tobbase" ] && [ -z "$(git status --porcelain --untracked-files=no)" ] \
   && t "test-on-base.sh: the same check on its own (exit 0, 1, 2), the branch untouched" || fail "tob script" "$out"
+# D101: errors are errors, a red base is inconclusive, only the patch's tests with FACTORY_TEST_FILES_CMD, cleanup on any exit.
+tob_rc() { rc=0; out="$(bash scripts/factory/test-on-base.sh "$@" 2>&1)" || rc=$?; }
+printf 'diff --git a/tests/tob/zz.check b/tests/tob/zz.check\n--- a/tests/tob/zz.check\n+++ b/tests/tob/zz.check\n@@ -1 +1 @@\n-nothing here\n+grep -qx 2 src/tob/value.txt\n' > "$work/tob-noapply.patch"
+tob_rc tob-feature 01-a "$work/tob-noapply.patch" "$tobbase"
+[ "$rc" = 2 ] && grep -q "test on base: error: the tests don't apply on" <<<"$out" || fail "tob: a patch that doesn't apply is an error" "$rc $out"
+tob_int feature noapply && fail "integrate must fail a round whose tests don't apply on base" "$(cat "$work/tob.log")"
+grep -q "error: the tests don't apply" .scratch/tob-feature/verdicts/01-a-code.md && t "test on base: tests that don't apply on the base are an error, a failed round, never 'not checked' (D101)" || fail "tob noapply verdict" "$(cat "$work/tob.log")"
+git reset -q --hard "$tobbase"
+printf 'FACTORY_TEST_CMD="definitely-not-a-command-xyz"\n' >> .factory/commands.env
+tob_rc tob-feature 01-a "$work/tob-adds.patch" "$tobbase"
+[ "$rc" = 2 ] && grep -q "error: the test command can't start" <<<"$out" && t "test on base: a test command that can't start is an error (D101)" || fail "tob can't start" "$rc $out"
+git checkout -q -- .factory/commands.env
+mkdir -p tests/tob; echo 'exit 1' > tests/tob/red.check; git add -A; git commit -qm "test: a red base"; redbase="$(git rev-parse HEAD)"
+tob_rc tob-feature 01-a "$work/tob-adds.patch" "$redbase"
+[ "$rc" = 2 ] && grep -q 'inconclusive: base already red: set FACTORY_TEST_FILES_CMD' <<<"$out" || fail "tob red base" "$rc $out"
+git reset -q --hard "$redbase"; bash scripts/factory/integrate.sh tob-feature 01-a "$work/tob-adds.patch" > "$work/tob.log" 2>&1 && fail "a red base must fail the round" "$(cat "$work/tob.log")"
+grep -q 'base already red' .scratch/tob-feature/verdicts/01-a-code.md && t "feature on a red base: inconclusive, recorded, the round fails (D101)" || fail "tob red verdict" "$(cat "$work/tob.log")"
+git reset -q --hard "$redbase"
+printf '%s\n' 'FACTORY_TEST_FILES_CMD='"'"'for f in {files}; do sh "$f" || exit 1; done'"'" >> .factory/commands.env
+tob_rc tob-feature 01-a "$work/tob-adds.patch" "$redbase"; r1="$rc $out"
+tob_rc tob-feature 01-a "$work/tob-pins.patch" "$redbase"
+[ "${r1%% *}" = 0 ] && grep -q 'as expected' <<<"$r1" && [ "$rc" = 1 ] \
+  && t "FACTORY_TEST_FILES_CMD runs only the patch's test files: a red base doesn't matter (D101)" || fail "tob files cmd" "$r1 / $rc $out"
+git reset -q --hard "$tobbase"
+printf 'FACTORY_TEST_CMD="sleep 30"\n' >> .factory/commands.env
+wt0="$(git worktree list | wc -l)"
+setsid bash scripts/factory/test-on-base.sh tob-feature 01-a "$work/tob-adds.patch" "$tobbase" > "$work/tob-int.log" 2>&1 & tobpid=$!
+for _ in $(seq 100); do [ "$(git worktree list | wc -l)" -gt "$wt0" ] && break; sleep 0.1; done
+[ "$(git worktree list | wc -l)" -gt "$wt0" ] || fail "tob: no temporary worktree to interrupt" "$(cat "$work/tob-int.log")"
+kill -TERM -- "-$tobpid" 2>/dev/null || true; wait "$tobpid" 2>/dev/null || true
+for _ in $(seq 50); do [ "$(git worktree list | wc -l)" = "$wt0" ] && break; sleep 0.1; done
+[ "$(git worktree list | wc -l)" = "$wt0" ] && t "test on base: an interrupt still removes its temporary worktree (trap, D101)" || fail "tob trap" "$(git worktree list)"
+git checkout -q -- .factory/commands.env
 FACTORY_TEST_ON_BASE=0 bash scripts/factory/integrate.sh tob-feature 01-a "$work/tob-pins.patch" > "$work/tob.log" 2>&1 && grep -q 'test on base: off' "$work/tob.log" \
   && t "FACTORY_TEST_ON_BASE=0 turns the check off" || fail "tob off" "$(cat "$work/tob.log")"
 git reset -q --hard "$tobbase"
@@ -1007,7 +1064,7 @@ cat > "$work/bin/fakebench" <<'FB'
 # <role> <case> <work-dir> <brief> <model> <thinking> <out-dir>
 set -euo pipefail
 role="$1" wd="$3" brief="$4" model="$5" thinking="$6" out="$7"
-echo "$role $2 $model $thinking" >> "$BENCH_LOG"
+echo "$role $2 $model $thinking role=${FACTORY_ROLE:-}" >> "$BENCH_LOG"
 grep -q 'brief-id:' "$brief" || { echo "no brief"; exit 1; }
 if [ "$role" = reviewer ]; then
   m="${2%%--*}" tk="${2#*--}"; mkdir -p "$wd/.scratch/$m/verdicts"
@@ -1016,6 +1073,7 @@ fi
 [ "$role" = worker ] || exit 1
 case "$model" in
   gw/maker-3) mkdir -p "$wd/.github"; echo x > "$wd/.github/ci.yml"; cost=0.1 ;;
+  gw/maker-hang) sleep 30; cost=0 ;;
   gw/maker-2) mkdir -p "$wd/tests"; echo 'ok' > "$wd/tests/bench.test.js"; cost=0.2 ;;
   *) mkdir -p "$wd/tests"; echo 'ok' > "$wd/tests/bench.test.js"; cost=0.5 ;;
 esac
@@ -1075,6 +1133,19 @@ lab="probe-$(git rev-parse --short HEAD)-p2"
 grep -qP '^runner--02-followup\tmedium\ttooling\tyes\t' ".factory/bench/results/$lab.tsv" && ! grep -q 'runner--01-run' ".factory/bench/results/$lab.tsv" \
   && grep -q '"probe": true' ".factory/bench/results/$lab.json" \
   && t "bench probe: follow-up cases run on today's code (how easy it is to change), regression cases don't" || fail "bench probe" "$out"
+# D101: bench agents run as workers, never unguarded, and leave no worktree behind.
+grep -q 'worker runner--01-run gw/maker-1 medium role=worker' "$BENCH_LOG" && t "bench agents run with FACTORY_ROLE=worker (the guard's worker rules, D101)" || fail "bench role" "$(cat "$BENCH_LOG")"
+out="$(bash scripts/factory/bench.sh probe default --config "$work/p2.json" --at "$(git rev-list --max-parents=0 HEAD | tail -1)" --label noguard 2>&1)" && fail "bench must refuse a case without the guard" "$out"
+grep -q "won't run agents without the factory guard" <<<"$out" && [ -z "$(git worktree list | grep 'pi-factory/bench/wt-')" ] \
+  && t "bench refuses a case worktree without the guard extension, and removes it (D101)" || fail "bench no guard" "$out $(git worktree list)"
+printf '{"agents":{"factory-worker":{"model":"gw/maker-hang","thinking":"low"}}}' > "$work/p5.json"
+setsid bash scripts/factory/bench.sh run default --config "$work/p5.json" --label hang > "$work/bench-hang.log" 2>&1 & bpid=$!
+for _ in $(seq 150); do git worktree list | grep -q 'pi-factory/bench/wt-hang' && break; sleep 0.1; done
+git worktree list | grep -q 'pi-factory/bench/wt-hang' || fail "bench: no case worktree to interrupt" "$(cat "$work/bench-hang.log")"
+kill -TERM -- "-$bpid" 2>/dev/null || true; wait "$bpid" 2>/dev/null || true
+for _ in $(seq 50); do git worktree list | grep -q 'pi-factory/bench/wt-' || break; sleep 0.1; done
+[ -z "$(git worktree list | grep 'pi-factory/bench/wt-')" ] && t "bench: an interrupted run removes its case worktree (trap, D101)" || fail "bench trap" "$(git worktree list; cat "$work/bench-hang.log")"
+rm -f .factory/bench/results/hang.* .factory/bench/results/noguard.*
 git add .factory/bench; git commit -qm "test: bench data"
 unset BENCH_LOG FACTORY_BENCH_RUNNER
 
@@ -1095,6 +1166,17 @@ cl=".factory/context/ctx src"
 [ -f "$cl/poll.js" ] && [ "$(stat -c %A "$cl/poll.js" | grep -o w)" = "" ] && grep -q "$(git -C "$ctx" rev-parse HEAD)" .scratch/inv/context.tsv \
   && [ -z "$(git status --porcelain -- .factory/context)" ] \
   && t "context repos are cloned into the factory's folder, read-only on disk, recorded, invisible to git" || fail "context clone" "$(ls -la "$cl" 2>&1; cat .scratch/inv/context.tsv 2>&1; git status --porcelain)"
+# D101: nothing is pushed from a clone; check compares source and branch, not names; "home" is reserved.
+[ "$(git -C "$cl" remote get-url --push origin)" = no-push ] && t "a context clone's push URL is no-push (D101)" || fail "no-push" "$(git -C "$cl" remote -v)"
+cp .scratch/inv/spec.md "$work/inv-spec.bak"
+bash scripts/factory/context.sh check inv >/dev/null || fail "context check" "$(bash scripts/factory/context.sh check inv 2>&1)"
+sed -i.bak "s|^- \`$ctx\`|- $ctx@other|" .scratch/inv/spec.md && rm -f .scratch/inv/spec.md.bak
+out="$(bash scripts/factory/context.sh check inv 2>&1)" && fail "context check must see the new branch" "$out"
+grep -q 'sync again' <<<"$out" && t "context check compares source and branch, not just names (D101)" || fail "context check branch" "$out"
+printf '\n- ../home — a repo named like this project\n' >> .scratch/inv/spec.md
+out="$(bash scripts/factory/context.sh check inv 2>&1)" && fail "home must be refused" "$out"
+grep -q "can't be named 'home'" <<<"$out" && t "a context repo named home is refused (reserved, D101)" || fail "home reserved" "$out"
+cp "$work/inv-spec.bak" .scratch/inv/spec.md
 printf 'diff --git a/.factory/context/ctx src/poll.js b/.factory/context/ctx src/poll.js\n--- a/.factory/context/ctx src/poll.js\n+++ b/.factory/context/ctx src/poll.js\n@@ -1 +1 @@\n-export const poll = () => 1;\n+export const poll = () => 2;\n' > "$work/ctx.patch"
 if bash scripts/factory/patch-guard.sh "$work/ctx.patch" >"$work/pg.log"; then fail "a patch into a context repo must be blocked"; fi
 grep -q 'BLOCKED paths: .factory/context/ctx src/poll.js' "$work/pg.log" && t "the patch guard refuses a change in a context repo" || fail "ctx patch guard" "$(cat "$work/pg.log")"
@@ -1118,6 +1200,10 @@ printf '\n## Conclusion\n**Cause:** a retried poll replays the sync.\n**Fix belo
 grep -q 'a reproduction ticket' <<<"$(bash scripts/factory/next.sh inv)" && t "a fix here needs its reproduction ticket first" || fail "repro needed" "$(bash scripts/factory/next.sh inv 2>&1)"
 mkdir -p .scratch/inv/issues; printf '# 01-reproduce-dup\n**Test:** `tests/dup.test.js`\n## Covers: enabler\nA replayed sync duplicates.\n' > .scratch/inv/issues/01-reproduce-dup.md
 [ "$(istep)" = "STEP: approve-conclusion" ] && t "the conclusion waits for the human" || fail "approve-conclusion" "$(bash scripts/factory/next.sh inv 2>&1)"
+cp .scratch/inv/investigation.md "$work/inv.bak"; printf '\n**Conclusion approved:** %s\n' "$(date +%F)" >> .scratch/inv/investigation.md
+[ "$(istep)" = "STEP: approve-conclusion" ] && grep -q 'no /factory-approve record' <<<"$(bash scripts/factory/next.sh inv)" \
+  && t "a hand-written conclusion approval approves nothing (D101)" || fail "conclusion self-approval" "$(bash scripts/factory/next.sh inv 2>&1)"
+cp "$work/inv.bak" .scratch/inv/investigation.md
 bash scripts/factory/human.sh approve inv conclusion >/dev/null 2>&1 || fail "approve conclusion" "$(bash scripts/factory/human.sh approve inv conclusion 2>&1)"
 grep -qE '^\*\*Conclusion approved:\*\* [0-9-]{10}' .scratch/inv/investigation.md && grep -q 'approve-conclusion' .scratch/inv/decisions.tsv \
   && [ "$(istep)" = "STEP: contract" ] && t "approved: the usual mission starts at the contract" || fail "after conclusion" "$(bash scripts/factory/next.sh inv 2>&1)"

@@ -107,9 +107,33 @@ investigation_rounds() { cat "$1/state/investigate.rounds" 2>/dev/null || echo 0
 
 has_contract() { grep -q '^## Validation contract' "$1"; }
 
-contract_approved() {
-  grep -qE '^\*\*Contract approved:\*\* [0-9]{4}-[0-9]{2}-[0-9]{2}' "$1"
+# Approvals (D101): a dated approval line counts only with the matching row
+# human.sh logged in the mission's decisions.tsv (same kind, same date; for the
+# contract, the latest approve-or-amend row is that approval). A line an agent
+# or a hand typed, with no row, approves nothing: next.sh says so.
+approval_date() {                      # <file> <Contract|Design|Conclusion> → the line's date
+  [ -f "$1" ] || return 0
+  { grep -m1 -E "^\*\*$2 approved:\*\* [0-9]{4}-[0-9]{2}-[0-9]{2}" "$1" || true; } | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1
 }
+approval_recorded() {                  # <decisions.tsv> <kind> <date>
+  [ -f "$1" ] && [ -n "$3" ] || return 1
+  awk -F'\t' -v k="$2" -v d="$3" '
+    NR == 1 { next }
+    k == "approve" && $3 == "approve" { last = $1; next }
+    k == "approve" && $3 == "amend"   { last = ""; next }
+    $3 == k && $1 == d                { found = 1 }
+    END { exit !(k == "approve" ? last == d : found) }' "$1"
+}
+approved_by_human() {                  # <file> <label> <kind>
+  local d; d="$(approval_date "$1" "$2")"
+  [ -n "$d" ] && approval_recorded "$(dirname "$1")/decisions.tsv" "$3" "$d"
+}
+# A dated line without its decisions.tsv row: written by hand or by an agent.
+approval_unrecorded() {                # <file> <label> <kind>
+  [ -n "$(approval_date "$1" "$2")" ] && ! approved_by_human "$1" "$2" "$3"
+}
+contract_approved() { approved_by_human "$1" Contract approve; }
+conclusion_approved() { approved_by_human "$1" Conclusion approve-conclusion; }
 
 # Active assertion IDs. Withdrawn ones are written "### ~~VAL-…~~" and skipped.
 contract_ids() {
@@ -148,7 +172,7 @@ design_needed() {                      # <spec>
   [ "$i" = feature ] || [ "$i" = refactor ]
 }
 design_approved() {                    # <design.md>
-  [ -f "$1" ] && grep -qE '^\*\*Design approved:\*\* [0-9]{4}-[0-9]{2}-[0-9]{2}' "$1"
+  approved_by_human "$1" Design approve-design
 }
 # Who approves (D95): FACTORY_APPROVER, else git's user.name.
 approver() { printf '%s' "${FACTORY_APPROVER:-$(git config user.name 2>/dev/null || true)}"; }
@@ -470,11 +494,12 @@ FACTORY_AUTHOR="${FACTORY_AUTHOR:-pi-factory <pi-factory@localhost>}"
 
 load_commands() {
   FACTORY_LINT_CMD=""; FACTORY_TEST_CMD=""; FACTORY_EXTRA_CMD=""; FACTORY_GATEWAY_URL=""; FACTORY_HEALTH_CMD=""; FACTORY_GATEWAY_KEY_ENV="${FACTORY_GATEWAY_KEY_ENV:-}"
+  FACTORY_TEST_FILES_CMD=""
   # shellcheck source=/dev/null
   if [ -f .factory/commands.env ]; then . .factory/commands.env; fi
   FACTORY_LINT_CMD="${FACTORY_LINT_CMD:-}"; FACTORY_TEST_CMD="${FACTORY_TEST_CMD:-}"
   FACTORY_EXTRA_CMD="${FACTORY_EXTRA_CMD:-}"; FACTORY_GATEWAY_URL="${FACTORY_GATEWAY_URL:-}"
-  FACTORY_HEALTH_CMD="${FACTORY_HEALTH_CMD:-}"
+  FACTORY_HEALTH_CMD="${FACTORY_HEALTH_CMD:-}"; FACTORY_TEST_FILES_CMD="${FACTORY_TEST_FILES_CMD:-}"
 }
 
 # --- the right mission, on the right branch (D67) --------------------------------
@@ -633,65 +658,101 @@ changed_code_files() {                 # <base> <commit>
 # change: in a feature or bugfix mission it must fail there (it tests what the
 # ticket adds); in a maintenance or refactor mission it must pass there (it
 # pins today's behavior). The patch's test files alone are applied to a
-# temporary checkout of HEAD, the test command runs once, and the result is
-# compared with what the intent expects. Costs one extra test run per ticket
-# with tests. Call after load_commands, from the project folder.
+# temporary checkout of HEAD, the tests run, and the result is compared with
+# what the intent expects. Call after load_commands, from the project folder.
+#
+# What runs (D101): with FACTORY_TEST_FILES_CMD (a command template holding
+# {files}), only the patch's test files, so "must fail" is about them alone.
+# Without it, a feature or bugfix first runs the whole suite on the base
+# without the tests: if the base is already red, the new tests' failure proves
+# nothing, so the check is inconclusive and the round fails ("base already
+# red: set FACTORY_TEST_FILES_CMD"). Costs one or two extra test runs per
+# ticket with tests.
 #
 # test_on_base <feature> <ticket> <project-relative patch> <log file> [base]
 #   base: the commit the tests run on (default HEAD, the ticket's base at
-#   integration and in a worker's worktree). Prints one line; returns 0 (as expected, or not checked), 1 (mismatch).
+#   integration and in a worker's worktree). Prints one line; returns 0 (as
+#   expected, or not checked: off, no test command, no test files, another
+#   intent), 1 (mismatch), 2 (error or inconclusive: the tests don't apply on
+#   the base, the temporary worktree can't be made, the test command can't
+#   start, the base is already red). Callers fail the round on 1 and 2.
 #   A ticket opts out with "## Test on base: skip — <reason>": the line then
 #   reads "test on base: skipped by the ticket (<reason>)".
-test_on_base() {
-  local feature="$1" ticket="$2" patch="$3" log="$4" base="${5:-HEAD}" dir intent want issue opt why tmp wt prefix top f n d rc
+# A subshell: its trap removes the temporary worktree on any exit or signal.
+test_on_base() (
+  feature="$1" ticket="$2" patch="$3" log="$4" base="${5:-HEAD}"
   dir="$(mission_dir "$feature")"
-  if [ "${FACTORY_TEST_ON_BASE:-1}" = 0 ]; then echo "test on base: off (FACTORY_TEST_ON_BASE=0)"; return 0; fi
-  if [ -z "${FACTORY_TEST_CMD:-}" ]; then echo "test on base: no test command"; return 0; fi
+  if [ "${FACTORY_TEST_ON_BASE:-1}" = 0 ]; then echo "test on base: off (FACTORY_TEST_ON_BASE=0)"; exit 0; fi
+  if [ -z "${FACTORY_TEST_CMD:-}" ]; then echo "test on base: no test command"; exit 0; fi
   intent="$(verdict_field "$dir/spec.md" Intent)"
   case "$intent" in
     feature|bugfix) want=fail ;;
     maintenance|refactor) want=pass ;;
-    *) echo "test on base: not checked for intent '${intent:-none}'"; return 0 ;;
+    *) echo "test on base: not checked for intent '${intent:-none}'"; exit 0 ;;
   esac
   issue="$dir/issues/$ticket.md"
   if [ -f "$issue" ] && opt="$(grep -m1 -iE '^## Test on base: *skip' "$issue")"; then
     why="$(printf '%s' "$opt" | sed -E 's/^## [Tt]est on base: *[Ss]kip *(—|-|:)? *//')"
-    echo "test on base: skipped by the ticket (${why:-no reason given})"; return 0
+    echo "test on base: skipped by the ticket (${why:-no reason given})"; exit 0
   fi
-  tmp="$(mktemp -d)"
+  tmp="$(mktemp -d)"; wt="$tmp/wt"
+  cleanup() {
+    if [ -d "$wt" ]; then git worktree remove --force "$wt" >/dev/null 2>&1 || true; fi
+    git worktree prune >/dev/null 2>&1 || true; rm -rf "$tmp"
+  }
+  trap cleanup EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
   while IFS=$'\x1f' read -r _ f n _; do
     for d in "$f" "$n"; do [ -n "$d" ] && is_test_file "$d" && printf '%s\n' "$d"; done
   done < <(node "$FACTORY_SCRIPTS/patch-paths.mjs" list "$patch") | sort -u > "$tmp/tests"
-  if [ ! -s "$tmp/tests" ]; then rm -rf "$tmp"; echo "test on base: the change has no test files"; return 0; fi
+  if [ ! -s "$tmp/tests" ]; then echo "test on base: the change has no test files"; exit 0; fi
   node "$FACTORY_SCRIPTS/patch-paths.mjs" keep "$patch" "$tmp/tests.patch" "$tmp/tests"
-  top="$(git rev-parse --show-toplevel)"; prefix="$(project_prefix)"; wt="$tmp/wt"
+  top="$(git rev-parse --show-toplevel)"; prefix="$(project_prefix)"
   # The instrument stays hidden, as in a worker's worktree (D21).
-  git worktree add -q --detach --no-checkout "$wt" "$base"
+  if ! git worktree add -q --detach --no-checkout "$wt" "$base" >"$log" 2>&1; then
+    echo "test on base: error: no temporary worktree at $base ($(tail -1 "$log"))"; exit 2
+  fi
   git -C "$wt" sparse-checkout set --no-cone '/*' "!/${prefix:+$prefix/}${FACTORY_INSTRUMENT_DIR}/" >/dev/null 2>&1 || true
-  git -C "$wt" checkout -q --detach "$base"
-  local dirarg=(); [ -z "$prefix" ] || dirarg=(--directory="$prefix")
-  if ! git -C "$wt" apply "${dirarg[@]}" "$tmp/tests.patch" 2>"$log"; then
-    git worktree remove --force "$wt" >/dev/null 2>&1 || true; rm -rf "$tmp"
-    echo "test on base: the tests don't apply on $base alone; not checked"; return 0
+  if ! git -C "$wt" checkout -q --detach "$base" >"$log" 2>&1; then
+    echo "test on base: error: can't check out $base in the temporary worktree ($(tail -1 "$log"))"; exit 2
   fi
   for d in ${prefix:+"$prefix"} ""; do           # the installed dependencies, as the worktree hook links them (D65)
     for n in ${FACTORY_DEPS_LINKS:-node_modules .venv}; do
       if [ -e "$top/${d:+$d/}$n" ] && [ ! -e "$wt/${d:+$d/}$n" ]; then ln -s "$top/${d:+$d/}$n" "$wt/${d:+$d/}$n"; fi
     done
   done
-  if (cd "$wt/$prefix" && bash -c "$FACTORY_TEST_CMD") >"$log" 2>&1; then rc=0; else rc=1; fi
-  git worktree remove --force "$wt" >/dev/null 2>&1 || true; git worktree prune >/dev/null 2>&1 || true; rm -rf "$tmp"
+  # The command: the test files alone (FACTORY_TEST_FILES_CMD), else the suite.
+  cmd="$FACTORY_TEST_CMD"
+  if [ -n "${FACTORY_TEST_FILES_CMD:-}" ]; then
+    files="$(while IFS= read -r f; do printf '%q ' "${f#"${prefix:+$prefix/}"}"; done < "$tmp/tests")"
+    cmd="${FACTORY_TEST_FILES_CMD//\{files\}/${files% }}"
+  elif [ "$want" = fail ]; then
+    # Without the new tests, the base must be green, or their failure proves nothing.
+    (cd "$wt/$prefix" && bash -c "$FACTORY_TEST_CMD") >"$log" 2>&1; rc=$?
+    if [ "$rc" -eq 126 ] || [ "$rc" -eq 127 ]; then echo "test on base: error: the test command can't start on $base (exit $rc)"; exit 2; fi
+    if [ "$rc" -ne 0 ]; then
+      echo "test on base: inconclusive: base already red: set FACTORY_TEST_FILES_CMD (the suite fails on $base without the new tests, so their failure proves nothing)"
+      exit 2
+    fi
+  fi
+  dirarg=(); [ -z "$prefix" ] || dirarg=(--directory="$prefix")
+  if ! git -C "$wt" apply "${dirarg[@]}" "$tmp/tests.patch" >"$log" 2>&1; then
+    echo "test on base: error: the tests don't apply on $base alone ($(tail -1 "$log"))"; exit 2
+  fi
+  (cd "$wt/$prefix" && bash -c "$cmd") >"$log" 2>&1; rc=$?
+  if [ "$rc" -eq 126 ] || [ "$rc" -eq 127 ]; then echo "test on base: error: the test command can't start on $base (exit $rc)"; exit 2; fi
   if [ "$want" = fail ] && [ "$rc" -eq 0 ]; then
     echo "test on base: the new tests pass on the code before the change ($intent mission): they don't test the ticket. Write a test that fails without the change, then make it pass"
-    return 1
+    exit 1
   fi
   if [ "$want" = pass ] && [ "$rc" -ne 0 ]; then
     echo "test on base: the new tests fail on today's code ($intent mission): a characterization test must describe current behavior. Pin what the code does now"
-    return 1
+    exit 1
   fi
   echo "test on base: as expected ($( [ "$want" = fail ] && echo "fails before the change" || echo "passes on today's code"))"
-  return 0
-}
+  exit 0
+)
 
 # --- ticket state (D33, D34) --------------------------------------------------
 # Per ticket: built and integrated by integrate.sh (marker = integration
