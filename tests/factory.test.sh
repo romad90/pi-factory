@@ -204,6 +204,7 @@ mkdir -p $m/issues
 cat > $m/spec.md <<'SPEC'
 # Demo
 **Intent:** feature
+**Reviewer:** jdoe
 
 Users get a greeting.
 
@@ -232,8 +233,30 @@ bash scripts/factory/workflow.sh contract demo >"$work/wf.log"
 wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
 [ -f "$wf" ] && grep -q 'const ITEMS' "$wf" && t "contract wave written to a file ($(basename "$wf"))" || fail "workflow file"
 grep -q '^\*\*Status:\*\* sent' $m/amendments/*.md && t "amendment marked sent" || fail "amendment status"
-bash scripts/factory/human.sh approve demo >/dev/null
+FACTORY_APPROVER="Test Human" bash scripts/factory/human.sh approve demo >/dev/null
+grep -qE '^\*\*Contract approved:\*\* [0-9-]+ — by Test Human' $m/spec.md && t "the approval line records who approved (D95)" || fail "approver" "$(grep 'Contract approved' $m/spec.md)"
+# D94: a feature mission gets a program design after G1, approved before tickets.
+expect_step design "feature mission, G1 approved, no design"
+bash scripts/factory/workflow.sh design demo >"$work/wf.log"
+wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
+grep -q '"agent": "factory-designer"' "$wf" && grep -q 'design-format.md' "$wf" && grep -q '.scratch/demo/design.md' "$wf" \
+  && t "the design wave runs the designer on the approved contract" || fail "design wave" "$(cat "$wf")"
+printf '# Design: demo\n\n## Call stacks\n```diff\n+greet  # VAL-HELLO-001\n```\n\n## Slices\n1. hello end to end — VAL-HELLO-001\n' > $m/design.md
+git add -A; git commit -qm "test: design draft"
+out="$(bash scripts/factory/next.sh demo)"
+grep -q '^STEP: approve-design' <<<"$out" && grep -q 'and jdoe, who will review the MR' <<<"$out" \
+  && t "an unapproved design waits for the human and the MR's reviewer (G1b)" || fail "approve-design" "$out"
+FACTORY_APPROVER="Test Human" bash scripts/factory/human.sh approve demo design >/dev/null
+sed -n 2p $m/design.md | grep -qE '^\*\*Design approved:\*\* [0-9-]+ — by Test Human' && grep -q $'\tapprove-design\t' $m/decisions.tsv \
+  && [ -z "$(git status --porcelain -- .scratch)" ] && t "/factory-approve <f> design writes the line under the title, logs it, checkpoints" || fail "approve design" "$(head -3 $m/design.md)"
 expect_step tickets "approved, no tickets"
+grep -q 'design.md if it exists (approved' <<<"$(bash scripts/factory/brief.sh ticket-writer demo all)" && grep -q 'Write vertical slices' <<<"$(bash scripts/factory/brief.sh ticket-writer demo all)" \
+  && grep -q 'design.md exists, it is approved' <<<"$(bash scripts/factory/brief.sh reviewer demo 01-hello)" \
+  && t "ticket writer follows the design in vertical slices; the reviewer checks commits against it (D94, D95)" || fail "design briefs"
+dn() { bash -c '. scripts/factory/lib.sh; f="$(mktemp)"; printf "%b" "$1" > "$f"; design_needed "$f" && echo yes || echo no' _ "$1"; }
+[ "$(dn '**Intent:** feature\n')" = yes ] && [ "$(dn '**Intent:** refactor\n')" = yes ] && [ "$(dn '**Intent:** maintenance\n')" = no ] \
+  && [ "$(dn '**Intent:** bugfix\n')" = no ] && [ "$(dn '**Intent:** bugfix\n**Design:** yes\n')" = yes ] && [ "$(dn '**Intent:** feature\n**Design:** no\n')" = no ] \
+  && t "design: feature and refactor by default, maintenance and bugfix skip it, **Design:** overrides" || fail "design_needed"
 bash scripts/factory/workflow.sh tickets demo all >"$work/wf.log"
 wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
 grep -q '"agent": "factory-ticket-writer"' "$wf" && grep -q 'write the mission' "$wf" && t "tickets come from the ticket writer" || fail "ticket writer wave" "$(cat "$wf")"
@@ -776,7 +799,7 @@ out="$(FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo --dry-run 2>
 echo "$out" | grep -q 'run /pr first' && t "mr.sh refuses without a PR body" || fail "mr no body" "$out"
 printf '# test(demo): characterize the hello tools\n\n## Summary\n\nTwo tools pinned.\n' > $m/pr.md
 out="$(FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo --dry-run 2>&1)"
-echo "$out" | grep -q "→ production" && echo "$out" | grep -q 'title: test(demo): characterize the hello tools' \
+echo "$out" | grep -q "→ production" && echo "$out" | grep -q 'title: test(demo): characterize the hello tools' && echo "$out" | grep -q 'reviewer: jdoe' \
   && t "mr.sh: title from the body's heading, target from FACTORY_MR_TARGET" || fail "mr dry" "$out"
 cur="$(git rev-parse --abbrev-ref HEAD)"
 out="$(FACTORY_MR_TARGET=production FACTORY_MR_BLOCKED_BRANCHES="other/* ${cur%%/*}*" bash scripts/factory/mr.sh demo --dry-run 2>&1)" && fail "mr.sh must refuse a blocked branch"
@@ -834,6 +857,7 @@ bid() { node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");cons
 bcommit() { local sha t; for sha in $(grep -oE '[0-9a-f]{40}' "$wf" | sort -u); do for t in - ""; do [ "$(brief_id "$1" runner "$t" "$sha")" = "$2" ] && { echo "$sha"; return; }; done; done; }
 echo "$(basename "$wf")" >> "$FAKE_LOG"
 case "$wf" in
+  *-design*.js) printf '# Design: runner\n\n## Slices\n1. run end to end — VAL-RUN-001\n' > $r/design.md; echo '{"output":"design"}' ;;
   *-tickets*.js) printf '# 01 run\n**Size:** S\n## Covers\nVAL-RUN-001\n' > $r/issues/01-run.md; echo '{"output":"1 ticket"}' ;;
   *-build-wave*.js)
     if [ ! -f "$FAKE_STATE.429" ]; then touch "$FAKE_STATE.429"; echo '[{"ticket":"01-run","patch":null,"ok":false,"error":"429 Too Many Requests: rate limit"}]'
@@ -854,6 +878,9 @@ esac
 FAKE
 chmod +x "$work/bin/fakerun"
 export FAKE_LOG="$work/fake.log" FAKE_STATE="$work/fake" FAKE_PATCH="$work/run.test.js.patch"
+out="$(FACTORY_RUNNER=fake FACTORY_FAKE_RUNNER="$work/bin/fakerun" bash scripts/factory/run.sh runner --no-preflight 2>&1)" || fail "run.sh design" "$out"
+echo "$out" | grep -q 'WAITING: human (approve-design)' && [ -f $r/design.md ] && t "run.sh: design wave, then stops for G1b (D94)" || fail "run.sh design" "$out"
+bash scripts/factory/human.sh approve runner design >/dev/null
 out="$(FACTORY_RUNNER=fake FACTORY_FAKE_RUNNER="$work/bin/fakerun" bash scripts/factory/run.sh runner --no-preflight 2>&1)" || fail "run.sh tickets" "$out"
 echo "$out" | grep -q 'WAITING: human (approve-tickets)' && [ -f $r/issues/01-run.md ] && t "run.sh: tickets wave, then stops for the human's approval" || fail "run.sh tickets" "$out"
 bash scripts/factory/human.sh approve runner tickets >/dev/null
@@ -921,7 +948,7 @@ git -C "$work/ci" checkout -q -- .
 (cd "$work/ci/apps/svc" && FACTORY_PACKAGE_GIT="$root" bash -c "$fetch" >/dev/null 2>&1) && [ -L "$work/ci/apps/svc/scripts/factory" ] \
   && [ "$(git -C "$(cd -P "$work/ci/apps/svc/scripts/factory/../.." && pwd)" rev-parse HEAD)" = "$(git -C "$root" rev-parse HEAD)" ] \
   && t "CI fetches the factory from FACTORY_PACKAGE_GIT at the recorded commit, into a directory of its own, then links it" || fail "CI fetch" "$(ls -la "$work/ci/apps/svc/scripts" 2>&1)"
-[ "$(node scripts/factory/effective-models.mjs | wc -l | tr -d ' ')" = 9 ] && node scripts/factory/models-lint.mjs --per-machine-ok >/dev/null \
+[ "$(node scripts/factory/effective-models.mjs | wc -l | tr -d ' ')" = 10 ] && node scripts/factory/models-lint.mjs --per-machine-ok >/dev/null \
   && t "agents come from the package; CI accepts models set per machine" || fail "package agents" "$(node scripts/factory/effective-models.mjs; node scripts/factory/models-lint.mjs --per-machine-ok)"
 cp .pi/settings.json "$work/svc-settings"; node -e 'const f=".pi/settings.json",s=require("./"+f);s.subagents.disableBuiltins=false;require("fs").writeFileSync(f,JSON.stringify(s))'
 out="$(node scripts/factory/models-lint.mjs --per-machine-ok 2>&1)" && fail "per-machine lint must still check the settings" "$out"

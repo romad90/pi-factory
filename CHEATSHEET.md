@@ -16,7 +16,9 @@ You keep the decisions that define value and risk; the factory does everything t
 | Write the validation contract | Factory (author agent) | Mechanical translation of the spec into checkable assertions. |
 | Attack the contract | Factory (critic, another family) | A second model family finds what the author can't see in its own work. |
 | **Approve the contract (G1)** | **You, one word** | The definition of done is the highest-leverage artifact; a human owns it. |
-| Write the tickets | Factory (ticket writer) | Sizing and ordering is repeatable work. |
+| Write the program design: call stacks, files, signatures, slices (feature, refactor) | Factory (designer) | The model drafts the shape of the code in minutes; arguing with it costs ten. |
+| **Approve the design (G1b)**, ideally with the MR's reviewer | **You, one word** | Every decision taken here is one the reviewer would otherwise make in code review, when changing it costs most (D94, D95). |
+| Write the tickets, as vertical slices | Factory (ticket writer) | Sizing and ordering is repeatable work; each ticket runs end to end. |
 | **Approve the tickets** | **You, one word** | Cheap to check, expensive to get wrong: a bad split costs rounds. |
 | Coverage check (G2), tests configured | Factory (script) | Pure bookkeeping. |
 | Build, integrate (lint, tests, extra check, patch guard) | Factory (workers + scripts) | Deterministic gates never get tired. |
@@ -159,7 +161,8 @@ It writes `.factory/commands.env`, `behavior-paths`, `model-families.json`, `VER
 | 1 | `/grill-with-docs`, then `/to-spec` → `.scratch/<f>/spec.md` (start with `**Intent:** feature`) | |
 | 2 | `/factory <f>` | pre-flight, contract author, then critic |
 | 3 | Read the contract + critique. `/factory-approve <f>`, or `/factory-amend <f> "<change>"` | amend reruns author + critic |
-| 4 | | ticket writer proposes tickets |
+| 3b | Feature or refactor: read `design.md` (with the MR's reviewer if the spec names one), then `/factory-approve <f> design`, or edit it | designer drafts it after G1 |
+| 4 | | ticket writer proposes tickets, as vertical slices |
 | 5 | Read `issues/` (edit, split, delete freely), then `/factory-approve <f> tickets` | coverage check |
 | 6 | | build waves, integration, reviews, validation |
 | 7 | Answer when notified: `/factory-decide <f> <your answer, and why>` (any text: quotes and backticks are safe) | logged in `decisions.tsv`, read by every role. Questions a rule or an earlier answer settles never reach you: logged as `auto` |
@@ -178,6 +181,8 @@ Keep specs to roughly 12 stories or fewer; split anything bigger into two missio
 | `grill` | you | no spec | `/grill-with-docs`, `/to-spec` |
 | `contract` | lead | no contract, no critique, or a pending amendment | runs the contract wave |
 | `approve` | you | G1 | `/factory-approve <f>` or `/factory-amend` |
+| `design` | lead | feature or refactor (or `**Design:** yes`), G1 approved, no `design.md` | runs the designer |
+| `approve-design` | you | G1b: `design.md` not approved | read it, `/factory-approve <f> design` |
 | `decide` | you | a worker or reviewer asked something | `/factory-decide` |
 | `tickets` | lead | no tickets | ticket writer drafts them |
 | `approve-tickets` | you | tickets or fix tickets proposed | review `issues/`, `/factory-approve <f> tickets` |

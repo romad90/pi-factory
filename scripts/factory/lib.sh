@@ -79,6 +79,21 @@ frozen_paths() {                       # <spec> → one pattern per line
     printf '%s\n' $FACTORY_FROZEN_MAINTENANCE
   fi
 }
+# Program design (D94): feature and refactor missions get one, others when the
+# spec says **Design:** yes; **Design:** no skips it.
+design_needed() {                      # <spec>
+  local d i
+  d="$(verdict_field "$1" Design | tr '[:upper:]' '[:lower:]')"
+  case "$d" in yes) return 0 ;; no) return 1 ;; esac
+  i="$(verdict_field "$1" Intent)"
+  [ "$i" = feature ] || [ "$i" = refactor ]
+}
+design_approved() {                    # <design.md>
+  [ -f "$1" ] && grep -qE '^\*\*Design approved:\*\* [0-9]{4}-[0-9]{2}-[0-9]{2}' "$1"
+}
+# Who approves (D95): FACTORY_APPROVER, else git's user.name.
+approver() { printf '%s' "${FACTORY_APPROVER:-$(git config user.name 2>/dev/null || true)}"; }
+
 # Frozen tests (D93): in a refactor, the tests that pin today's behavior are
 # the reference, so not a line of them may change. Unlike frozen paths, the
 # test-file exception does not apply. From "## Frozen tests", same syntax.

@@ -19,7 +19,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib.sh
 . "$here/lib.sh"
 
-mode="${1:?usage: workflow.sh <contract|tickets|build-wave|review-wave|validate|steward|light> <feature> ...}"
+mode="${1:?usage: workflow.sh <contract|design|tickets|build-wave|review-wave|validate|steward|light> <feature> ...}"
 feature="${2:?usage: workflow.sh <mode> <feature> ...}"
 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
@@ -66,6 +66,15 @@ for (const it of ITEMS) {            // sequential: the critic reads the author'
   out.push({ key: it.key, output: r.output });
 }
 return out;'
+    ;;
+
+  design)
+    # D94: the program design, after G1 and before tickets; a human approves it.
+    contract_approved "$(mission_dir "$feature")/spec.md" || die "approve the contract first (G1)"
+    add designer factory-designer false designer "$feature"
+    body='const it = ITEMS[0];
+const r = await runs.run(it.key, { agent: it.agent, task: it.task });
+return { output: r.output };'
     ;;
 
   tickets)
