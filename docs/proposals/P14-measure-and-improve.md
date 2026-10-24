@@ -34,6 +34,13 @@ A benchmark case is a ticket that was really done: its issue file, the contract 
 - Output: `bench/<suite>/<config>.tsv` (case, pass, rounds, tokens, cost, time) and a summary per config: pass rate, cost per passed case, median turns. Two or more configs give the cost-versus-correctness curve.
 - Side effects: replays run in worktrees, with no push, no MR and the command guard on; cases that needed a network service run with the same test doubles as the mission did, or are marked not replayable.
 
+The results page (seen in Warp Factories' benchmark view):
+- **One variable at a time.** Each configuration differs from a named default by one thing (the model, or the thinking level, or a brief); `bench.sh compare` warns when two configs differ by more, since the result then can't say which change mattered.
+- **A written summary first,** then three recommendations: highest quality, most efficient (quality per unit of cost), lowest cost, each with its score and cost per trial.
+- **A scatter with selectable axes:** correctness, cost per trial, turns, time, rounds; one point per configuration, labelled `model (thinking)`.
+- **Difficulty and area** on every case (easy to extra-hard from the case's known rounds; an area tag; the role it exercises), so a suite tests one agent type and results break down by tier.
+- **Debug a single case** before running a whole suite.
+
 What it answers: which worker, reviewer and thinking level for each kind of ticket, at what cost; whether a change to a brief, a resolver rule or the factory version helps, on the same cases. It turns the budget question for the committee into a number: cost per accepted ticket for the chosen setup.
 
 ### 3. Scoring past runs

@@ -20,6 +20,7 @@ Status: **draft** (open for discussion) · **accepted** (in the roadmap) · **re
 | P12 | [A durable runner: the mission survives a closed laptop, and the human answers from anywhere](P12-durable-run.md) | draft | P2 |
 | P13 | [Context repos: investigate across services, change only one](P13-context-repos.md) | draft | — |
 | P14 | [Measure and improve: a run archive, a benchmark from our own tickets, scoring](P14-measure-and-improve.md) | draft | — (P5 builds on it) |
+| P15 | [The factory improves itself: agents that read failed runs and propose changes to the factory](P15-factory-improves-itself.md) | draft, later | P14 |
 
 ## Why these four, in this order
 
@@ -53,3 +54,5 @@ P12 answers P2's open question with Pi Durable, a library from Pi's authors that
 P13 comes from a bug between an API and the two bots that keep it in sync. One mission still changes one repo; the others become read-only context, mapped by one fresh agent per repo, and an investigation step finds the cause and reproduces it in the repo being fixed before any contract is written.
 
 P14 makes the factory measurable: keep every run, replay real tickets as a benchmark across models and factory versions, score runs for failure modes tests cannot see, and aggregate cost per merged MR across missions. It is what lets P5 prove an improvement before it is merged, and what gives the pilot its numbers.
+
+P15 is P5 one level up: agents that read the run archive and scores across missions, find failure patterns seen at least three times, propose the smallest change to the factory, prove it with a before-and-after benchmark, and open a PR a human merges. The safety layer is out of their reach.
