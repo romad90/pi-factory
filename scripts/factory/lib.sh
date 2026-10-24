@@ -391,6 +391,12 @@ failure_signature() {                  # <log>
     | sort -u | head -40
 }
 
+# --- the factory's own identity (D100) ---------------------------------------
+# Commits the factory makes are authored by it, committed by the human whose
+# git identity runs the mission: `git log --author=pi-factory` is what the
+# factory did, `--committer` who let it.
+FACTORY_AUTHOR="${FACTORY_AUTHOR:-pi-factory <pi-factory@localhost>}"
+
 # --- commands.env (D8, D34) ---------------------------------------------------
 
 load_commands() {

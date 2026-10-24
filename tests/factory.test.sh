@@ -380,6 +380,9 @@ rm -rf node_modules
 git worktree remove --force "$wt"; git branch -q -D pi-subagents/01-hello-abc123-s0-t0
 c1="$(cat $m/state/01-hello.integrated)"
 grep -q '^feat(demo): 01-hello' <<<"$(git log -1 --skip=1 --format=%s)" && t "integration commit is a Conventional Commit" || fail "integration message: $(git log -3 --format=%s)"
+[ "$(git log -1 --format='%an <%ae>' "$c1")" = "pi-factory <pi-factory@localhost>" ] && [ "$(git log -1 --format=%cn "$c1")" = "$GIT_COMMITTER_NAME" ] \
+  && [ "$(git log -1 --skip=0 --format=%an HEAD)" = pi-factory ] \
+  && t "factory commits are authored by pi-factory and committed by the human (D100)" || fail "factory identity" "$(git log -3 --format='%an / %cn: %s')"
 expect_step review "integrated ticket waits for review"
 
 # D81: a review of an older commit is stale: kept aside, not a round.
