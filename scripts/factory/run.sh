@@ -171,8 +171,12 @@ $nxt"
     paused)
       if [ "$steps" = 1 ]; then must pause.sh resume "$feature"; continue; fi
       printf '%s\n' "$nxt"; stop 3 "the mission paused itself" ;;
-    grill|approve|decide|approve-tickets|coverage|setup|escalate|blocked|unverified)
+    grill|approve|decide|approve-tickets|coverage|setup|escalate|blocked|unverified|approve-conclusion|handoff|report)
       printf '%s\n' "$nxt"; echo "WAITING: human ($step)"; exit 0 ;;
+    context-sync)
+      must context.sh sync "$feature" ;;
+    investigate)
+      wave investigate "$feature"; [ "$WAVE_OK" = 1 ] || stop 2 "the investigate wave failed: $RESULT" ;;
     contract|validate|steward)
       wave "$step" "$feature"; [ "$WAVE_OK" = 1 ] || stop 2 "the $step wave failed: $RESULT"
       [ "$step" = contract ] || must collect.sh "$feature" ;;

@@ -1,8 +1,8 @@
 // Unit tests for the command guard rules. Run: node --test tests/
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { check } from "../scripts/factory/guard-rules.mjs";
 
@@ -99,4 +99,32 @@ test("D71: mission records are not deleted by hand", () => {
     assert.equal(bash(cmd)?.rule, "records", `should block: ${cmd}`);
   for (const cmd of ["scripts/factory/reset-ticket.sh m 05-x reason", "rm -f /tmp/x.patch", "ls .scratch/m"])
     assert.equal(bash(cmd), null, `should allow: ${cmd}`);
+});
+
+test("D99: context repos are read, never changed; nothing is written outside the project", () => {
+  // Under $HOME, not the temp folder: temp paths stay writable by design.
+  const proj = mkdtempSync(join(homedir(), ".guard-ctx-"));
+  mkdirSync(join(proj, ".git")); mkdirSync(join(proj, ".factory", "context", "bot-a"), { recursive: true });
+  const at = (tool, path, cwd = proj) => check({ tool, input: { path }, cwd });
+  assert.equal(at("write", ".factory/context/bot-a/src/sync.js")?.rule, "context");
+  assert.equal(at("edit", join(proj, ".factory/context/bot-a/README.md"))?.rule, "context");
+  assert.equal(at("read", ".factory/context/bot-a/src/sync.js"), null, "reading a context repo is the point");
+  assert.equal(at("write", "../sibling-repo/src/x.js")?.rule, "outside");
+  assert.equal(at("write", "/etc/hosts")?.rule, "outside");
+  assert.equal(at("edit", join(homedir(), "elsewhere", "x.js"))?.rule, "outside");
+  assert.equal(at("write", "/tmp/pr-body-m.md"), null, "the temp folder stays writable for scratch files");
+  assert.equal(at("write", "src/fix.js"), null);
+  assert.equal(at("write", ".scratch/m/context/bot-a.md"), null, "explorers write their brief in the mission folder");
+  const sh = (command) => check({ tool: "bash", input: { command }, cwd: proj });
+  for (const cmd of [
+    "git -C .factory/context/bot-a checkout -b fix", "git -C ./.factory/context/bot-a commit -am x",
+    "cd .factory/context/bot-a && git stash", "cd .factory/context/bot-a; git reset --hard",
+    "git --git-dir=.factory/context/bot-a/.git log", "echo x > .factory/context/bot-a/src/a.js",
+    "cat patch >> .factory/context/bot-a/notes.md",
+  ]) assert.equal(sh(cmd)?.rule, "context", `should block: ${cmd}`);
+  for (const cmd of [
+    "grep -rn retry .factory/context/bot-a/src", "cat .factory/context/bot-a/src/sync.js",
+    "ls .factory/context", "git log --oneline -3", "sed -n 1,40p .factory/context/bot-a/src/sync.js",
+  ]) assert.equal(sh(cmd), null, `should allow: ${cmd}`);
+  rmSync(proj, { recursive: true, force: true });
 });

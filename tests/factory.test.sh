@@ -877,6 +877,65 @@ echo "$out" | grep -q 'more than 0 steps' && t "run.sh: a step budget stops a lo
 unset FAKE_LOG FAKE_STATE FAKE_PATCH
 
 # D92: install once per machine (P11). Models per machine, then a project on the package.
+echo "Context repos and investigation (D99)"
+ctx="$work/ctx src"; git init -q "$ctx"; (cd "$ctx" && echo 'export const poll = () => 1;' > poll.js && git add -A && git commit -qm init)
+mkdir -p .scratch/inv
+inv_spec() {                                # <intent>
+  printf '# Inv\n**Intent:** %s\n\nDuplicates appear after a sync.\n\n## Context repos\n- `%s` — pulls from the API every 5 minutes\n' "$1" "$ctx" > .scratch/inv/spec.md
+}
+inv_spec bugfix; git add .scratch/inv; git commit -qm "test: investigation mission"
+istep() { head -1 <<<"$(bash scripts/factory/next.sh inv 2>&1 || true)"; }
+[ "$(bash -c '. scripts/factory/lib.sh; context_repos .scratch/inv/spec.md' | cut -f1,4)" = "$(printf 'ctx src\tpulls from the API every 5 minutes')" ] \
+  && t "the spec's context repos are parsed (name, role)" || fail "context parse" "$(bash -c '. scripts/factory/lib.sh; context_repos .scratch/inv/spec.md')"
+[ "$(istep)" = "STEP: context-sync" ] && t "a bugfix naming context repos starts by syncing them" || fail "context-sync step" "$(bash scripts/factory/next.sh inv 2>&1)"
+bash scripts/factory/context.sh sync inv >"$work/ctx.log" 2>&1 || fail "context sync" "$(cat "$work/ctx.log")"
+cl=".factory/context/ctx src"
+[ -f "$cl/poll.js" ] && [ "$(stat -c %A "$cl/poll.js" | grep -o w)" = "" ] && grep -q "$(git -C "$ctx" rev-parse HEAD)" .scratch/inv/context.tsv \
+  && [ -z "$(git status --porcelain -- .factory/context)" ] \
+  && t "context repos are cloned into the factory's folder, read-only on disk, recorded, invisible to git" || fail "context clone" "$(ls -la "$cl" 2>&1; cat .scratch/inv/context.tsv 2>&1; git status --porcelain)"
+printf 'diff --git a/.factory/context/ctx src/poll.js b/.factory/context/ctx src/poll.js\n--- a/.factory/context/ctx src/poll.js\n+++ b/.factory/context/ctx src/poll.js\n@@ -1 +1 @@\n-export const poll = () => 1;\n+export const poll = () => 2;\n' > "$work/ctx.patch"
+if bash scripts/factory/patch-guard.sh "$work/ctx.patch" >"$work/pg.log"; then fail "a patch into a context repo must be blocked"; fi
+grep -q 'BLOCKED paths: .factory/context/ctx src/poll.js' "$work/pg.log" && t "the patch guard refuses a change in a context repo" || fail "ctx patch guard" "$(cat "$work/pg.log")"
+[ "$(istep)" = "STEP: investigate" ] && t "then the investigation starts: briefs missing" || fail "investigate step" "$(bash scripts/factory/next.sh inv 2>&1)"
+bash scripts/factory/workflow.sh investigate inv > "$work/wf.log" 2>&1 || fail "investigate wave" "$(cat "$work/wf.log")"
+wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
+grep -q '"key": "explore-ctx src"' "$wf" && grep -q '"key": "explore-home"' "$wf" && grep -q '"agent": "factory-investigator"' "$wf" \
+  && [ "$(cat .scratch/inv/state/investigate.rounds)" = 1 ] && t "the investigate wave: one fresh explorer per repo, then the investigator (round 1)" || fail "investigate wave" "$(cat "$wf")"
+bash scripts/factory/brief.sh explorer inv "ctx src" > "$work/b.txt"
+grep -q 'Target: context repo ctx src at .factory/context/ctx src/ (pulls from the API every 5 minutes)' "$work/b.txt" && grep -q 'never run git in them' "$work/b.txt" \
+  && t "an explorer's brief names its one repo and forbids changing it" || fail "explorer brief" "$(cat "$work/b.txt")"
+mkdir -p .scratch/inv/context
+echo "# ctx src" > ".scratch/inv/context/ctx src.md"; echo "# home" > .scratch/inv/context/home.md
+printf '# Investigation: inv\n\n## System map\n- bot polls the API\n\n## Hypotheses\n- **H1** open: retries replay a sync\n\n## Questions\n- Q1 [ctx src]: does a failed poll retry with the same payload & key?\n' > .scratch/inv/investigation.md
+[ "$(istep)" = "STEP: investigate" ] && grep -q 'answers to Q1' <<<"$(bash scripts/factory/next.sh inv)" && t "an open question sends the investigation round again" || fail "question loop" "$(bash scripts/factory/next.sh inv 2>&1)"
+bash scripts/factory/brief.sh explorer inv Q1 > "$work/b.txt"
+grep -qF 'answer Q1 about ctx src (.factory/context/ctx src/): does a failed poll retry with the same payload & key?' "$work/b.txt" \
+  && t "a question goes to a fresh explorer in that repo, its text intact" || fail "question brief" "$(cat "$work/b.txt")"
+mkdir -p .scratch/inv/context/answers; echo "Yes, same key (poll.js:1)" > .scratch/inv/context/answers/Q1.md
+printf '\n## Conclusion\n**Cause:** a retried poll replays the sync.\n**Fix belongs:** here\n**Reproduction:** issues/01-reproduce-dup.md\n\n### Assertions for the fix\n- a sync replayed twice creates no duplicate\n' >> .scratch/inv/investigation.md
+grep -q 'a reproduction ticket' <<<"$(bash scripts/factory/next.sh inv)" && t "a fix here needs its reproduction ticket first" || fail "repro needed" "$(bash scripts/factory/next.sh inv 2>&1)"
+mkdir -p .scratch/inv/issues; printf '# 01-reproduce-dup\n**Test:** `tests/dup.test.js`\n## Covers: enabler\nA replayed sync duplicates.\n' > .scratch/inv/issues/01-reproduce-dup.md
+[ "$(istep)" = "STEP: approve-conclusion" ] && t "the conclusion waits for the human" || fail "approve-conclusion" "$(bash scripts/factory/next.sh inv 2>&1)"
+bash scripts/factory/human.sh approve inv conclusion >/dev/null 2>&1 || fail "approve conclusion" "$(bash scripts/factory/human.sh approve inv conclusion 2>&1)"
+grep -qE '^\*\*Conclusion approved:\*\* [0-9-]{10}' .scratch/inv/investigation.md && grep -q 'approve-conclusion' .scratch/inv/decisions.tsv \
+  && [ "$(istep)" = "STEP: contract" ] && t "approved: the usual mission starts at the contract" || fail "after conclusion" "$(bash scripts/factory/next.sh inv 2>&1)"
+touch .scratch/inv/state/01-reproduce-dup.integrated
+bash -c '. scripts/factory/lib.sh; frozen_tests .scratch/inv/spec.md' | grep -qx 'tests/dup.test.js' && t "once integrated, the reproduction test is frozen (D93)" || fail "repro frozen" "$(bash -c '. scripts/factory/lib.sh; frozen_tests .scratch/inv/spec.md')"
+rm -f .scratch/inv/state/01-reproduce-dup.integrated
+sed -i.bak 's/^\*\*Fix belongs:\*\* here/**Fix belongs:** ctx src/' .scratch/inv/investigation.md && rm -f .scratch/inv/investigation.md.bak
+grep -q 'the finding for ctx src' <<<"$(bash scripts/factory/next.sh inv)" && t "a fix elsewhere needs a finding for that team" || fail "finding needed" "$(bash scripts/factory/next.sh inv 2>&1)"
+echo "Symptom, cause, evidence, suggested fix" > ".scratch/inv/finding-for-ctx src.md"
+[ "$(istep)" = "STEP: handoff" ] && t "then the mission hands off and changes nothing here" || fail "handoff" "$(bash scripts/factory/next.sh inv 2>&1)"
+sed -i.bak 's/^\*\*Fix belongs:\*\* ctx src/**Fix belongs:** here/' .scratch/inv/investigation.md && rm -f .scratch/inv/investigation.md.bak
+inv_spec exploration
+[ "$(istep)" = "STEP: report" ] && t "an exploration ends with its approved report" || fail "report" "$(bash scripts/factory/next.sh inv 2>&1)"
+inv_spec bugfix; rm -f .scratch/inv/context/home.md; echo 3 > .scratch/inv/state/investigate.rounds
+[ "$(istep)" = "STEP: escalate" ] && t "an investigation that used its rounds escalates to the human" || fail "rounds limit" "$(bash scripts/factory/next.sh inv 2>&1)"
+bash scripts/factory/context.sh release inv >/dev/null
+[ -n "$(stat -c %A "$cl/poll.js" | grep -o w)" ] && t "release gives write permission back" || fail "release" "$(ls -la "$cl")"
+chmod -R u+w .factory/context; rm -rf .scratch/inv .factory/context
+git add -A .scratch; git commit -qm "test: investigation done" >/dev/null 2>&1 || true
+
 echo "Install once (D92)"
 mkdir -p "$PI_CODING_AGENT_DIR"
 printf '{"subagents":{"agentOverrides":{"factory-worker":{"model":"gw/maker-2","thinking":"low"}}}}' > "$PI_CODING_AGENT_DIR/settings.json"
@@ -921,7 +980,7 @@ git -C "$work/ci" checkout -q -- .
 (cd "$work/ci/apps/svc" && FACTORY_PACKAGE_GIT="$root" bash -c "$fetch" >/dev/null 2>&1) && [ -L "$work/ci/apps/svc/scripts/factory" ] \
   && [ "$(git -C "$(cd -P "$work/ci/apps/svc/scripts/factory/../.." && pwd)" rev-parse HEAD)" = "$(git -C "$root" rev-parse HEAD)" ] \
   && t "CI fetches the factory from FACTORY_PACKAGE_GIT at the recorded commit, into a directory of its own, then links it" || fail "CI fetch" "$(ls -la "$work/ci/apps/svc/scripts" 2>&1)"
-[ "$(node scripts/factory/effective-models.mjs | wc -l | tr -d ' ')" = 9 ] && node scripts/factory/models-lint.mjs --per-machine-ok >/dev/null \
+[ "$(node scripts/factory/effective-models.mjs | wc -l | tr -d ' ')" = "$(ls "$root"/.pi/agents/factory/*.md | wc -l | tr -d ' ')" ] && node scripts/factory/models-lint.mjs --per-machine-ok >/dev/null \
   && t "agents come from the package; CI accepts models set per machine" || fail "package agents" "$(node scripts/factory/effective-models.mjs; node scripts/factory/models-lint.mjs --per-machine-ok)"
 cp .pi/settings.json "$work/svc-settings"; node -e 'const f=".pi/settings.json",s=require("./"+f);s.subagents.disableBuiltins=false;require("fs").writeFileSync(f,JSON.stringify(s))'
 out="$(node scripts/factory/models-lint.mjs --per-machine-ok 2>&1)" && fail "per-machine lint must still check the settings" "$out"
