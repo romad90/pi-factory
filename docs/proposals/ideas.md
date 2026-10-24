@@ -162,6 +162,7 @@ Bias: HumanLayer sells planning and review tooling. The incident data (Faros) is
 - **Navigation as a model of factory engineering:** Inbox, Runs, MCPs and apps, Secrets across factories; per factory: Dashboard, Agents, Automations, Scorers, Self-improvement (with a count of open items), Benchmarks, Factory definition, Settings. Our cockpit v2 (P10 §5).
 - **A benchmark suite distilled from real runs** ("WarpBench"): self-contained tasks, tiered easy, medium, hard and extra-hard, spread over areas (configuration, client UI, server logic, cross-cutting), scoped to one agent type (implementation only, independent of the others). Our D98 cases get a difficulty (from their known rounds), an area and a role.
 - **Several factories side by side** (product, marketing): one per product surface. Ours: one per repo or project, at the leads level.
+- **A benchmark run's result page:** a written summary, then "highest quality", "most efficient" and "lowest cost" recommendations with cost per trial, and a correctness-versus-cost scatter with selectable axes. Every configuration differs from the default by one variable (the model), so the comparison is controlled. In their run, a cheap open-weight flash model was both the most efficient and the cheapest (about $2 a trial) at 93% correctness, against 95% for the most expensive. The speaker's point: a benchmark built from your own runs, with your gates as reward, is an RL environment you own. P14.
 
 ## What to watch for
 
