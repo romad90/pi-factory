@@ -125,6 +125,7 @@ You type `/factory <feature>` once. The lead loops on `scripts/factory/next.sh`,
 |---|---|---|---|
 | `factory-contract-author` | Writes or amends the validation contract from the spec | Frontier, family A | fresh |
 | `factory-contract-critic` | Attacks the contract before you approve it | Frontier, **family ≠ author** | fresh |
+| `factory-designer` | Writes the program design (call stacks, files, signatures, slices) after G1, for feature and refactor missions | Frontier, family A | fresh |
 | `factory-ticket-writer` | Drafts sized, ordered tickets (and fix tickets from findings); you approve | Frontier, any family | fresh |
 | `factory-explorer` | Maps one repo's side of a cross-service bug, or answers one question about it; read-only (D99) | Efficient | fresh |
 | `factory-investigator` | Reasons from the explorers' briefs: hypotheses, questions, a reproduction ticket, where the fix belongs (D99) | Frontier | fresh |

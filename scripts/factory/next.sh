@@ -4,7 +4,7 @@
 #   STEP: <code>
 # Codes (human steps marked *, they notify you):
 #   paused* grill* context-sync investigate approve-conclusion* handoff* report*
-#   contract approve* decide* tickets approve-tickets* coverage*
+#   contract approve* design approve-design* decide* tickets approve-tickets* coverage*
 #   setup* build review escalate* blocked* validate behavior-fix
 #   behavior-stale health health-fix steward unverified* pr*
 #
@@ -21,7 +21,7 @@ critique="$dir/contract-critique.md"
 STATUS=""
 shopt -s nullglob
 
-HUMAN_STEPS=" paused grill approve-conclusion handoff report approve decide approve-tickets coverage setup escalate blocked unverified pr "
+HUMAN_STEPS=" paused grill approve-conclusion handoff report approve approve-design decide approve-tickets coverage setup escalate blocked unverified pr "
 
 step() {                                  # <code> <human explanation>
   local code="$1"; shift
@@ -112,7 +112,18 @@ fi
 if ! contract_approved "$spec"; then
   hint=""
   grep -q '\[blocking\]' "$critique" && hint=" The critique has [blocking] findings: rerun 'workflow.sh contract' to amend, then re-read."
-  step approve "G1, human: read the contract and $critique, then /factory-approve $feature (or /factory-amend $feature \"<change>\").$hint"
+  who="$(verdict_field "$spec" Reviewer)"
+  step approve "G1, human${who:+ (and $who, who will review the MR)}: read the contract and $critique, then /factory-approve $feature (or /factory-amend $feature \"<change>\").$hint"
+fi
+
+# D94: the shape of the code, approved before any ticket (feature, refactor).
+if design_needed "$spec"; then
+  design="$dir/design.md"
+  [ -f "$design" ] || step design "scripts/factory/workflow.sh design $feature (designer, fresh: call stacks, files, types and slices, per docs/agents/design-format.md)"
+  if ! design_approved "$design"; then
+    who="$(verdict_field "$spec" Reviewer)"
+    step approve-design "G1b, human${who:+ (and $who, who will review the MR)}: read $design, then /factory-approve $feature design. To change it, edit it or delete it and run next.sh (the designer writes it again)."
+  fi
 fi
 
 tickets=("$dir"/issues/*.md)

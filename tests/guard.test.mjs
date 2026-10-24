@@ -128,3 +128,50 @@ test("D99: context repos are read, never changed; nothing is written outside the
   ]) assert.equal(sh(cmd), null, `should allow: ${cmd}`);
   rmSync(proj, { recursive: true, force: true });
 });
+
+// D100: a worker's hands: no network, no writes into the shared dependencies, no secrets.
+import { writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { scrubCommand, secretEnvNames } from "../scripts/factory/guard-rules.mjs";
+const workerGit = mkdtempSync(join(tmpdir(), "guard-gitdir-"));
+writeFileSync(join(workerGit, "HEAD"), "ref: refs/heads/pi-subagents/01-hello-abc123-s0-t0\n");
+const workerWt = mkdtempSync(join(tmpdir(), "guard-worker-"));
+writeFileSync(join(workerWt, ".git"), `gitdir: ${workerGit}\n`);
+mkdirSync(join(workerWt, ".factory"));
+
+test("a worker stays off the network and out of the shared dependencies (D100)", () => {
+  for (const cmd of [
+    "curl -s https://example.com", "wget https://x/y.tgz", "npm install left-pad", "pnpm add x", "yarn add x",
+    "npx -y some-tool", "pip install requests", "python -m pip install x", "uv add x", "go get example.com/x",
+    "git fetch origin", "git clone https://x/y", "git pull", "python3 -c 'import urllib.request'",
+    "node -e \"fetch('https://x')\"", "echo x > node_modules/a/index.js", "sed -i s/a/b/ node_modules/x/y.js",
+    "rm -rf node_modules/", "cp evil.js node_modules/x/index.js", "touch .venv/lib/x.py",
+  ]) assert.ok(check({ tool: "bash", input: { command: cmd }, cwd: workerWt }), `worker should be blocked: ${cmd}`);
+  for (const cmd of ["npm test", "npx vitest run", "cat node_modules/x/package.json", "ls node_modules", "git status", "node src/app.js"]) {
+    assert.equal(check({ tool: "bash", input: { command: cmd }, cwd: workerWt }), null, `worker should be allowed: ${cmd}`);
+  }
+  assert.ok(check({ tool: "write", input: { path: "node_modules/x/index.js" }, cwd: workerWt }));
+  assert.ok(check({ tool: "edit", input: { path: join(workerWt, ".venv/lib/a.py") }, cwd: workerWt }));
+  assert.equal(check({ tool: "read", input: { path: "node_modules/x/index.js" }, cwd: workerWt }), null);
+  // The lead and the main checkout are not concerned.
+  assert.equal(bash("curl -s https://example.com"), null);
+  assert.equal(bash("npm install"), null);
+  assert.equal(check({ tool: "write", input: { path: "node_modules/x/index.js" }, cwd: main }), null);
+});
+
+test("Pi's provider keys are never read (D100)", () => {
+  assert.ok(bash("cat ~/.pi/agent/models.json"));
+  assert.ok(check({ tool: "read", input: { path: "/home/u/.pi/agent/auth.json" }, cwd: main }));
+});
+
+test("the hands hold no secrets: bash runs with credential variables unset (D100)", () => {
+  const env = { FACTORY_TEST_SECRET_KEY: "s3cret", GW: "gwk", FACTORY_GATEWAY_KEY_ENV: "GW", PLAIN: "ok", DB_PASSWORD: "p",
+    MAKERS: "mk", KEEP_TOKEN: "k", FACTORY_TOOL_ENV_KEEP: "KEEP_TOKEN" };
+  const names = secretEnvNames({ env, modelsJson: { providers: { a: { apiKey: "MAKERS" }, b: { apiKey: "literal-value" } } } });
+  assert.deepEqual(names, ["DB_PASSWORD", "FACTORY_TEST_SECRET_KEY", "GW", "MAKERS"]);
+  const cmd = scrubCommand('printf "%s|%s|%s|%s" "$FACTORY_TEST_SECRET_KEY" "$GW" "$PLAIN" "$KEEP_TOKEN"', names);
+  const out = execFileSync("bash", ["-c", cmd], { env: { ...env, PATH: process.env.PATH }, encoding: "utf8" });
+  assert.equal(out, "||ok|k");                       // secrets gone in the tool's shell, the rest intact
+  assert.equal(env.FACTORY_TEST_SECRET_KEY, "s3cret"); // the harness keeps its own copy
+  assert.equal(scrubCommand("npm test", []), "npm test");
+});

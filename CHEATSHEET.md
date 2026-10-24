@@ -16,7 +16,9 @@ You keep the decisions that define value and risk; the factory does everything t
 | Write the validation contract | Factory (author agent) | Mechanical translation of the spec into checkable assertions. |
 | Attack the contract | Factory (critic, another family) | A second model family finds what the author can't see in its own work. |
 | **Approve the contract (G1)** | **You, one word** | The definition of done is the highest-leverage artifact; a human owns it. |
-| Write the tickets | Factory (ticket writer) | Sizing and ordering is repeatable work. |
+| Write the program design: call stacks, files, signatures, slices (feature, refactor) | Factory (designer) | The model drafts the shape of the code in minutes; arguing with it costs ten. |
+| **Approve the design (G1b)**, ideally with the MR's reviewer | **You, one word** | Every decision taken here is one the reviewer would otherwise make in code review, when changing it costs most (D94, D95). |
+| Write the tickets, as vertical slices | Factory (ticket writer) | Sizing and ordering is repeatable work; each ticket runs end to end. |
 | **Approve the tickets** | **You, one word** | Cheap to check, expensive to get wrong: a bad split costs rounds. |
 | Coverage check (G2), tests configured | Factory (script) | Pure bookkeeping. |
 | Build, integrate (lint, tests, extra check, patch guard) | Factory (workers + scripts) | Deterministic gates never get tired. |
@@ -160,7 +162,8 @@ It writes `.factory/commands.env`, `behavior-paths`, `model-families.json`, `VER
 | 1 | `/grill-with-docs`, then `/to-spec` → `.scratch/<f>/spec.md` (start with `**Intent:** feature`) | |
 | 2 | `/factory <f>` | pre-flight, contract author, then critic |
 | 3 | Read the contract + critique. `/factory-approve <f>`, or `/factory-amend <f> "<change>"` | amend reruns author + critic |
-| 4 | | ticket writer proposes tickets |
+| 3b | Feature or refactor: read `design.md` (with the MR's reviewer if the spec names one), then `/factory-approve <f> design`, or edit it | designer drafts it after G1 |
+| 4 | | ticket writer proposes tickets, as vertical slices |
 | 5 | Read `issues/` (edit, split, delete freely), then `/factory-approve <f> tickets` | coverage check |
 | 6 | | build waves, integration, reviews, validation |
 | 7 | Answer when notified: `/factory-decide <f> <your answer, and why>` (any text: quotes and backticks are safe) | logged in `decisions.tsv`, read by every role. Questions a rule or an earlier answer settles never reach you: logged as `auto` |
@@ -183,6 +186,8 @@ Keep specs to roughly 12 stories or fewer; split anything bigger into two missio
 | `handoff` / `report` | you | the fix belongs elsewhere / an exploration is done | send the finding / read the report; the mission ends |
 | `contract` | lead | no contract, no critique, or a pending amendment | runs the contract wave |
 | `approve` | you | G1 | `/factory-approve <f>` or `/factory-amend` |
+| `design` | lead | feature or refactor (or `**Design:** yes`), G1 approved, no `design.md` | runs the designer |
+| `approve-design` | you | G1b: `design.md` not approved | read it, `/factory-approve <f> design` |
 | `decide` | you | a worker or reviewer asked something | `/factory-decide` |
 | `tickets` | lead | no tickets | ticket writer drafts them |
 | `approve-tickets` | you | tickets or fix tickets proposed | review `issues/`, `/factory-approve <f> tickets` |
@@ -205,7 +210,8 @@ Keep specs to roughly 12 stories or fewer; split anything bigger into two missio
 
 The codebase is the fuel that brings value to customers, so every mission must leave it **safe, understandable by any human, battle-tested and predictable**. Two layers:
 
-- **Measured (no model):** `health.sh check` compares duplication, large files, deep nesting, debt markers and skipped tests to `.factory/health-baseline.json`. A mission may improve them, never make them worse. Your repo tool (`FACTORY_HEALTH_CMD`) must pass too. A justified exception: a human runs `scripts/factory/health.sh baseline` and commits it with the reason.
+- **Tests that test something (D96):** at integration and in self-check, a ticket's new tests run alone on the code before the change. Feature and bugfix: they must fail there. Maintenance and refactor: they must pass there. A ticket opts out with `## Test on base: skip — <reason>` (a decision, logged); `FACTORY_TEST_ON_BASE=0` turns it off. One extra test run per ticket with tests.
+- **Measured (no model):** `health.sh check` compares duplication, large files, deep nesting, debt markers and skipped tests to `.factory/health-baseline.json`. A mission may improve them, never make them worse. Your repo tool (`FACTORY_HEALTH_CMD`) must pass too. Pick its thresholds on **maximum complexity** and **duplicated-code share** first: of 41 deterministic quality metrics in a long-horizon benchmark (SlopCodeBench), those two were the ones that told good and bad code apart; most others barely moved. A justified exception: a human runs `scripts/factory/health.sh baseline` and commits it with the reason.
 - **Judged:** the code steward (fresh, on another family than the workers) reads the whole mission diff against `docs/agents/quality-bar.md`. Every `QB-` item gets evidence or a label, and every changed source file gets a three-sentence explanation. A file it can't explain fails the gate: a human wouldn't understand it either.
 
 ## 9. Safety: what agents can never do
@@ -214,7 +220,11 @@ The codebase is the fuel that brings value to customers, so every mission must l
 |---|---|---|
 | **Command guard** (`.pi/extensions/factory-guard.ts`) | Live, on every tool call of the lead and agents | push, force, `--no-verify`, history rewrites, `sudo`, recursive deletes of `/ ~ .. .git`, cluster/cloud/secret-store changes, uploads and remote shells, reading credentials (home folder, `.env`, secrets mounted in a container such as a Kubernetes service account token), publishing, merging, writing to the factory, CI or hooks, any route to `instrument/` from a worker |
 | **Patch guard** (`patch-guard.sh`) | Every worker patch, every fix-lane change | changes to the instrument, the factory, CI or hooks; deleted, skipped or focused tests; silenced checks (`eslint-disable`, `@ts-ignore`, `noqa`, …); anything that looks like a secret; paths the contract freezes (`## Frozen paths`, or `src/` for a maintenance mission; tests there stay allowed) |
+| **No secrets in the hands** (D100, in the guard) | Every bash call in a factory project | the command runs with credential variables unset: the gateway key (`FACTORY_GATEWAY_KEY_ENV`), the variables Pi's `models.json` names as `apiKey`, and `*_TOKEN`, `*_KEY`, `*_SECRET`, `*PASSWORD*`; keep one with `FACTORY_TOOL_ENV_KEEP`. Pi's `models.json` and `auth.json` can't be read |
+| **Worker off the network** (D100) | Every tool call from a worker worktree | `curl`, `wget`, package installs, `git fetch/clone/pull`, network code in `python -c`/`node -e`; writes into the shared `node_modules`/`.venv` (the main checkout's, linked in) |
 | **CI gate** | Every MR | all of G1–G5, lanes, instrument rule |
+
+**Security model.** Assume anything inside a worker's tools is controlled by an attacker: an agent reads untrusted text all the time (repo files, issues, test output), and one injected line can steer it. So the question is what it can reach, not whether it behaves. Inside a worker's bash: the project's code and its linked dependencies (read-only by rule), no credential variables, no network by rule, no factory, CI or instrument files. What it can't do: change what lands (the patch guard re-checks every patch), push or merge (no git push, MRs are opened by a person), read Pi's provider keys. **What remains** (no OS sandbox without root): a determined injection could still find a key elsewhere on the machine (the harness process's own environment is readable by the same user) or reach the network through a route the rules don't name. Run the factory as a user with only the gateway key it needs, and on a machine whose outbound traffic your network already filters. Factory commits are authored by `pi-factory` and committed by you: `git log --author=pi-factory` (GitLab: Repository → Commits, filter by author, or `GET /projects/:id/repository/commits?author=pi-factory`) is what the factory did.
 
 A blocked agent stops and asks; it never looks for another way. Blocks are logged in `.pi-subagents/guard.log`, and patch-guard blocks count as failed rounds in the metrics. The guard loads only once the project is trusted in Pi; the patch guard holds either way. Working on the factory itself in Pi: start Pi with `FACTORY_GUARD=off` (maintainers only, never in a target repo).
 
@@ -245,6 +255,9 @@ If the merge left your branch's dependency versions, take the target's `package.
 | `scripts/factory/doctor.sh [--quick]` | after install or a model change / before a run |
 | `scripts/factory/gate.sh mission <f>` | the gate CI will run |
 | `scripts/factory/metrics.sh <f>` | numbers for the MR |
+| `scripts/factory/metrics.sh --all` | every mission and the total: cost per MR, interventions per MR, first pass, scores (D97) |
+| `scripts/factory/archive.sh list\|export <f>` | the mission's archived runs (transcripts, briefs, guard refusals), outside the repo (D97) |
+| `scripts/factory/score.sh <f> [--dimension x] [--sample n]` | a judge of another family checks archived runs for failure modes in `.factory/scoring/` (D97) |
 | `scripts/factory/health.sh metrics` | today's health metrics for the repo |
 | `scripts/factory/readiness.sh` | what the repo still lacks for Step 2 |
 | `scripts/factory/skills-pin.sh verify\|check-global` | skills drifted or shadowed? |
@@ -290,6 +303,18 @@ If the merge left your branch's dependency versions, take the target's `package.
 | 429 on the lead's model in a burst | the lead's quota is per minute (5 on some gateways) | Pi waits and retries; ask for more requests per minute for the lead model |
 | "Workflow script timed out after 1800000ms" | pi-subagents' 30-minute default for a wave | `bash scripts/factory/install-pi-config.sh` once (raises it to 2 h); salvage the work: `scripts/factory/integrate.sh <f> <ticket> null` |
 | "sent back to review" in `collect.sh` | the reviewer's verdict had no `**Result:**` line | nothing: reviewed again once, not counted as a round |
+
+## 13b. Choose models with data (D98)
+
+Pick models, thinking levels and factory changes on your own tickets, not on public benchmarks or feel.
+
+1. **Build a suite** from tickets the factory did: `scripts/factory/bench.sh add <mission> <ticket> --area <tag>` (difficulty comes from the ticket's rounds; `--difficulty` to override). Mix easy, hard and one escalated ticket, so the suite tells good setups from bad ones. A suite tests one role (`--role`, worker by default).
+2. **Run one configuration per run:** a models profile (as `models-profile.mjs` writes) with the roles you test, `bench.sh run default --config gw-maker-1.json --label maker1`. `--case <id> --debug` replays one case and keeps its worktree to look at. `--review` also runs the reviewer on the passes.
+3. **Change one thing at a time:** each new profile differs from the default by one variable, a model or a thinking level.
+4. **Compare:** `bench.sh compare maker1 maker2 maker1-high` prints the answer first (highest quality, most efficient, lowest cost, with cost per trial; cost recommendations only above a quality floor: within 10 points of the default, or `--min-pass <pct>`), then the breakdown by difficulty and area. The cockpit shows it under **B** (Benchmarks), with a scatter whose axes you pick.
+5. **Judge a refactor by changeability:** write two or three follow-up tickets (`bench.sh add-file <issue.md> <mission>`), run `bench.sh probe default --config cheap.json --at <before>` and again `--at <after>`: a cheap model passing more of them on the refactored code is the number that says the refactor helped.
+
+Replays cost tokens: a suite of 10 cases × 3 configurations is 30 worker runs. Run it before changing a model or a brief, not after every mission.
 
 ## 14. Where things live
 

@@ -6,6 +6,7 @@
 # Usage:
 #   human.sh approve           <feature> [note]        G1: the contract
 #   human.sh approve           <feature> tickets       the tickets the ticket writer proposed
+#   human.sh approve           <feature> design [note] G1b: the program design (D94)
 #   human.sh approve           <feature> conclusion    an investigation's conclusion (D99)
 #   human.sh ask               <feature> <ticket|-> <question>      (lead, when relaying)
 #   human.sh ask               <feature> <ticket|-> --stdin < question
@@ -76,11 +77,28 @@ case "$cmd" in
       echo "Conclusion approved (the fix belongs ${belongs:-here})."
       exit 0
     fi
+    if [ "${1:-}" = design ]; then
+      shift
+      design="$dir/design.md"
+      [ -f "$design" ] || die "no design at $design yet: run scripts/factory/workflow.sh design $feature"
+      who="$(approver)"; tmp="$(mktemp)"
+      awk -v line="**Design approved:** $(date +%F)${who:+ — by $who}${1:+ — $*}" '
+        index($0, "**Design approved:**") == 1 { next }
+        { print }
+        /^# / && !done { print line; done = 1 }' "$design" > "$tmp"
+      grep -q '^\*\*Design approved:\*\*' "$tmp" || { printf '%s\n\n' "**Design approved:** $(date +%F)${who:+ — by $who}${1:+ — $*}" | cat - "$design" > "$tmp"; }
+      mv "$tmp" "$design"
+      decision_log "$feature" - approve-design "G1b: approve the program design" "approved${who:+ by $who}" design
+      bash "$here/checkpoint.sh" "$feature" >/dev/null
+      echo "G1b approved: the ticket writer reads $design next."
+      exit 0
+    fi
     has_contract "$spec" || die "no validation contract in $spec yet"
     if [ -f "$dir/contract-critique.md" ] && grep -q '\[blocking\]' "$dir/contract-critique.md"; then
       echo "Note: the critique still lists [blocking] findings. Approving means you accept them as they are."
     fi
-    set_contract_line "Contract approved" "$(date +%F)${1:+ — $*}"
+    who="$(approver)"
+    set_contract_line "Contract approved" "$(date +%F)${who:+ — by $who}${1:+ — $*}"
     decision_log "$feature" - approve "G1: approve the validation contract" "approved" contract
     echo "G1 approved."
     ;;
