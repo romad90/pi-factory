@@ -70,6 +70,16 @@ Keys, as in Mission Control: `L` leads, `M` mission, `W` workers, `R` rounds, `T
 
 The mockup is the "Factory Cockpit" canvas (desktop and phone boards).
 
+### 5. Factory engineering views (from Warp Factories' interface)
+
+The user's look at Warp Factories (October 2026) shows a second audience for the page: not the person following a mission, but the person tuning the factory. Its navigation is the map:
+
+- **Across factories:** an **Inbox** (every human action waiting, whatever the factory: our needs-you across missions and repos), **Runs** (every agent run, searchable), connected tools and **Secrets** (names only).
+- **Per factory** (one per product surface; for us, one per repo or project): **Dashboard**, **Agents** (each role with its effective model, thinking level and brief), **Automations** (what starts work: P4's triggers), **Scorers** (P14's dimensions and their trend), **Self-improvement** (P15's open patterns, with a count badge), **Benchmarks** (suites, their tasks, past runs, a Run button), **Factory definition** (the versioned configuration, P11's manifest), **Settings**.
+- **A benchmark page** describes its suite in one paragraph (tasks distilled from real runs, how many easy, medium, hard and extra-hard, which areas, which agent type it exercises) and has two tabs: **Runs** (configs compared) and **Tasks**.
+
+For us, v2 of the cockpit adds, next to leads → mission → ticket: an Inbox across repos, Agents (from `effective-models.mjs`), Scorers and Benchmarks (from P14's files), Self-improvement (from P15's `patterns.md`) and the factory definition with its version. Still read-only; the Run and approve buttons wait for P12 or P6.
+
 ## Trade-offs
 
 | For | Against |

@@ -157,6 +157,12 @@ An essay against lights-off factories ([wsff.md](https://github.com/humanlayer/a
 
 Bias: HumanLayer sells planning and review tooling. The incident data (Faros) is correlation, not proof.
 
+### Warp Factories' interface (screenshot from a talk, October 2026)
+
+- **Navigation as a model of factory engineering:** Inbox, Runs, MCPs and apps, Secrets across factories; per factory: Dashboard, Agents, Automations, Scorers, Self-improvement (with a count of open items), Benchmarks, Factory definition, Settings. Our cockpit v2 (P10 §5).
+- **A benchmark suite distilled from real runs** ("WarpBench"): self-contained tasks, tiered easy, medium, hard and extra-hard, spread over areas (configuration, client UI, server logic, cross-cutting), scoped to one agent type (implementation only, independent of the others). Our D98 cases get a difficulty (from their known rounds), an area and a role.
+- **Several factories side by side** (product, marketing): one per product surface. Ours: one per repo or project, at the leads level.
+
 ## What to watch for
 
 Each of these tools keeps something we don't want to give away: the runtime (OpenCode Swarm needs OpenCode), the hosted control plane and its data (Factory, Port), or a maintainer we depend on. The test for anything we take: does it keep working if that vendor disappears tomorrow?
