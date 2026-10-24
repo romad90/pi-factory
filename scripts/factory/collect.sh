@@ -74,4 +74,5 @@ if [ -f "$dir/verdicts/health.md" ]; then
   record_verdict "$dir/verdicts/health.md" factory-code-steward; summary "$dir/verdicts/health.md"
 fi
 bash "$here/usage.sh" "$feature" >/dev/null 2>&1 || true   # D85
+bash "$here/archive.sh" collect "$feature" >/dev/null 2>&1 || true   # D97
 bash "$here/checkpoint.sh" "$feature" >/dev/null

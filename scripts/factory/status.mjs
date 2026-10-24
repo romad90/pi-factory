@@ -190,4 +190,7 @@ for (const raw of fs.readFileSync(0, "utf8").split("\n")) {
   if (l[0] === "M") { cur = { name: l[1], lines: [] }; groups.push(cur); } else if (cur) cur.lines.push(l);
 }
 const missions = groups.map((g) => mission(g.name, g.lines));
-process.stdout.write(JSON.stringify({ generated: new Date().toISOString(), factoryDir: root, missions }, null, 1) + "\n");
+// D97: totals across missions (metrics.sh --all --json), when status.sh passes them.
+let factory = null;
+try { if (env.METRICS) factory = JSON.parse(read(env.METRICS)).total || null; } catch {}
+process.stdout.write(JSON.stringify({ generated: new Date().toISOString(), factoryDir: root, factory, missions }, null, 1) + "\n");

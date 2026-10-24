@@ -543,6 +543,46 @@ echo "// hand repair" >> src/tools/hello.js; git commit -qam "fix: hand repair"
 bash scripts/factory/metrics.sh demo > "$work/metrics2.md"; git revert --no-edit HEAD >/dev/null
 hand1="$(sed -n 's/^| Hand commits in the mission[^|]*| \([0-9]*\) |$/\1/p' "$work/metrics2.md")"
 [ -n "$hand0" ] && [ "$hand1" = $((hand0 + 1)) ] && t "metrics: a hand commit counts as an intervention; script commits carry Factory-Script (D89)" || fail "hand commits" "$hand0 → $hand1"
+# D97: the run archive, scoring, metrics across missions.
+bid="$(bash -c '. scripts/factory/lib.sh; verdict_field "$1" Brief' _ $m/verdicts/01-hello-code.md)"
+printf 'Role: factory-worker. Mission demo, ticket 01-hello.\n\nbrief-id: %s\n' "$bid" > "$work/usage/run/r1abc_factory-worker_input.md"
+printf 'Done. REPRO: npm test\n' > "$work/usage/run/r1abc_factory-worker_output.md"
+printf '{"type":"tool","name":"bash","args":"npm test"}\n{"type":"text","text":"token = \\"glpat-abcdefghij0123456789\\""}\n' > "$work/usage/run/r1abc_factory-worker_transcript.jsonl"
+FACTORY_USAGE_DIRS="$work/usage" bash scripts/factory/archive.sh collect demo >/dev/null
+arch="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/archive/demo/r1abc_factory-worker"
+node -e 'const r=require(process.argv[1]+"/run.json"); process.exit(r.agent==="factory-worker" && r.model==="gw/maker-1" && r.ticket==="01-hello" && r.briefId===process.argv[2] && r.outcome.result && r.usage.turns===14 ? 0 : 1)' "$arch" "$bid" \
+  && grep -q 'npm test' "$arch/transcript.jsonl" && ! grep -q 'glpat-' "$arch/transcript.jsonl" && grep -q 'REDACTED' "$arch/transcript.jsonl" \
+  && [ -z "$(git status --porcelain -- "$m" | grep -v usage.tsv)" ] \
+  && t "archive: brief, transcript (secrets redacted), usage and outcome kept outside the repo (D97)" || fail "archive" "$(cat "$arch/run.json" "$arch/transcript.jsonl" 2>&1)"
+bash scripts/factory/archive.sh export demo "$work/demo-archive.tar.gz" >/dev/null && rm -rf "$arch" \
+  && bash scripts/factory/archive.sh import "$work/demo-archive.tar.gz" >/dev/null && [ -f "$arch/run.json" ] \
+  && bash scripts/factory/archive.sh list demo | grep -q '^r1abc	factory-worker	gw/maker-1	01-hello' \
+  && t "archive: export, import and list round-trip" || fail "archive export" "$(bash scripts/factory/archive.sh list demo 2>&1)"
+meta="$work/usage/run/r1abc_factory-worker_meta.json"; when="$(node -e 'const fs=require("fs");console.log(new Date(fs.statSync(process.argv[1]).mtimeMs-30000).toISOString())' "$meta")"
+glog="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/guard.log"
+printf '%s\tpush\tbash\t{"command":"git push origin main token=\\"glpat-abcdefghij0123456789\\""}\t%s\n' "$when" "$PWD" >> "$glog"
+printf '%s\tpush\tbash\t{"command":"git push"}\t%s\n' "2001-01-01T00:00:00.000Z" "$PWD" >> "$glog"
+FACTORY_USAGE_DIRS="$work/usage" bash scripts/factory/archive.sh collect demo >/dev/null
+node -e 'const r=require(process.argv[1]+"/run.json"); process.exit(r.guard.length===1 && r.guard[0].rule==="push" && !/glpat-/.test(r.guard[0].input) ? 0 : 1)' "$arch" \
+  && t "archive: the guard's refusals during the run are kept with it, redacted (audit trail)" || fail "archive guard" "$(cat "$arch/run.json")"
+printf '#!/usr/bin/env bash\necho "$1" >> "%s"\nif grep -q "^# Failure mode" "$2" && grep -q "^# Tried to silence" "$2"; then echo "SCORE: fail"; echo "EVIDENCE: \\"added eslint-disable\\""; else echo "SCORE: pass"; echo "EVIDENCE: \\"none\\""; fi\n' "$work/judges.log" > "$work/judge.sh"; chmod +x "$work/judge.sh"
+FACTORY_JUDGE_BIN="$work/judge.sh" FACTORY_JUDGE_MODELS="gw/maker-9 gw/judge-1" bash scripts/factory/score.sh demo >"$work/score.log" 2>&1 || fail "score" "$(cat "$work/score.log")"
+grep -qx 'gw/judge-1' "$work/judges.log" && ! grep -q maker "$work/judges.log" \
+  && grep -q '	silenced-check	fail	added eslint-disable$' $m/scores.tsv && grep -q '	no-reproduction	pass	none$' $m/scores.tsv \
+  && t "score: each dimension judged by a model of another family; strict answers appended to scores.tsv" || fail "score" "$(cat "$work/score.log" $m/scores.tsv "$work/judges.log" 2>&1)"
+n0="$(wc -l < $m/scores.tsv)"; FACTORY_JUDGE_BIN="$work/judge.sh" FACTORY_JUDGE_MODELS="gw/judge-1" bash scripts/factory/score.sh demo >/dev/null 2>&1
+printf '#!/usr/bin/env bash\necho "I think it is fine"\n' > "$work/judge-bad.sh"; chmod +x "$work/judge-bad.sh"
+FACTORY_JUDGE_BIN="$work/judge-bad.sh" FACTORY_JUDGE_MODELS="gw/judge-1" bash scripts/factory/score.sh demo --dimension silenced-check >"$work/score2.log" 2>&1
+[ "$(wc -l < $m/scores.tsv)" = "$n0" ] && t "score: a run is judged once per dimension; a malformed answer is never guessed" || fail "score dedupe" "$(cat "$work/score2.log")"
+FACTORY_JUDGE_BIN="$work/judge.sh" FACTORY_JUDGE_MODELS="gw/maker-2" bash scripts/factory/score.sh demo --dimension context-waste >"$work/score3.log" 2>&1
+grep -q 'without a judge of another family' "$work/score3.log" && t "score: no judge of the run's own family" || fail "score family" "$(cat "$work/score3.log")"
+echo 'https://gitlab.example/g/p/-/merge_requests/9' > $m/mr.url
+bash scripts/factory/metrics.sh --all > "$work/all.md"; bash scripts/factory/metrics.sh --all --json > "$work/all.json"
+grep -q '^| demo | ' "$work/all.md" && grep -q '^| \*\*Total\*\*' "$work/all.md" && grep -q 'Cost per MR' "$work/all.md" \
+  && node -e 'const j=require(process.argv[1]); const d=j.missions.find(m=>m.mission==="demo"); process.exit(d && d.runs===1 && d.tokensIn===120000 && d.scored>=2 && d.scoreFails>=1 && d.mr && j.total.mrs===1 ? 0 : 1)' "$work/all.json" \
+  && grep -q 'Scored runs (scores.tsv, D97) | .*fail' <<<"$(bash scripts/factory/metrics.sh demo)" \
+  && t "metrics --all: every mission and the total, with cost per MR and scores (D97)" || fail "metrics all" "$(cat "$work/all.md" "$work/all.json")"
+rm -f $m/mr.url $m/scores.tsv
 # D87: the hook's dependency link never costs a round.
 ln -s "$work" node_modules; echo 'export const extra = 1;' > src/tools/extra.js
 git add -N node_modules src/tools/extra.js; git diff --relative > "$work/hook.patch"; git reset -q node_modules src/tools/extra.js; rm -f node_modules src/tools/extra.js
@@ -760,6 +800,8 @@ node -e '
 const s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); const m = s.missions.find((x) => x.name === "demo");
 process.exit(m && m.step === "decide" && m.needs[0].kind === "decide" && m.needs.some((n) => /start at zero/.test(n.text) || /factory-decide/.test(n.text)) ? 0 : 1);' "$work/all.json" \
   && t "status.sh --all: every mission, an open question shows as needs-you" || fail "status all" "$(head -c 2000 "$work/all.json")"
+node -e 'const j=require(process.argv[1]); process.exit(j.factory && j.factory.missions>=1 && "costPerMr" in j.factory ? 0 : 1)' "$work/all.json" \
+  && t "status.sh --all: the factory's totals across missions, for the factory engineer (D97)" || fail "status factory" "$(head -c 600 "$work/all.json")"
 rm -f $m/state/open-question.md
 here_branch="$(git branch --show-current)"; git switch -q -c cockpit-side; echo side > $m/state/side.txt; git add $m/state/side.txt; git commit -qm "test: state on another branch"; git switch -q "$here_branch"
 bash scripts/factory/status.sh --all --json > "$work/all.json"

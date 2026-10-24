@@ -1,6 +1,6 @@
 # P14. Measure and improve: a run archive, a benchmark from our own tickets, scoring
 
-**Status:** draft · **Effort:** M (archive S, benchmark M, scoring S) · **Depends on:** nothing to start; P5 builds on it, P11's manifest makes it one command
+**Status:** run archive, scoring and metrics across missions shipped (D97); benchmark in progress · **Effort:** M (archive S, benchmark M, scoring S) · **Depends on:** nothing to start; P5 builds on it, P11's manifest makes it one command
 
 ## Problem
 
