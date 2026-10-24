@@ -930,10 +930,16 @@ grep -qP '^runner--01-run\teasy\ttooling\tno\treview\t' .factory/bench/results/r
   && t "bench run --review: a case that passes the gates is reviewed; a FAIL verdict fails it" || fail "bench review" "$(cat .factory/bench/results/rv.tsv)"
 out="$(bash scripts/factory/bench.sh compare m1 m2 m3 --name trio 2>&1)" || fail "bench compare" "$out"
 head -1 <<<"$out" | grep -q '^3 configurations on suite default, 1 cases each, against the default m1; one variable changed in m2 (worker model: gw/maker-2)' \
-  && grep -q '^highest quality  m2' <<<"$out" && grep -q '^most efficient   m2' <<<"$out" && grep -q '^lowest cost      m3' <<<"$out" \
+  && grep -q '^highest quality  m2' <<<"$out" && grep -q '^most efficient   m2' <<<"$out" && grep -q '^lowest cost      m2' <<<"$out" \
+  && grep -q 'Below the floor, never recommended: m3 (0%)' <<<"$out" && grep -qP '^m3\t0%\t\$0.10\t7\t\d+\tbelow the floor' <<<"$out" \
   && grep -q '⚠ m3 differs from m1 by 2 variables (worker model, worker thinking)' <<<"$out" \
-  && node -e 'const c=require(process.argv[1]);process.exit(c.points.length===3&&c.points.find(p=>p.label==="m2").pareto&&!c.points.find(p=>p.label==="m1").pareto&&c.axes.includes("cost_per_trial")?0:1)' "$PWD/.factory/bench/compare/trio.json" \
-  && t "bench compare: the answer first, three recommendations, a warning when two variables changed, the cockpit's points" || fail "bench compare" "$out"
+  && node -e 'const c=require(process.argv[1]),p=(l)=>c.points.find(x=>x.label===l);process.exit(c.points.length===3&&p("m2").pareto&&!p("m1").pareto&&!p("m3").pareto&&p("m3").below_floor&&Math.abs(c.floor-0.9)<1e-9&&c.axes.includes("cost_per_trial")?0:1)' "$PWD/.factory/bench/compare/trio.json" \
+  && t "bench compare: the answer first, cost recommendations only above the quality floor, a warning when two variables changed, the cockpit's points" || fail "bench compare" "$out"
+bash scripts/factory/bench.sh run default --config "$work/p3.json" --label m3b >/dev/null 2>&1 || fail "bench run m3b"
+out="$(bash scripts/factory/bench.sh compare m3 m3b --min-pass 50 --name floorless 2>&1)" || fail "bench compare floor" "$out"
+grep -q '^most efficient   none: no configuration reaches the quality floor (50%)' <<<"$out" && grep -q '^lowest cost      none: no configuration reaches' <<<"$out" \
+  && grep -q 'No configuration reaches the quality floor of 50%, so none is recommended on cost' <<<"$out" \
+  && t "bench compare: when nothing reaches the floor (--min-pass), the cost recommendations say so instead of naming a config" || fail "bench floor" "$out"
 if bash scripts/factory/bench.sh compare m1 m3 --strict >/dev/null 2>&1; then fail "compare --strict must refuse a two-variable comparison"; fi
 [ ! -f .factory/bench/compare/m1-vs-m3.json ] || fail "a refused comparison must write nothing"
 bash scripts/factory/status.sh --all --json > "$work/state-bench.json" 2>/dev/null

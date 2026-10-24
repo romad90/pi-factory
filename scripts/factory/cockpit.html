@@ -206,8 +206,8 @@ function scatter(c) {
   return `<svg class="scatter" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="max-width:100%;height:auto" role="img" aria-label="${esc(AXES[axY])} versus ${esc(AXES[axX])}">
     <line x1="${P}" y1="${H - P}" x2="${W - P / 2}" y2="${H - P}" stroke="#262B35"/><line x1="${P}" y1="${P / 2}" x2="${P}" y2="${H - P}" stroke="#262B35"/>
     <text x="${W - P / 2}" y="${H - P + 30}" text-anchor="end">${esc(AXES[axX])} →</text><text x="${P - 8}" y="${P / 2}" text-anchor="end">↑</text>
-    ${c.points.map((p) => `<g class="pt"><circle cx="${sx(p[axX])}" cy="${sy(p[axY])}" r="6" fill="${p.label === c.default ? "#9AA3B2" : p.pareto ? "#3DD68C" : "#6CB4FF"}"/>
-      <text x="${sx(p[axX]) + (sx(p[axX]) > W / 2 ? -9 : 9)}" y="${sy(p[axY]) - 8}" text-anchor="${sx(p[axX]) > W / 2 ? "end" : "start"}">${esc(p.label)} · ${fmtAx(axY, p[axY])} · ${fmtAx(axX, p[axX])}</text></g>`).join("")}
+    ${c.points.map((p) => `<g class="pt"><circle cx="${sx(p[axX])}" cy="${sy(p[axY])}" r="6" fill="${p.below_floor ? "none" : p.label === c.default ? "#9AA3B2" : p.pareto ? "#3DD68C" : "#6CB4FF"}" stroke="${p.below_floor ? "#FF7A6B" : "none"}" stroke-width="2"/>
+      <text x="${sx(p[axX]) + (sx(p[axX]) > W / 2 ? -9 : 9)}" y="${sy(p[axY]) - 8}" text-anchor="${sx(p[axX]) > W / 2 ? "end" : "start"}">${esc(p.label)} · ${fmtAx(axY, p[axY])} · ${fmtAx(axX, p[axX])}${p.below_floor ? " · below the floor" : ""}</text></g>`).join("")}
   </svg>`;
 }
 function benchView(name) {
@@ -221,10 +221,10 @@ function benchView(name) {
     <div class="panel"><div class="row"><h2 style="margin:0">Benchmark · ${esc(c.name)}</h2>
       ${list.length > 1 ? `<select id="bsel">${list.map((x) => `<option${x.name === c.name ? " selected" : ""}>${esc(x.name)}</option>`).join("")}</select>` : ""}</div>
       <p style="margin:12px 0 4px">${esc(c.summary)}</p>${(c.warnings || []).map((w) => `<div class="warn">⚠ ${esc(w)}</div>`).join("")}</div>
-    <div class="grid recs">${c.recommendations.map((r) => `<div class="panel rec"><div class="k">${esc(r.kind)}</div><div class="v">${esc(r.label)}</div>
-      <div class="stat"><span><b>${fmtAx("pass_rate", r.pass_rate)}</b> pass</span><span><b>${fmtAx("cost_per_trial", r.cost_per_trial)}</b>/trial</span></div></div>`).join("")}</div>
+    <div class="grid recs">${c.recommendations.map((r) => `<div class="panel rec"><div class="k">${esc(r.kind)}</div>${r.label ? `<div class="v">${esc(r.label)}</div>
+      <div class="stat"><span><b>${fmtAx("pass_rate", r.pass_rate)}</b> pass</span><span><b>${fmtAx("cost_per_trial", r.cost_per_trial)}</b>/trial</span></div>` : `<div class="v muted">None</div><div class="muted" style="font-size:12.5px">${esc(r.note)}</div>`}</div>`).join("")}</div>
     <div class="panel"><div class="row"><h2 style="margin:0">Configurations</h2><span><select id="axy">${opts(axY)}</select> vs <select id="axx">${opts(axX)}</select></span></div>
-      ${scatter(c)}<p class="muted" style="font-size:12px">Grey: the default. Green: no other configuration is both better and cheaper.</p></div>
+      ${scatter(c)}<p class="muted" style="font-size:12px">Grey: the default. Green: no other configuration above the quality floor (${fmtAx("pass_rate", c.floor ?? 0)}) is both better and cheaper. Red ring: below the floor, never recommended.</p></div>
     <div class="panel"><h2>By difficulty</h2>${tbl("difficulty") || `<p class="empty">No tiers.</p>`}</div>
     <div class="panel"><h2>By area</h2>${tbl("area") || `<p class="empty">No areas.</p>`}</div>
   </div>`;
