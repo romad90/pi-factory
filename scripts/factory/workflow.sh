@@ -7,6 +7,7 @@
 # mission's files, so the lead relays orchestration instead of improvising it.
 #
 # Usage:
+#   scripts/factory/workflow.sh investigate <feature>
 #   scripts/factory/workflow.sh contract    <feature>
 #   scripts/factory/workflow.sh tickets     <feature> <all|fix-behavior|fix-health>
 #   scripts/factory/workflow.sh build-wave  <feature>
@@ -19,7 +20,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib.sh
 . "$here/lib.sh"
 
-mode="${1:?usage: workflow.sh <contract|design|tickets|build-wave|review-wave|validate|steward|light> <feature> ...}"
+mode="${1:?usage: workflow.sh <investigate|contract|design|tickets|build-wave|review-wave|validate|steward|light> <feature> ...}"
 feature="${2:?usage: workflow.sh <mode> <feature> ...}"
 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
@@ -52,6 +53,32 @@ print(json.dumps(out, indent=2), end="")' "$items"
 }
 
 case "$mode" in
+  investigate)
+    # D99: explorers (one repo each, fresh) write briefs and answer the open
+    # questions in parallel; then the investigator reads them and updates
+    # investigation.md. Each wave is one round, bounded by FACTORY_INVESTIGATE_ROUNDS.
+    d="$(mission_dir "$feature")"
+    investigation_applies "$d/spec.md" || die "$feature has no '## Context repos' with Intent bugfix or exploration"
+    bash "$here/context.sh" check "$feature" >/dev/null || die "context repos not in sync: scripts/factory/context.sh sync $feature"
+    r=$(( $(investigation_rounds "$d") + 1 ))
+    [ "$r" -le "$FACTORY_INVESTIGATE_ROUNDS" ] || die "the investigation already used its $FACTORY_INVESTIGATE_ROUNDS rounds (FACTORY_INVESTIGATE_ROUNDS)"
+    mkdir -p "$d/state" "$d/context/answers"; printf '%s\n' "$r" > "$d/state/investigate.rounds"
+    while IFS= read -r n; do
+      [ -s "$d/context/$n.md" ] || add "explore-$n" factory-explorer false explorer "$feature" "$n"
+    done < <(context_repos "$d/spec.md" | cut -f1; echo home)
+    while IFS=$'\t' read -r qid _; do
+      [ -n "$qid" ] && add "answer-$qid" factory-explorer false explorer "$feature" "$qid"
+    done < <(open_questions "$d")
+    add investigator factory-investigator false investigator "$feature"
+    body='const explorers = ITEMS.filter((it) => it.agent === "factory-explorer");
+const inv = ITEMS.find((it) => it.agent === "factory-investigator");
+const found = explorers.length
+  ? await runs.all(explorers.map((it) => ({ key: it.key, agent: it.agent, task: it.task })))
+  : [];
+const r = await runs.run(inv.key, { agent: inv.agent, task: inv.task });   // after the explorers: it reads their files
+return { explorers: found.map((x, i) => ({ key: explorers[i].key, output: x?.output })), investigator: r.output };'
+    ;;
+
   contract)
     # Amendment requests (human.sh amend) go to this wave, then are marked sent.
     shopt -s nullglob

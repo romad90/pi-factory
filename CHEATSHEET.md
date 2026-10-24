@@ -44,6 +44,7 @@ The goal is not more code, faster: it is the day correction and maintenance run 
 | New behavior to build | **Feature mission** | `/grill-with-docs`, `/to-spec` (`**Intent:** feature`), `/factory <f>` | contract, tickets, tested and reviewed code, MR | available |
 | Legacy code nobody dares to change | **Maintenance mission** (characterization) | spec with `**Intent:** maintenance`, `/factory <f>` | tests that pin today's behavior, bugs included; glossary and docs. `src/` is frozen (D61) | available; a lane of its own is planned (proposal P3) |
 | Change the structure of code whose behavior is pinned; bring it under `AGENTS.md` | **Refactor mission** | spec with `**Intent:** refactor` and `## Frozen tests` (the characterization tests), `/factory <f>` | the same behavior, new structure, every `AGENTS.md` rule it applies cited; the frozen tests never change (D93) | available |
+| A bug between services: this repo and the repos that call it or sync with it | **Investigation across services** | spec with `**Intent:** bugfix` (or `exploration`) and `## Context repos`, `/factory <f>` | read-only clones, one brief per repo, a hypothesis log, a reproduction test here, a conclusion you approve; a fix elsewhere becomes a finding for that team (D99) | available |
 | A small, contained fix | **Fix lane** | `/factory-fix <slug> start "<what>"` | one reviewed commit, at most 80 lines, no behavior path touched | available |
 | A change made by hand needs a second pair of eyes | **Light review** | `/factory-light <slug> <base>` | a verdict from another model family, checked by the MR gate | available |
 | You don't know where a repo is weak | **Audit and gaps** (read-only) | the `audit-gaps.md` prompt, with any agent | findings with evidence, the characterization test and acceptance criteria for each, questions | prompt available; becomes the discovery phase of proposal P3 |
@@ -86,7 +87,7 @@ After any model change, probe the gateway once: `doctor.sh` (full) runs `models-
 
 | File | Set |
 |---|---|
-| `.pi/agents/factory/*.md` | `model:` and `thinking:` per agent (9 agents) |
+| `.pi/agents/factory/*.md` | `model:` and `thinking:` per agent (11 agents) |
 | `.pi/settings.json` | `subagents.modelScope.allow: ["<your-provider>/*"]` |
 | `.factory/model-families.json` | a `{ "match": "*name*", "family": "x" }` line per model you use |
 
@@ -179,6 +180,10 @@ Keep specs to roughly 12 stories or fewer; split anything bigger into two missio
 |---|---|---|---|
 | `paused` | lead | a pause note exists | lead resumes and continues |
 | `grill` | you | no spec | `/grill-with-docs`, `/to-spec` |
+| `context-sync` | lead | context repos not cloned, or changed in the spec | `context.sh sync <f>` (read-only clones, D99) |
+| `investigate` | lead | briefs, answers, a conclusion or a reproduction ticket missing | runs the investigate wave (explorers, then the investigator) |
+| `approve-conclusion` | you | the investigation concluded | `/factory-approve <f> conclusion` |
+| `handoff` / `report` | you | the fix belongs elsewhere / an exploration is done | send the finding / read the report; the mission ends |
 | `contract` | lead | no contract, no critique, or a pending amendment | runs the contract wave |
 | `approve` | you | G1 | `/factory-approve <f>` or `/factory-amend` |
 | `design` | lead | feature or refactor (or `**Design:** yes`), G1 approved, no `design.md` | runs the designer |

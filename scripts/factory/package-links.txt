@@ -10,3 +10,4 @@ docs/agents/contract-format.md
 docs/agents/verdict-format.md
 docs/agents/bot-harness.md
 docs/agents/ticket-format.md
+docs/agents/investigation-format.md

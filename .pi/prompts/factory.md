@@ -10,7 +10,9 @@ Loop:
 1. Run `scripts/factory/next.sh $1`. Read its first line, `STEP: <code>`. Only that line decides what you do: the ticket table below it (ESCALATE, blocked, FAIL) is status, never a reason to stop.
 2. Act:
    - `paused`: run `scripts/factory/pause.sh resume $1`, show its output, go to 1.
-   - `grill`, `approve`, `decide`, `approve-tickets`, `coverage`, `setup`, `escalate`, `blocked`, `unverified`: stop. Show the human the status and the NEXT line. These are human steps.
+   - `grill`, `approve`, `decide`, `approve-tickets`, `coverage`, `setup`, `escalate`, `blocked`, `unverified`, `approve-conclusion`, `handoff`, `report`: stop. Show the human the status and the NEXT line. These are human steps.
+   - `context-sync`: run `scripts/factory/context.sh sync $1`, go to 1.
+   - `investigate`: `scripts/factory/workflow.sh investigate $1`, pass its `WORKFLOW_FILE` path as below, go to 1.
    - `contract`, `validate`, `behavior-stale`, `steward`: run `scripts/factory/workflow.sh contract|validate|steward $1`. It prints `WORKFLOW_FILE: <path>`. Call `subagent({ workflow: "<path>", context: "fresh", async: false })` with that exact path. Never paste the script inline. After `validate` or `steward`, run `scripts/factory/collect.sh $1`.
    - `tickets`: `scripts/factory/workflow.sh tickets $1 all`, pass its `WORKFLOW_FILE` as above. `behavior-fix`: same with `fix-behavior`. `health-fix`: same with `fix-health`. The next step is the human's approval.
    - `health`: run `scripts/factory/health.sh check $1` (no model). A non-zero exit is expected when health fails; continue the loop.

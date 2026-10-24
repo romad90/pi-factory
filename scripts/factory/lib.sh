@@ -44,6 +44,65 @@ die() { printf 'factory: %s\n' "$*" >&2; exit 2; }
 
 mission_dir()  { printf '%s/%s' "$FACTORY_DIR" "$1"; }
 
+# --- context repos and investigation (D99) ------------------------------------
+# A mission changes one repo. Other repos it must understand are listed in the
+# spec, cloned read-only into FACTORY_CONTEXT_DIR by context.sh, and mapped by
+# explorers before an investigator concludes where the fix belongs.
+FACTORY_CONTEXT_DIR="${FACTORY_CONTEXT_DIR:-.factory/context}"
+FACTORY_INVESTIGATE_ROUNDS="${FACTORY_INVESTIGATE_ROUNDS:-3}"
+
+# context_repos <spec> → name \t source \t branch \t role, one line per repo,
+# from "## Context repos": "- <url or path>[@branch] — <role>".
+context_repos() {
+  [ -f "$1" ] && grep -q '^## Context repos' "$1" || return 0
+  awk '/^## Context repos/ { f = 1; next }
+       f && /^## /         { exit }
+       f && /^[-*][ \t]+/  {
+         line = $0; sub(/^[-*][ \t]+/, "", line); gsub(/`/, "", line); role = ""
+         if (match(line, /[ \t]+(—|--|-)[ \t]+/)) { role = substr(line, RSTART + RLENGTH); line = substr(line, 1, RSTART - 1) }
+         src = line; sub(/[ \t]+$/, "", src); br = ""
+         if (match(src, /@[^@\/:]+$/)) { br = substr(src, RSTART + 1); src = substr(src, 1, RSTART - 1) }
+         if (src == "" || tolower(src) == "none") next
+         n = src; sub(/\/+$/, "", n); sub(/.*[\/:]/, "", n); sub(/\.git$/, "", n)
+         print n "\t" src "\t" br "\t" role }' "$1"
+}
+
+# The investigation applies to a bugfix or an exploration that names context repos.
+investigation_applies() {              # <spec>
+  local intent
+  [ -n "$(context_repos "$1")" ] || return 1
+  intent="$(verdict_field "$1" Intent)"
+  [ "$intent" = bugfix ] || [ "$intent" = exploration ]
+}
+
+# open_questions <mission dir> → id \t repo \t question, for each "- Q<n> [repo]: …"
+# under "## Questions" in investigation.md without an answer file
+# context/answers/Q<n>.md (one file per answer: explorers run in parallel).
+open_questions() {
+  local inv="$1/investigation.md"
+  [ -f "$inv" ] || return 0
+  awk -v ans="$1/context/answers" '
+    function answered(id,   l) { if ((getline l < (ans "/" id ".md")) > 0) { close(ans "/" id ".md"); return 1 } return 0 }
+    /^## Questions/ { f = 1; next }
+    f && /^## /     { exit }
+    f && /^[-*][ \t]+Q[0-9]+[ \t]*\[[^]]+\][ \t]*:/ {
+      line = $0; sub(/^[-*][ \t]+/, "", line)
+      id = line; sub(/[ \t\[].*/, "", id)
+      repo = line; sub(/^[^[]*\[/, "", repo); sub(/\].*/, "", repo)
+      q = line; sub(/^[^:]*:[ \t]*/, "", q)
+      if (!answered(id)) print id "\t" repo "\t" q }' "$inv"
+}
+
+# fix_belongs <investigation.md>: "here" or a context repo's name, whole
+# (repo names may hold spaces, unlike verdict_field's first word).
+fix_belongs() {
+  [ -f "$1" ] || return 0
+  { grep -m1 -E '^\*\*Fix belongs:\*\*' "$1" || true; } | sed -E 's/^\*\*Fix belongs:\*\* *//; s/`//g; s/[[:space:]]+$//'
+}
+
+# investigation_rounds <mission dir>: investigate waves run so far.
+investigation_rounds() { cat "$1/state/investigate.rounds" 2>/dev/null || echo 0; }
+
 # --- contract (spec.md) ------------------------------------------------------
 
 has_contract() { grep -q '^## Validation contract' "$1"; }
@@ -98,11 +157,21 @@ approver() { printf '%s' "${FACTORY_APPROVER:-$(git config user.name 2>/dev/null
 # the reference, so not a line of them may change. Unlike frozen paths, the
 # test-file exception does not apply. From "## Frozen tests", same syntax.
 frozen_tests() {                       # <spec> → one pattern per line
-  [ -f "$1" ] && grep -q '^## Frozen tests' "$1" || return 0
-  awk '/^## Frozen tests/ { in_f = 1; next }
-       in_f && /^## /     { exit }
-       in_f && /^[-*][ \t]+/ { sub(/^[-*][ \t]+/, ""); gsub(/`/, ""); sub(/[ \t]+(—|-).*$/, "")
-                            if ($1 != "" && tolower($1) != "none") print $1 }' "$1"
+  [ -f "$1" ] || return 0
+  if grep -q '^## Frozen tests' "$1"; then
+    awk '/^## Frozen tests/ { in_f = 1; next }
+         in_f && /^## /     { exit }
+         in_f && /^[-*][ \t]+/ { sub(/^[-*][ \t]+/, ""); gsub(/`/, ""); sub(/[ \t]+(—|-).*$/, "")
+                              if ($1 != "" && tolower($1) != "none") print $1 }' "$1"
+  fi
+  # D99: a reproduction test is frozen once its ticket is integrated (green):
+  # later tickets fix the code, never the test that shows the bug.
+  local d t
+  d="$(dirname "$1")"
+  for t in "$d"/issues/*-reproduce-*.md; do
+    [ -f "$t" ] && [ -f "$d/state/$(basename "$t" .md).integrated" ] || continue
+    verdict_field "$t" Test | sed 's/`//g'
+  done
 }
 is_frozen() {                          # <path> <patterns (newline-separated)>
   local p
