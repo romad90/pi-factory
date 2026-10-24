@@ -115,7 +115,7 @@ echo "Integrating $ticket on $(git rev-parse --short HEAD)"
 if check_lint && run_check tests "$FACTORY_TEST_CMD" \
    && run_check extra "$FACTORY_EXTRA_CMD"; then
   type="feat"; [[ "$ticket" == *-fix-* ]] && type="fix"
-  git commit -q -m "${FACTORY_COMMIT_TYPE:-$type}($feature): $ticket" \
+  git commit -q --author="$FACTORY_AUTHOR" -m "${FACTORY_COMMIT_TYPE:-$type}($feature): $ticket" \
     -m "Integrated by the factory after lint and tests passed." -m "Factory-Script: integrate" -- . ":(exclude)${FACTORY_DIR}"
   git rev-parse HEAD > "$dir/state/$ticket.integrated"
   bash "$here/checkpoint.sh" "$feature" >/dev/null
