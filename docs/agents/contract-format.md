@@ -6,7 +6,11 @@ The spec itself starts with an intent line, used by `metrics.sh` (D26):
 
 ```markdown
 **Intent:** feature | maintenance | refactor | bugfix | exploration
+**Reviewer:** <GitLab username of the person who will review the MR>   (optional, D95)
+**Design:** yes | no                                                   (optional; default yes for feature and refactor, D94)
 ```
+
+The reviewer approves the contract and the design with you, so the MR review confirms what was agreed instead of discovering it; `mr.sh` asks them to review the MR.
 
 A spec may freeze paths the mission must not change (D61). The patch guard refuses worker changes there before integration; test files under them stay allowed. A maintenance mission without this section freezes `src/`; write `- none` to freeze nothing.
 

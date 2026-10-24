@@ -56,7 +56,7 @@ for v in "$dir"/verdicts/*-code.md; do
   # aside, never counted as a round, and the ticket goes back to review.
   marker="$(ticket_marker "$feature" "$ticket")"; vc="$(verdict_field "$v" Commit)"
   if [ -n "$marker" ] && [ -n "$vc" ] && [ "$vc" != "$marker" ] \
-     && ! [[ "$(verdict_field "$v" Brief)" =~ ^(integrate|worker-no-patch|patch-guard)$ ]] \
+     && ! [[ "$(verdict_field "$v" Brief)" =~ ^(integrate|worker-no-patch|patch-guard|test-on-base)$ ]] \
      && { [ "$n" -eq 0 ] || ! cmp -s "$v" "${v%.md}.r$n.md"; }; then
     mkdir -p "$dir/state"; mv "$v" "$dir/state/$ticket.stale-verdict.md"
     if [ "$n" -gt 0 ]; then cp "${v%.md}.r$n.md" "$v"; fi

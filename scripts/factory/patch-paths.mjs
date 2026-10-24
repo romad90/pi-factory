@@ -9,6 +9,9 @@
 //   node patch-paths.mjs project <in> <out> <prefix> <repo-root> <project-dir>
 //       rewrites root-relative paths to project-relative; exit 3 when a file
 //       is outside the project
+//   node patch-paths.mjs keep <in> <out> <paths-file>
+//       keeps only the file blocks whose old or new path is listed (one per
+//       line); the test-on-base check applies a patch's tests alone (D96)
 //   node patch-paths.mjs strip-hook <in> <out> "<names>"
 //       drops what the worktree hook added (D87): new symbolic links named
 //       like a dependency link (node_modules .venv ...) and .env.factory, at
@@ -136,13 +139,29 @@ function stripHook(inp, out, names) {
   return 0;
 }
 
+function keep(inp, out, listFile) {
+  const want = new Set(readFileSync(listFile, "utf8").split("\n").filter(Boolean));
+  const { lines, files } = parse(readFileSync(inp, "utf8"));
+  const starts = files.map((f) => f.header[0]);
+  const kept = [];
+  files.forEach((f, i) => {
+    if (!want.has(f.new ?? "") && !want.has(f.old ?? "")) return;
+    const to = i + 1 < starts.length ? starts[i + 1] : lines.length;
+    kept.push(...lines.slice(starts[i], to));
+  });
+  writeFileSync(out, kept.length ? kept.join("\n").replace(/\n*$/, "\n") : "");
+  return 0;
+}
+
 const [cmd, ...args] = process.argv.slice(2);
 if (cmd === "list") {
   for (const f of parse(readFileSync(args[0], "utf8")).files) process.stdout.write([f.status, f.old ?? "", f.new ?? "", f.mode].join("\x1f") + "\n");
+} else if (cmd === "keep") {
+  process.exit(keep(...args));
 } else if (cmd === "strip-hook") {
   process.exit(stripHook(...args));
 } else if (cmd === "project") {
   process.exit(project(...args));
 } else if (cmd) {
-  console.error("usage: patch-paths.mjs list <patch> | project <in> <out> <prefix> <repo-root> <project-dir> | strip-hook <in> <out> <names>"); process.exit(2);
+  console.error("usage: patch-paths.mjs list <patch> | project <in> <out> <prefix> <repo-root> <project-dir> | keep <in> <out> <paths-file> | strip-hook <in> <out> <names>"); process.exit(2);
 }

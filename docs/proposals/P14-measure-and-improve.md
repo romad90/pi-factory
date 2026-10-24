@@ -1,6 +1,6 @@
 # P14. Measure and improve: a run archive, a benchmark from our own tickets, scoring
 
-**Status:** run archive, scoring and metrics across missions shipped (D97); benchmark in progress · **Effort:** M (archive S, benchmark M, scoring S) · **Depends on:** nothing to start; P5 builds on it, P11's manifest makes it one command
+**Status:** run archive, scoring and metrics across missions shipped (D97); benchmark shipped (D98: cases, runs, comparisons, probe, cockpit view) · **Effort:** M (archive S, benchmark M, scoring S) · **Depends on:** nothing to start; P5 builds on it, P11's manifest makes it one command
 
 ## Problem
 
@@ -73,6 +73,10 @@ P5's strategist reads the scores, the retros and the journals, groups repeated f
 - Warp (founder's talk, October 2026): factories as code, the run archive as the key asset, scoring with LLM-as-judge on samples, a benchmark suite from your own tasks replayed across models and harnesses, a cost-versus-correctness curve, model routing from it, agents proposing PRs to the factory definition, cost per PR as the headline metric.
 - Google Harness²: keep a harness edit only when it changes behavior for the better on the same task.
 - Factory Missions: learning from repeated work.
+
+### Judging the refactor mission with the probe
+
+Before the refactor starts, write two or three follow-up tickets that a later change would plausibly need (a new mode, a changed rule), and add them with `bench.sh add-file <issue.md> <mission>` (kind `followup`). Run `bench.sh probe default --config <cheap profile> --at <commit before the refactor>`, then the same at the refactor's last commit. The frozen tests prove behavior did not change; the probe's pass rate (and its cost and turns) shows whether the code got easier to change. Same cases, same cheap model, two commits: one variable.
 
 ## Plan
 

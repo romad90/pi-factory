@@ -193,4 +193,12 @@ const missions = groups.map((g) => mission(g.name, g.lines));
 // D97: totals across missions (metrics.sh --all --json), when status.sh passes them.
 let factory = null;
 try { if (env.METRICS) factory = JSON.parse(read(env.METRICS)).total || null; } catch {}
-process.stdout.write(JSON.stringify({ generated: new Date().toISOString(), factoryDir: root, factory, missions }, null, 1) + "\n");
+// D98: the factory engineer's benchmarks, newest comparison first (bench.sh compare).
+const benchDir = env.FACTORY_BENCH_DIR || ".factory/bench";
+let bench = [];
+try {
+  bench = fs.readdirSync(path.join(benchDir, "compare")).filter((f) => f.endsWith(".json"))
+    .map((f) => { try { return JSON.parse(read(path.join(benchDir, "compare", f))); } catch { return null; } })
+    .filter(Boolean).sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 10);
+} catch {}
+process.stdout.write(JSON.stringify({ generated: new Date().toISOString(), factoryDir: root, factory, missions, bench }, null, 1) + "\n");
