@@ -21,6 +21,8 @@ Status: **draft** (open for discussion) · **accepted** (in the roadmap) · **re
 | P13 | [Context repos: investigate across services, change only one](P13-context-repos.md) | draft | — |
 | P14 | [Measure and improve: a run archive, a benchmark from our own tickets, scoring](P14-measure-and-improve.md) | draft | — (P5 builds on it) |
 | P15 | [The factory improves itself: agents that read failed runs and propose changes to the factory](P15-factory-improves-itself.md) | draft, later | P14 |
+| P16 | [Issue in, MR out: the factory works where the team already looks](P16-issue-in-mr-out.md) | draft, after mission 4 | P2 (P12 keeps it running) |
+| P17 | [Plans that leave no decision: readiness, reuse, plain words, drift](P17-plans-that-leave-no-decision.md) | draft, after mission 4 | D94, P14 |
 
 ## Why these four, in this order
 
@@ -56,3 +58,7 @@ P13 comes from a bug between an API and the two bots that keep it in sync. One m
 P14 makes the factory measurable: keep every run, replay real tickets as a benchmark across models and factory versions, score runs for failure modes tests cannot see, and aggregate cost per merged MR across missions. It is what lets P5 prove an improvement before it is merged, and what gives the pilot its numbers.
 
 P15 is P5 one level up: agents that read the run archive and scores across missions, find failure patterns seen at least three times, propose the smallest change to the factory, prove it with a before-and-after benchmark, and open a PR a human merges. The safety layer is out of their reach.
+
+P16 takes the experience Warp Factories sells, issue in and reviewed MR out, without its hosted product: a labeled issue starts a mission, the factory comments on it only at human steps, and approvals come back as comments from listed humans, checked by the forge's identity, which closes the self-approval hole D101 left open.
+
+P17 takes four checks from Google's Elephant-Goldfish Model into roles we already have: a design that leaves the worker no decision, a code search before anything new is built, every term defined, and a drift check before the MR. Each one is kept only if the next missions' numbers show it helps.

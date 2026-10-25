@@ -164,6 +164,47 @@ Bias: HumanLayer sells planning and review tooling. The incident data (Faros) is
 - **Several factories side by side** (product, marketing): one per product surface. Ours: one per repo or project, at the leads level.
 - **A benchmark run's result page:** a written summary, then "highest quality", "most efficient" and "lowest cost" recommendations with cost per trial, and a correctness-versus-cost scatter with selectable axes. Every configuration differs from the default by one variable (the model), so the comparison is controlled. In their run, a cheap open-weight flash model was both the most efficient and the cheapest (about $2 a trial) at 93% correctness, against 95% for the most expensive. The speaker's point: a benchmark built from your own runs, with your gates as reward, is an RL environment you own. P14.
 
+## From Warp Factories' documentation (October 2026)
+
+Read from [docs.warp.dev/factories](https://docs.warp.dev/factories/) and the founder's [Latent Space interview](https://latent.space/p/software-factories); the marketing site would not load. Their pitch: "issues, tickets and Slack messages in, reviewed pull requests out; agents do the work, people approve specs and merges". The default human gates are ours (approve the spec, answer questions, merge), and the factory never merges.
+
+| Idea | For us | Fits |
+|---|---|---|
+| A work item keeps its source from intake to handoff; the result goes back to the thread it came from | The forge issue as the mission's front door and status page | P16 |
+| An inbox of everything that needs a person | Per person, across repos, in the cockpit | P16, P10 |
+| A local agent hands work to the factory and takes it back (Factory MCP) | A teammate's own agent session starts a mission, or takes over a stuck ticket, through the same files | later |
+| Adoption starts with low-risk repos and ticket types; the share merged without rework grows over time | The pilot's shape; one more metric for `metrics --all` | deck, P14 |
+| A guided setup: code host, repos, name, agents, chat and tracker | `factory onboard` asks instead of writing stubs | P11 |
+
+Not taken: the LLM foreman (our loop is code, D91), an advisory-only review verdict (ours are gates), hosted compute.
+
+## From Google's Elephant-Goldfish Model (EGM, October 2026)
+
+[google/elephant-goldfish-model](https://github.com/google/elephant-goldfish-model) (Apache 2.0, "not an officially supported Google product"; read from its code). Skills and reviewer personas for spec-driven development: a deep-context "Elephant" drafts the design doc with the human, zero-context "Goldfish" reviewers stress-test it (zoom out, naive reader, design critic, implementation readiness), a synthesizer deduplicates their findings. Same core idea as our fresh context per role.
+
+| Idea | For us | Fits |
+|---|---|---|
+| **Zero-decision rule**: a plan passes only if the implementer has no design choice left | Readiness pass on `design.md` and tickets; open choices answered at G1b, not mid-build | P17 |
+| The zoom-out reviewer must search the code before accepting a new helper | Reuse search in the designer and critic; duplication flag in G5 | P17 |
+| Naive reader: every term defined, in the glossary, or linked | Contract critic pass and glossary step before G1 | P17 |
+| Drift report: design docs against the code | C10, made partly exact by assertion IDs | P17 |
+| Behavioral tests for prompts (required and forbidden patterns per scenario) and a live probe that a reviewer sees no parent context | A fresh-context probe in `self-check.sh` | P17 |
+| Per-directory READMEs as contracts (interfaces, invariants, side effects), written bottom-up | Output of a maintenance mission, or the explorers' briefs in context repos | P3, P13 |
+| The **Heilmeier catechism** as a standard for proposals: objectives with no jargon, how it is done today, what is new, who cares, risks, cost, timeline, mid-term and final exams | Check the committee deck and each P-proposal against it | deck |
+
+Not taken: the plugin (interactive harnesses only, one-question modal gates), its long all-capitals prompts tuned for frontier models.
+
+## From anti-slop (Dillon Mulroy, October 2026)
+
+[dmmulroy/anti-slop](https://github.com/dmmulroy/anti-slop) (MIT): Oxlint rules for TypeScript, vendored rather than installed from npm, that reject code hiding missing evidence: chained type assertions, widen-then-assert, `unknown` parameters and returns, loose dictionary types, `Reflect.get`/`apply`, module mocking, a type assertion without a `SAFETY:` comment. Same-file analysis, no type checker.
+
+| Idea | For us | Fits |
+|---|---|---|
+| Deterministic rules for model "slop" that tests don't catch | A TypeScript practice pack, run as `FACTORY_EXTRA_CMD` on worker patches with the lint ratchet (only new violations fail); never in the project's own lint config, which is the team's | packs |
+| Keep the evidence rules, drop the taste rules | Drop `no-shape-in-symbol-names`, `require-readable-spacing`; drop `no-module-mocking` for maintenance missions, whose characterization tests mock modules on purpose | packs |
+
+To check first: `oxlint` and `@oxlint/plugins` at matching versions on the work machine's Node. After the next mission, one change at a time.
+
 ## What to watch for
 
 Each of these tools keeps something we don't want to give away: the runtime (OpenCode Swarm needs OpenCode), the hosted control plane and its data (Factory, Port), or a maintainer we depend on. The test for anything we take: does it keep working if that vendor disappears tomorrow?
@@ -176,3 +217,6 @@ Each of these tools keeps something we don't want to give away: the runtime (Ope
 - [Anthropic skills repository](https://github.com/anthropics/skills)
 - [Machinist](https://github.com/owainlewis/machinist)
 - [afonsoft/skills](https://github.com/afonsoft/skills)
+- [Warp Factories documentation](https://docs.warp.dev/factories/), [Latent Space: software factories](https://latent.space/p/software-factories)
+- [Elephant-Goldfish Model](https://github.com/google/elephant-goldfish-model)
+- [anti-slop](https://github.com/dmmulroy/anti-slop)
