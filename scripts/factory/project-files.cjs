@@ -20,13 +20,13 @@ if (cmd === "ci") {
     // variable, no default: the project decides where its CI may fetch from),
     // at the commit onboard recorded in .factory/package-sha, checked before
     // anything from it runs; into a directory of its own.
-    const fetch = "    - 'test -e scripts/factory || { if [ -z \"$FACTORY_PACKAGE_GIT\" ]; then echo \"FACTORY_PACKAGE_GIT is not set (a CI variable, the URL of your pi-factory mirror)\" >&2; exit 1; fi; [ -s .factory/package-sha ] || { echo \".factory/package-sha missing (factory onboard records it)\" >&2; exit 1; }; sha=\"$(cat .factory/package-sha)\"; d=\"$(mktemp -d)\"; git clone -q \"$FACTORY_PACKAGE_GIT\" \"$d/pi-factory\" && git -C \"$d/pi-factory\" checkout -q --detach \"$sha\" && [ \"$(git -C \"$d/pi-factory\" rev-parse HEAD)\" = \"$sha\" ] && bash \"$d/pi-factory/scripts/factory/link.sh\"; }'\n";
+    const fetch = "    - 'test -e scripts/factory || { if [ -z \"$FACTORY_PACKAGE_GIT\" ]; then echo \"FACTORY_PACKAGE_GIT is not set (a CI variable, the URL of your pi-factory mirror)\" >&2; exit 1; fi; [ -s .factory/package-sha ] || { echo \".factory/package-sha missing (factory onboard records it)\" >&2; exit 1; }; sha=\"$(cat .factory/package-sha)\"; d=\"$(mktemp -d)\"; p=\"$(cat .factory/package-dir 2>/dev/null || true)\"; case \"$p\" in *..*|/*) echo \".factory/package-dir must be a folder inside the factory repository\" >&2; exit 1 ;; esac; git clone -q \"$FACTORY_PACKAGE_GIT\" \"$d/pi-factory\" && git -C \"$d/pi-factory\" checkout -q --detach \"$sha\" && [ \"$(git -C \"$d/pi-factory\" rev-parse HEAD)\" = \"$sha\" ] && bash \"$d/pi-factory/${p:+$p/}scripts/factory/link.sh\"; }'\n";
     y = y.replace(/^  script:\n(?=(?:    - .*\n)*?    - .*scripts\/factory\/)/gm, "  script:\n" + fetch)
          .replace("command -v bash >/dev/null && command -v node >/dev/null || apk add --no-cache bash nodejs", "command -v bash >/dev/null && command -v node >/dev/null && command -v git >/dev/null || apk add --no-cache bash nodejs git")
          .replace(/command -v bash >\/dev\/null \|\| apk add --no-cache bash$/m, "command -v bash >/dev/null && command -v git >/dev/null || apk add --no-cache bash git")
          .replace("node scripts/factory/models-lint.mjs", "node scripts/factory/models-lint.mjs --per-machine-ok")
          .replace(/^variables:\n/m, "# FACTORY_PACKAGE_GIT: set it as a CI/CD variable, the URL of your pi-factory mirror\n# (no default). Jobs check out the commit in .factory/package-sha.\nvariables:\n");
-    const fetched = (y.match(/pi-factory\/scripts\/factory\/link\.sh/g) || []).length;
+    const fetched = (y.match(/pi-factory\/\$\{p:\+\$p\/\}scripts\/factory\/link\.sh/g) || []).length;
     if (fetched !== 3) { console.error(`CI template: ${fetched}/3 jobs fetch the package; update project-files.cjs`); process.exit(1); }
   }
   const MR = /^(\s*)- if: \$CI_PIPELINE_SOURCE == "merge_request_event"$/gm;

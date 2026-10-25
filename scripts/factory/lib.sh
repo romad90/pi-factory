@@ -4,6 +4,34 @@
 # Rationale for each rule: docs/adr/ADR-001-agentic-factory.md.
 
 FACTORY_DIR="${FACTORY_DIR:-.scratch}"            # one path segment, no slash
+# Some workspace images ship without coreutils' head (D102); every
+# "… | head -1" would then stop a script under pipefail. This stand-in covers
+# what the factory calls (-N, -n N, -nN, -c N, files, stdin), reads all its
+# input (an early exit would send SIGPIPE upstream) and is defined only when
+# head is missing.
+if ! command -v head >/dev/null 2>&1; then
+  head() {
+    local n=10 c=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        -n) n="$2"; shift 2 ;;
+        -n*) n="${1#-n}"; shift ;;
+        -c) c="$2"; shift 2 ;;
+        -c*) c="${1#-c}"; shift ;;
+        -[0-9]*) n="${1#-}"; shift ;;
+        --) shift; break ;;
+        *) break ;;
+      esac
+    done
+    if [ -n "$c" ]; then
+      node -e 'const fs = require("fs"); const n = Number(process.argv[1]); const f = process.argv.slice(2);
+        const b = f.length ? Buffer.concat(f.map((x) => fs.readFileSync(x))) : fs.readFileSync(0);
+        process.stdout.write(b.subarray(0, n));' "$c" "$@"
+    else
+      sed -n "1,${n}p" "$@"
+    fi
+  }
+fi
 FACTORY_SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FACTORY_ROUND_LIMIT="${FACTORY_ROUND_LIMIT:-3}"
 FACTORY_BEHAVIOR_PATHS_FILE="${FACTORY_BEHAVIOR_PATHS_FILE:-.factory/behavior-paths}"

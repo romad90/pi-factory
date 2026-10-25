@@ -1253,7 +1253,7 @@ t "onboard writes only the project's own files ($(wc -w <<<"$changed" | tr -d ' 
   && t "factory scripts, briefs and docs are local links, excluded from git (monorepo folder)" || fail "links" "$(ls -la scripts; cat "$pk/.git/info/exclude")"
 [ "$(cat .factory/VERSION)" = "$(cat "$root/.factory/VERSION")" ] && ! grep -q '<' .pi/settings.json \
   && [ "$(cat .factory/package-sha)" = "$(git -C "$root" rev-parse HEAD)" ] \
-  && [ "$(grep -c 'pi-factory/scripts/factory/link.sh' .factory/ci/factory.gitlab-ci.yml)" = 3 ] && grep -q 'models-lint.mjs --per-machine-ok' .factory/ci/factory.gitlab-ci.yml \
+  && [ "$(grep -c 'scripts/factory/link.sh' .factory/ci/factory.gitlab-ci.yml)" = 3 ] && grep -q 'models-lint.mjs --per-machine-ok' .factory/ci/factory.gitlab-ci.yml \
   && grep -q 'cd "apps/svc"' .factory/ci/factory.gitlab-ci.yml && ! grep -qE 'FACTORY_PACKAGE_GIT: *"?http' .factory/ci/factory.gitlab-ci.yml \
   && t "project expects this factory version and commit; CI has no default fetch URL; no placeholder model scope" || fail "onboard files" "$(cat .pi/settings.json .factory/ci/factory.gitlab-ci.yml)"
 # The CI fetch line, run as a job would: a fresh checkout without the links.
@@ -1306,6 +1306,122 @@ bash "$root/scripts/factory/onboard.sh" --migrate >"$work/migrate.log" 2>&1 || f
 [ -z "$(git ls-files -- scripts/factory .pi/agents/factory .factory/briefs docs/factory)" ] && [ -L scripts/factory ] \
   && grep -q 'FACTORY_TEST_CMD="true"' .factory/commands.env && [ -f .pi/settings.json ] \
   && t "onboard --migrate removes the copied factory, keeps the project's own files, links the package" || fail "migrate result" "$(git status --short | head -20)"
+cd "$repo"
+
+echo "Setup by rehearsal (D102)"
+# head missing from the image: lib.sh's stand-in covers what the scripts call.
+nohead="$work/nohead"; mkdir -p "$nohead"
+for c in bash sh env sed awk grep cut tr wc sort uniq mktemp find xargs diff cat tail dirname basename git node ls rm mkdir cp mv ln printf readlink sha256sum shasum seq; do
+  p="$(command -v "$c" 2>/dev/null || true)"; [ -n "$p" ] && [ -x "$p" ] && ln -sf "$p" "$nohead/$c"
+done
+out="$(PATH="$nohead" "$nohead/bash" -c '. "'"$root"'/scripts/factory/lib.sh"; command -v head >/dev/null && [ "$(type -t head)" = function ] || exit 9
+  printf "a\nb\nc\n" | head -1; printf "1\n2\n3\n4\n5\n" | head -40 | wc -l | tr -d " "; printf "%s\n" x y | head -n 1
+  printf "abcdef0123456789\n" > "'"$work"'/h"; head -c 12 "'"$work"'/h"; echo; set -o pipefail; seq 1 100000 2>/dev/null | head -1 >/dev/null; echo "pipe=$?"' 2>&1)"
+[ "$out" = "$(printf 'a\n5\nx\nabcdef012345\npipe=0')" ] && t "no head on the machine: lib.sh's stand-in answers -N, -n N, -c N and files, and never breaks a pipe" || fail "head fallback" "$out"
+rm -f "$nohead/diff"
+out="$(PATH="$nohead" "$nohead/node" "$root/scripts/factory/env-check.mjs" 2>&1 || true)"
+grep -q 'missing on this machine: diff' <<<"$out" && grep -q 'head is missing: the factory uses its own stand-in' <<<"$out" \
+  && t "env-check names the commands the scripts need that this machine lacks" || fail "env-check tools" "$out"
+
+# The factory as a folder of another repository (an internal mirror, D102).
+mirror="$work/mirror"; mkdir -p "$mirror/pi-factory"; git -C "$mirror" init -q
+( cd "$root" && git ls-files -co --exclude-standard -z | xargs -0 -I{} cp --parents {} "$mirror/pi-factory/" 2>/dev/null || true )
+( cd "$mirror" && echo other > OTHER.md && git add -A && git commit -qm mirror )
+mp="$work/mirror project"; mkdir -p "$mp"; git -C "$mp" init -q; ( cd "$mp"; echo x > README.md; git add -A; git commit -qm init )
+cd "$mp"
+bash "$mirror/pi-factory/scripts/factory/onboard.sh" --no-setup >"$work/onboard-mirror.log" 2>&1 || fail "onboard from a mirror" "$(cat "$work/onboard-mirror.log")"
+[ "$(cat .factory/package-dir)" = pi-factory ] && [ "$(cat .factory/package-sha)" = "$(git -C "$mirror" rev-parse HEAD)" ] \
+  && grep -q 'no model on this machine for factory-' "$work/onboard-mirror.log" \
+  && t "onboard from a mirror: records the factory's folder next to the commit, and names the agents without a model" || fail "package-dir" "$(cat "$work/onboard-mirror.log")"
+bash scripts/factory/skills-pin.sh verify >"$work/pin.log" 2>&1 && t "skills pin verifies on the installed package (paths relative, D102)" || fail "skills pin in package mode" "$(cat "$work/pin.log")"
+fetch="$(grep -m1 "^    - 'test -e scripts/factory" .factory/ci/factory.gitlab-ci.yml | sed "s/^    - '//; s/'\$//")"
+git add -A; git commit -qm onboard
+rm -rf "$work/ci-mirror"; git clone -q "$mp" "$work/ci-mirror"
+(cd "$work/ci-mirror" && FACTORY_PACKAGE_GIT="$mirror" bash -c "$fetch" >"$work/fetch.log" 2>&1) && [ -L "$work/ci-mirror/scripts/factory" ] \
+  && [ -f "$work/ci-mirror/scripts/factory/next.sh" ] && t "CI links the factory's folder of the mirror clone" || fail "CI fetch from a mirror" "$(cat "$work/fetch.log"; ls -la "$work/ci-mirror/scripts" 2>&1)"
+echo ../x > "$work/ci-mirror/.factory/package-dir"; rm -rf "$work/ci-mirror/scripts"
+(cd "$work/ci-mirror" && FACTORY_PACKAGE_GIT="$mirror" bash -c "$fetch" >"$work/fetch.log" 2>&1) && fail "CI must refuse a package-dir outside the repository"
+grep -q 'package-dir must be a folder inside' "$work/fetch.log" && t "CI refuses a package-dir that leaves the factory repository" || fail "package-dir check" "$(cat "$work/fetch.log")"
+
+# A Node project: a stand-in runner (node_modules/.bin/jest), one passing test.
+sp="$work/setup project"; mkdir -p "$sp/tests" "$sp/node_modules/.bin"; cd "$sp"; git init -q
+printf '{"name":"s","private":true,"scripts":{"test":"jest","postinstall":"npm audit fix"},"devDependencies":{"jest":"0.0.0"}}\n' > package.json
+cat > node_modules/.bin/jest <<'JEST'
+#!/usr/bin/env node
+const fs = require("fs"), path = require("path"), { spawnSync } = require("child_process");
+const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
+const walk = (d) => fs.existsSync(d) ? fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]) : [];
+const files = args.length ? args : walk("tests").filter((f) => /\.test\.js$/.test(f));
+if (!files.length) { console.log("No tests found, exiting with code 0"); process.exit(0); }
+let bad = 0;
+for (const f of files) { const r = spawnSync(process.execPath, [f], { encoding: "utf8" }); if (r.status) { bad++; console.log(`FAIL ${f}\n${r.stderr}`); } else console.log(`PASS ${f}`); }
+process.exit(bad ? 1 : 0);
+JEST
+chmod +x node_modules/.bin/jest
+echo 'require("assert").strictEqual(1 + 1, 2);' > tests/add.test.js
+printf 'node_modules\n' > .gitignore; echo 'TOKEN=x' > .env
+printf 'deploy-dev:\n  stage: deploy\n  script:\n    - ./deploy.sh\n  rules:\n    - if: $CI_COMMIT_BRANCH != "production" && $CI_PIPELINE_SOURCE != "merge_request_event"\n' > .gitlab-ci.yml
+mkdir -p .factory; printf 'FACTORY_LINT_CMD=""\nFACTORY_TEST_CMD=""\nFACTORY_TEST_FILES_CMD=""\nFACTORY_EXTRA_CMD=""\n' > .factory/commands.env
+git add -A; git commit -qm init
+disc="$(node "$root/scripts/factory/setup-discover.mjs")"
+node -e 'const d=JSON.parse(process.argv[1]);const t=(f)=>d.findings.some(f);process.exit(
+  d.candidates.test[0].cmd==="node_modules/.bin/jest --passWithNoTests" && d.probe.file==="tests/factory-setup-probe.test.js"
+  && t((f)=>f.level==="decide"&&/postinstall: npm audit fix/.test(f.text)) && t((f)=>/tracked environment files: \.env/.test(f.text))
+  && t((f)=>f.level==="decide"&&/job `deploy-dev`/.test(f.text)) ? 0 : 1)' "$disc" \
+  && t "discover: the local runner first; install scripts that write, tracked .env files and jobs a branch push deploys are named" || fail "discover" "$disc"
+out="$(node "$root/scripts/factory/setup.mjs" --write 2>&1)" || true
+grep -q '✓ FACTORY_TEST_CMD  node_modules/.bin/jest --passWithNoTests' <<<"$out" && grep -q 'turns it red, because of that file' .factory/setup.md \
+  && grep -q '✓ FACTORY_TEST_FILES_CMD' <<<"$out" && grep -q '^FACTORY_TEST_CMD="node_modules/.bin/jest --passWithNoTests"$' .factory/commands.env \
+  && grep -q '^FACTORY_TEST_FILES_CMD="node_modules/.bin/jest --passWithNoTests {files}"$' .factory/commands.env \
+  && [ "$(git worktree list | wc -l | tr -d ' ')" = 1 ] && [ ! -e tests/factory-setup-probe.test.js ] \
+  && t "setup: green twice offline, red with a planted failing file, files command narrowed to it; written; no worktree or probe left" || fail "setup rehearsal" "$out"$'\n'"$(cat .factory/setup.md)"
+printf 'FACTORY_TEST_CMD="true"\n' > .factory/commands.env
+out="$(node "$root/scripts/factory/setup.mjs" --write 2>&1)" && fail "setup must fail a test command that ignores a failing test" "$out"
+grep -q 'leaves it green' <<<"$out" && grep -qx 'FACTORY_TEST_CMD="true"' .factory/commands.env \
+  && t "setup: a command a failing test can't turn red fails; your own value is never replaced" || fail "setup yours" "$out"
+printf 'FACTORY_TEST_CMD="npx some-runner-not-here"\n' > .factory/commands.env
+out="$(node "$root/scripts/factory/setup.mjs" 2>&1)" || true
+grep -q "isn't installed in the project: npx would download it" <<<"$out" && t "setup: a command npx would download fails (a worker is offline)" || fail "setup npx" "$out"
+echo 'process.exit(process.env.MY_API_TOKEN ? 3 : process.env.HTTPS_PROXY === "http://127.0.0.1:9" && process.env.npm_config_offline === "true" ? 0 : 4);' > check-env.js
+git add check-env.js; git commit -qm "env check"
+printf 'FACTORY_TEST_CMD="node check-env.js"\n' > .factory/commands.env
+out="$(MY_API_TOKEN=s3cr3t node "$root/scripts/factory/setup.mjs" 2>&1)" || true
+grep -q 'green twice offline, credentials unset' .factory/setup.md && t "setup rehearses with credential variables unset, package managers offline and the proxies on a closed port" || fail "setup env" "$out"$'\n'"$(cat .factory/setup.md)"
+
+# Review fixes: verdicts from exit codes, process groups, quoting, the user's .git untouched.
+echo 'console.log("getaddrinfo ENOTFOUND api.example.invalid (handled)");' > net-ok.js
+echo 'process.exit(require("fs").existsSync("café new.txt") ? 0 : 5);' > new-file.js
+printf 'console.error("Oops! Something went wrong! couldn'"'"'t find the plugin"); process.exit(2);\n' > lint-crash.js
+git add net-ok.js new-file.js lint-crash.js; git commit -qm "review fixtures"
+echo x > "café new.txt"
+printf 'FACTORY_TEST_CMD="node net-ok.js && node new-file.js"\nFACTORY_LINT_CMD="node lint-crash.js"\n' > .factory/commands.env
+out="$(node "$root/scripts/factory/setup.mjs" 2>&1)" || true
+grep -q 'green twice offline' .factory/setup.md && ! grep -q 'reaching for the network' .factory/setup.md \
+  && grep -q "didn't run to the end (exit 2" .factory/setup.md && ! grep -q 'leaves files in the tree' .factory/setup.md \
+  && ! grep -q 'no test command found' .factory/setup.md && ! grep -q 'worktreeConfig' .git/config \
+  && t "setup: a passing suite that logs a network error passes; a crashing lint fails; new files with unusual names are rehearsed; .git/config untouched" || fail "review fixes" "$out"$'\n'"$(cat .factory/setup.md)"
+rm -f "café new.txt"
+printf 'FACTORY_TEST_CMD="sleep 41.37; true"\n' > .factory/commands.env
+out="$(node "$root/scripts/factory/setup.mjs" --timeout 1 2>&1)" || true
+sleep 1
+grep -q 'timed out after 1s' .factory/setup.md && ! pgrep -f '^sleep 41[.]37' >/dev/null && [ "$(git worktree list | wc -l | tr -d ' ')" = 1 ] \
+  && t "setup: a command that times out is stopped with everything it started" || fail "setup timeout" "$out"$'\n'"$(pgrep -fa '^sleep 41[.]37')"
+
+# This machine: floating aliases, production routes, TLS checks off.
+mkdir -p "$PI_CODING_AGENT_DIR"
+printf '{"providers":{"gw":{"baseUrl":"https://llm-prod.example/v1","api":"openai-completions","apiKey":"GW_KEY"}}}' > "$PI_CODING_AGENT_DIR/models.json"
+printf '{"subagents":{"agentOverrides":{"factory-reviewer":{"model":"gw/judge-latest"},"factory-worker":{"model":"gw/maker-1"}}}}' > "$PI_CODING_AGENT_DIR/settings.json"
+out="$(NODE_TLS_REJECT_UNAUTHORIZED=0 node "$root/scripts/factory/env-check.mjs" 2>&1 || true)"
+grep -q 'gw/judge-latest is a floating alias (factory-reviewer)' <<<"$out" && grep -q 'factory-reviewer, factory-worker go through llm-prod.example, which looks like production' <<<"$out" \
+  && grep -q 'NODE_TLS_REJECT_UNAUTHORIZED=0' <<<"$out" && t "env-check: floating aliases, roles on a production-looking route, TLS checks off" || fail "env-check" "$out"
+out="$(FACTORY_GATEWAY_PROD_RE='nothing-matches' node "$root/scripts/factory/env-check.mjs" 2>&1 || true)"
+grep -q 'no factory agent on a production route' <<<"$out" && t "env-check: FACTORY_GATEWAY_PROD_RE makes the route check exact" || fail "env-check prod re" "$out"
+printf 'FACTORY_TEST_CMD="node_modules/.bin/jest"\nFACTORY_EXTRA_CMD="curl -H \\"Authorization: Bearer abcdefghijklmnop1234\\" https://x"\n' > .factory/commands.env
+out="$(node "$root/scripts/factory/report.mjs" --full 2>&1)"
+grep -q '^factory report ' <<<"$out" && grep -q 'reviewer: gw/judge-latest' <<<"$out" && grep -q 'floating alias' <<<"$out" && grep -q '^Commands' <<<"$out" \
+  && ! grep -q abcdefghijklmnop1234 <<<"$out" && grep -q REDACTED <<<"$out" && [ -f "$(git rev-parse --git-common-dir)/pi-factory/report.txt" ] \
+  && t "factory report: one redacted text (models and routes, commands, setup, pre-flight), kept out of the repository" || fail "report" "$out"
+rm -f "$PI_CODING_AGENT_DIR/models.json" "$PI_CODING_AGENT_DIR/settings.json"
 cd "$repo"
 
 if [ -n "${mono:-}" ]; then

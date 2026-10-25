@@ -46,7 +46,8 @@ const setting = (name, dflt) => {
 };
 const exists = (p) => { try { lstatSync(p); return true; } catch { return false; } };
 
-execFileSync("git", ["-C", wt, "sparse-checkout", "set", "--no-cone", "/*", `!/${pattern(inProject(instrument))}/`], { stdio: "ignore" });
+// factory setup (D102) rehearses without it: no instrument to hide, and no worktreeConfig turned on.
+if (process.env.FACTORY_HOOK_NO_SPARSE !== "1") execFileSync("git", ["-C", wt, "sparse-checkout", "set", "--no-cone", "/*", `!/${pattern(inProject(instrument))}/`], { stdio: "ignore" });
 writeFileSync(join(wt, prefix, ".env.factory"), `BOT_PORT=${base + Number(input.index ?? 0)}\n`);
 
 const synthetic = [inProject(".env.factory")];

@@ -23,6 +23,7 @@ Status: **draft** (open for discussion) · **accepted** (in the roadmap) · **re
 | P15 | [The factory improves itself: agents that read failed runs and propose changes to the factory](P15-factory-improves-itself.md) | draft, later | P14 |
 | P16 | [Issue in, MR out: the factory works where the team already looks](P16-issue-in-mr-out.md) | draft, after mission 4 | P2 (P12 keeps it running) |
 | P17 | [Plans that leave no decision: readiness, reuse, plain words, drift](P17-plans-that-leave-no-decision.md) | draft, after mission 4 | D94, P14 |
+| P18 | [Setup by rehearsal: the factory finds its own commands and proves them as a worker would](P18-setup-by-rehearsal.md) | accepted (D102) | P11 |
 
 ## Why these four, in this order
 
@@ -62,3 +63,5 @@ P15 is P5 one level up: agents that read the run archive and scores across missi
 P16 takes the experience Warp Factories sells, issue in and reviewed MR out, without its hosted product: a labeled issue starts a mission, the factory comments on it only at human steps, and approvals come back as comments from listed humans, checked by the forge's identity, which closes the self-approval hole D101 left open.
 
 P17 takes four checks from Google's Elephant-Goldfish Model into roles we already have: a design that leaves the worker no decision, a code search before anything new is built, every term defined, and a drift check before the MR. Each one is kept only if the next missions' numbers show it helps.
+
+P18 comes from onboarding mission 4's project: ten problems found by hand at a red prompt, every one readable or testable by a script. Setup reads the project's CI file and manifests for its commands, rehearses them under a worker's conditions (fresh worktree, offline, no credentials, guard on), checks the machine and the gateway the same way, and hands the human one page to approve.

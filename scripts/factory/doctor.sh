@@ -45,6 +45,8 @@ if [ "${1:-}" = "--quick" ]; then
   [ -z "$dirty" ] && ok "clean tree outside ${FACTORY_DIR}/" || bad "uncommitted changes outside ${FACTORY_DIR}/ (commit or stash)"
   if node "$here/models-lint.mjs" >/dev/null 2>&1; then ok "models: one per role, families separated"
   else bad "models-lint fails (node scripts/factory/models-lint.mjs)"; fi
+  # D102: tools, models without a version, production routes, TLS checks off.
+  ( export FACTORY_GATEWAY_URL; node "$here/env-check.mjs" ) || fail=1
   if [ -f "$(factory_res .pi/extensions/factory-guard.ts)" ] && node -e '
       import("./scripts/factory/guard-rules.mjs").then(({ check }) => {
         process.exit(check({ tool: "bash", input: { command: "git push" }, cwd: process.cwd() }) ? 0 : 1); });' 2>/dev/null; then
@@ -90,6 +92,10 @@ echo "pi-subagents config (user level)"
 cfg="$HOME/.pi/agent/extensions/subagent/config.json"
 if [ -f "$cfg" ] && grep -q 'factory-worktree-hook.mjs' "$cfg"; then ok "worktree hook shim configured"
 else bad "run scripts/factory/install-pi-config.sh (worktree hook hides the instrument, D35)"; fi
+
+echo
+echo "Machine and gateway (D102)"
+( . "$here/lib.sh"; load_commands; export FACTORY_GATEWAY_URL; node "$here/env-check.mjs" --strict ) || fail=1
 
 echo
 bash "$here/skills-pin.sh" verify || fail=1
