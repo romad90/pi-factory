@@ -76,6 +76,8 @@ if [ -n "$dry" ]; then echo "(dry run: nothing pushed)"; exit 0; fi
 
 url_file="$dir/mr.url"
 record() { [ -n "$1" ] || return 0; printf '%s\n' "$1" > "$url_file"; echo "MR: $1"; }
+# D103: the mission's last runs go into the archive before the MR, so its data is complete.
+bash "$here/archive.sh" collect "$feature" >/dev/null 2>&1 || true
 
 # 1. glab
 if command -v glab >/dev/null 2>&1 && glab auth status >/dev/null 2>&1; then
