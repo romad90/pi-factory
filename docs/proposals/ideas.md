@@ -205,6 +205,19 @@ Not taken: the plugin (interactive harnesses only, one-question modal gates), it
 
 To check first: `oxlint` and `@oxlint/plugins` at matching versions on the work machine's Node. After the next mission, one change at a time.
 
+## From our own manual labor (onboarding mission 4, October 2026)
+
+Not borrowed: seen in our own evening of setup, each a person doing a script's job. Ranked by human time saved.
+
+| Manual labor seen | Idea | Fits |
+|---|---|---|
+| Terminal output relayed by phone photos, one screen at a time | `factory report`: one redacted text file with everything a diagnosis needs (versions, effective models and their routes, `commands.env`, doctor and rehearsal results, `git status`), small enough to paste anywhere | P18 |
+| A person triages an audit's findings by reading `file:line` | Verify findings by execution: a fresh worker turns each finding into a test on today's code; the test shows the behavior, and the human only decides "intended or bug" | P3, P9 |
+| Three questions to pick models for new roles | Roles declare what they need (tier, family group, thinking); `factory models suggest` assigns the models the gateway serves, under the family rules (a small constraint problem), later weighted by the benchmark | P14, D31 |
+| The factory copied into an internal mirror by hand, with no GitHub access at work | Ship each release as a `git bundle` file: one file, the same commits and hashes as GitHub, so `package-sha` and the pin checks hold, and `git pull` from the file is the upgrade | P11 |
+| The spec of a characterization mission written from an audit that already lists the workflows | Draft the spec skeleton (intent, workflows as stories, frozen paths) from the audit; the human edits instead of writing | P3 |
+| Vulnerabilities seen in install output, then forgotten | Setup writes them as findings for the owning team, never as work for the current mission | P18 |
+
 ## What to watch for
 
 Each of these tools keeps something we don't want to give away: the runtime (OpenCode Swarm needs OpenCode), the hosted control plane and its data (Factory, Port), or a maintainer we depend on. The test for anything we take: does it keep working if that vendor disappears tomorrow?
