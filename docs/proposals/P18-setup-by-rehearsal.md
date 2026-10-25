@@ -1,6 +1,6 @@
 # P18. Setup by rehearsal: the factory finds its own commands and proves them as a worker would
 
-**Status:** draft · **Effort:** M · **Depends on:** P11 (onboard); none of the mission loop changes
+**Status:** accepted, built as D102 (factory setup, env-check, factory report) · **Effort:** M · **Depends on:** P11 (onboard); none of the mission loop changes
 
 ## Problem
 
@@ -90,11 +90,18 @@ The machine and the gateway get the same treatment, as `doctor` checks with the 
 
 ## Plan
 
-1. Fix the bugs found: skills pin paths in package mode; `package-sha` with the factory in a subfolder (record the folder, CI links from it); `onboard` names the agents without a model; the family lint covers designer, explorer and investigator. **S**
-2. `doctor` environment checks: placeholders named per agent, floating aliases, production routes, TLS off. **S**
-3. Discovery: CI file read, manifest tables (Node, Python, Go, Rust, JVM), lifecycle scripts. **M**
-4. Rehearsal in a worker worktree: offline, scrubbed, guard on, twice; the three checks. **M**
-5. `setup.md` report and `commands.env` writing; `factory onboard` runs it. **S**
+1. Fix the bugs found: skills pin paths in package mode; `package-sha` with the factory in a subfolder (record the folder, CI links from it); `onboard` names the agents without a model. **S** Done (D102). The family lint for designer, explorer and investigator waits for P17, where a judge first reviews the design.
+2. `doctor` environment checks: placeholders named per agent, floating aliases, production routes, TLS off. **S** Done (D102).
+3. Discovery: CI file read, manifest tables (Node, Python, Go, Rust, JVM), lifecycle scripts. **M** Done (D102).
+4. Rehearsal in a worker worktree: offline, scrubbed, twice; the three checks. **M** Done (D102).
+5. `setup.md` report and `commands.env` writing; `factory onboard` runs it. **S** Done (D102), with `factory report`.
+
+## As built (D102)
+
+- **The CI file is a cross-check, not the first source.** Its job lines often carry the pipeline's own setup (`npm ci && npm run test:ci`); the local runner binary is the more precise candidate. The report lists what CI runs next to what setup chose.
+- **The command guard is not loaded during the rehearsal**: the commands it rehearses are not agent tool calls. What the guard does to a worker's commands, unsetting credential variables (D100), is applied the same way.
+- **The planted failing test covers Node and Python.** For Go, Rust and the JVM the report says the check wasn't made.
+- **Offline is proxies and package managers**, not a network namespace: a program opening its own socket is not stopped.
 
 ## Open questions
 

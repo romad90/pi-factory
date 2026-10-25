@@ -150,7 +150,7 @@ fi
 
 load_commands
 if [ -z "$FACTORY_TEST_CMD" ] && [ "${FACTORY_ALLOW_NO_TESTS:-0}" != "1" ]; then
-  step setup "human: set FACTORY_TEST_CMD (and FACTORY_LINT_CMD) in .factory/commands.env and commit it. The factory never integrates without tests (D44)."
+  step setup "human: factory setup --write (finds and rehearses the test and lint commands, D102), or set FACTORY_TEST_CMD in .factory/commands.env yourself; then commit it. The factory never integrates without tests (D44)."
 fi
 
 compute_ticket_state "$feature"

@@ -23,7 +23,7 @@ Status: **draft** (open for discussion) · **accepted** (in the roadmap) · **re
 | P15 | [The factory improves itself: agents that read failed runs and propose changes to the factory](P15-factory-improves-itself.md) | draft, later | P14 |
 | P16 | [Issue in, MR out: the factory works where the team already looks](P16-issue-in-mr-out.md) | draft, after mission 4 | P2 (P12 keeps it running) |
 | P17 | [Plans that leave no decision: readiness, reuse, plain words, drift](P17-plans-that-leave-no-decision.md) | draft, after mission 4 | D94, P14 |
-| P18 | [Setup by rehearsal: the factory finds its own commands and proves them as a worker would](P18-setup-by-rehearsal.md) | draft | P11 |
+| P18 | [Setup by rehearsal: the factory finds its own commands and proves them as a worker would](P18-setup-by-rehearsal.md) | accepted (D102) | P11 |
 
 ## Why these four, in this order
 

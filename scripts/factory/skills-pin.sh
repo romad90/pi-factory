@@ -20,7 +20,10 @@ hash_tree() {               # stable manifest of every pinned upstream file
   local s
   for s in $(skills); do
     find "$FACTORY_SKILLS_DIR/$s" -type f | LC_ALL=C sort
-  done | while IFS= read -r f; do sha256 "$f"; done
+  done | while IFS= read -r f; do sha256 "$f"; done \
+    | awk -v d="$FACTORY_SKILLS_DIR/" '{ i = index($0, "  " d); if (i) $0 = substr($0, 1, i + 1) ".pi/skills/" substr($0, i + 2 + length(d)); print }'
+  # D102: on the installed package (D92) the skills are the package's, an
+  # absolute path; the manifest names them .pi/skills/…, as in the factory repo.
 }
 
 fail=0

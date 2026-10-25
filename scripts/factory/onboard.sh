@@ -14,7 +14,9 @@
 #     guard load from the package itself
 #
 # Usage, from the project folder (a monorepo project: its own folder):
-#   <package>/scripts/factory/onboard.sh [--ci mr|child] [--migrate]
+#   <package>/scripts/factory/onboard.sh [--ci mr|child] [--migrate] [--no-setup]
+#   --no-setup  skip factory setup (D102): discovery and rehearsal of the
+#               project's commands, run at the end by default
 #   --migrate   the factory was copied in by install-into.sh: remove the copies
 #               (git rm), keep the project's own files, then onboard. One MR.
 # Run again after upgrading the package: it bumps .factory/VERSION and the CI.
@@ -24,11 +26,12 @@ here="$(cd -P "$(dirname "$0")" && pwd)"
 . "$here/lib.sh"
 pkg="$FACTORY_PACKAGE_ROOT"
 
-ci_mode=mr; migrate=0
+ci_mode=mr; migrate=0; setup=1
 while [ $# -gt 0 ]; do
   case "$1" in
     --ci) case "${2:-}" in mr|child) ci_mode="$2"; shift 2 ;; *) die "--ci takes mr or child" ;; esac ;;
     --migrate) migrate=1; shift ;;
+    --no-setup) setup=0; shift ;;
     *) die "unknown option: $1" ;;
   esac
 done
@@ -66,8 +69,13 @@ mkdir -p instrument/scenarios
 [ -e GLOSSARY.md ] || { printf '# Glossary\n\nThe domain terms of this project, one per line: **Term**: what it means here.\n' > GLOSSARY.md; note "+ GLOSSARY.md (stub)"; }
 # CI fetches the factory at this commit and checks it before running it (D92).
 if sha="$(git -C "$pkg" rev-parse HEAD 2>/dev/null)"; then
-  [ -z "$(git -C "$pkg" status --porcelain --untracked-files=no)" ] || note "WARNING: the factory checkout has local changes; CI runs $sha without them"
+  [ -z "$(git -C "$pkg" status --porcelain --untracked-files=no -- .)" ] || note "WARNING: the factory checkout has local changes; CI runs $sha without them"
   printf '%s\n' "$sha" > .factory/package-sha
+  # D102: the factory can be a folder of another repository (an internal
+  # mirror holding it as pi-factory/); CI then links that folder of the clone.
+  pdir="$(git -C "$pkg" rev-parse --show-prefix 2>/dev/null)"; pdir="${pdir%/}"
+  if [ -n "$pdir" ]; then printf '%s\n' "$pdir" > .factory/package-dir; note ".factory/package-dir: $pdir (the factory is a folder of its repository)"
+  else rm -f .factory/package-dir; fi
 else
   note "the factory is not a git checkout: write the pi-factory commit CI must run into .factory/package-sha"
 fi
@@ -94,15 +102,21 @@ bash "$here/link.sh" | sed 's/^/  /'
 if [ ! -f .factory/health-baseline.json ]; then
   bash scripts/factory/health.sh baseline >/dev/null 2>&1 && note "+ .factory/health-baseline.json (ratchet starts from today's code)" || true
 fi
-if node "$here/effective-models.mjs" | awk -F'\t' '$2 ~ /[<>]/ || $2 == "" { bad = 1 } END { exit bad ? 0 : 1 }'; then
-  note "models: placeholders on this machine. Once per machine: node $here/models-profile.mjs apply --user"
+unset_agents="$(node "$here/effective-models.mjs" | awk -F'\t' '$2 ~ /[<>]/ || $2 == "" { printf "%s%s", sep, $1; sep = ", " }')"
+if [ -n "$unset_agents" ]; then
+  note "models: no model on this machine for $unset_agents. Add them to ~/.pi-factory/models.json, then: factory models apply --user"
 fi
+
+# D102: the project's commands, found and rehearsed as a worker would run them.
+if [ "$setup" -eq 1 ]; then echo; node "$here/setup.mjs" || true; fi
 
 cat <<MSG
 
 Nothing committed$( [ "$migrate" -eq 1 ] && printf ' (the removals of the copied files are staged)'). Review, commit on its own branch, MR (D48):
 $(git status --short -- . | sed 's/^/  /')
-Then: .factory/commands.env (FACTORY_TEST_CMD), the CI variable FACTORY_PACKAGE_GIT
+Then: the decisions in .factory/setup.md, then factory setup --write (it writes
+the commands that passed into .factory/commands.env; run it again after each
+decision), the CI variable FACTORY_PACKAGE_GIT
 (the URL your CI may fetch pi-factory from, no default), the CI include
   include: [{ local: ${prefix:+$prefix/}.factory/ci/factory.gitlab-ci.yml }]
 and, in Pi from here: scripts/factory/doctor.sh.

@@ -153,6 +153,14 @@ factory onboard              # a new project; --ci child as above
 factory onboard --migrate    # a project the factory was copied into: git rm the copies, then onboard
 ```
 
+It ends with **`factory setup`** (D102): the project's test, test-files and lint commands, found in its manifests and CI file, then rehearsed as a worker runs them (fresh worktree, offline, no credentials, green twice, red with a planted failing test). Read `.factory/setup.md`: the decisions first (a test runner that isn't a dependency, an install script that writes, a CI job a branch push starts), then `factory setup --write` puts the commands that passed into `.factory/commands.env` (never over a value you set), then `factory health baseline`. Run `factory setup` again after each decision, or after changing the test setup.
+
+```bash
+factory setup                # discover and rehearse; writes .factory/setup.md
+factory setup --write        # and the commands that passed, into empty FACTORY_* lines
+factory report               # stuck? one redacted text block to share instead of screenshots (--full for everything)
+```
+
 It writes `.factory/commands.env`, `behavior-paths`, `model-families.json`, `VERSION` (the factory version the project expects), `package-sha` (the factory commit CI runs), the CI include, `docs/agents/quality-bar.md`, a `GLOSSARY.md` stub, the `AGENTS.md` pointer and the `.pi/settings.json` subagents block, links the rest, and never commits (with `--migrate` it stages the `git rm` of the copies): review, commit, MR. In CI the factory jobs fetch the factory from `FACTORY_PACKAGE_GIT` (a CI/CD variable you set to a URL your CI may reach, e.g. your mirror; no default) at the commit in `.factory/package-sha`, check that commit, then link it; models stay per machine, checked by each pre-flight. `onboard` writes `package-sha` from your factory checkout: commit it with the rest. **Upgrade:** `git pull` in `~/pi-factory`, then `factory onboard` in each project when you want it to move up (bumps `.factory/VERSION` and the CI include, its own MR). The pre-flight refuses an installed factory older than the project expects, and checks the links (`factory link` repairs them). `factory version` shows both; `factory <script>` runs any factory script (`factory next <mission>`, `factory mr <mission>`).
 
 ## 6. A mission
@@ -192,7 +200,7 @@ Keep specs to roughly 12 stories or fewer; split anything bigger into two missio
 | `tickets` | lead | no tickets | ticket writer drafts them |
 | `approve-tickets` | you | tickets or fix tickets proposed | review `issues/`, `/factory-approve <f> tickets` |
 | `coverage` | you | G2: an assertion uncovered or a ticket unjustified | fix `## Covers`, or amend |
-| `setup` | you | `FACTORY_TEST_CMD` empty | fill `.factory/commands.env`, commit |
+| `setup` | you | `FACTORY_TEST_CMD` empty | `factory setup --write` (D102), or fill `.factory/commands.env` yourself; commit |
 | `build` | lead | tickets ready | build wave → integrate each patch |
 | `review` | lead | integrated tickets | review wave → `collect.sh` |
 | `escalate` | you | 3 failed rounds | usually: split the ticket, amend the contract, or rethink the design |
@@ -270,6 +278,8 @@ If the merge left your branch's dependency versions, take the target's `package.
 |---|---|
 | `scripts/factory/next.sh <f>` | where is this mission? |
 | `scripts/factory/doctor.sh [--quick]` | after install or a model change / before a run |
+| `factory setup [--write]` | after onboarding or a change to the test setup: commands found, rehearsed offline, written (D102) |
+| `factory report [--full]` | something is wrong and you need help: one redacted text with what a diagnosis needs (D102) |
 | `scripts/factory/gate.sh mission <f>` | the gate CI will run |
 | `scripts/factory/metrics.sh <f>` | numbers for the MR |
 | `scripts/factory/metrics.sh --all` | every mission and the total: cost per MR, interventions per MR, first pass, scores (D97) |
