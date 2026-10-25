@@ -108,7 +108,7 @@ if [ -n "$unset_agents" ]; then
 fi
 
 # D102: the project's commands, found and rehearsed as a worker would run them.
-if [ "$setup" -eq 1 ]; then echo; node "$here/setup.mjs" || true; fi
+if [ "$setup" -eq 1 ]; then echo; echo "factory setup runs this project's tests (twice, offline, credential variables unset) and its lint; --no-setup skips it."; node "$here/setup.mjs" || true; fi
 
 cat <<MSG
 

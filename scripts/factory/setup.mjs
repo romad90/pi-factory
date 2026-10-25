@@ -23,7 +23,7 @@
 // Offline is as far as proxies and package managers go (npm, yarn, pnpm, pip,
 // uv, cargo, go): a program opening its own socket is not stopped. It is a
 // rehearsal of the worker's conditions, not a sandbox.
-import { spawnSync, execFileSync } from "node:child_process";
+import { spawn, spawnSync, execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, writeFileSync, mkdirSync, rmSync, copyFileSync, lstatSync } from "node:fs";
 import { tmpdir, homedir } from "node:os";
 import { join, dirname } from "node:path";
@@ -63,7 +63,7 @@ for (const k of Object.keys(KINDS)) {
 // ------------------------------------------------------------------ 2. rehearse
 const results = {};           // kind → { status: pass|fail|warn|skip, checks: [{ ok, text }], tail }
 const logDir = join(commonDir, "pi-factory", "setup", new Date().toISOString().replace(/[:.]/g, "-"));
-let snapshot = "";
+let tmp = "";
 const workerEnv = () => {
   let modelsJson = null;
   try { modelsJson = JSON.parse(readFileSync(join(process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent"), "models.json"), "utf8")); } catch {}
@@ -78,47 +78,78 @@ const workerEnv = () => {
   });
   return env;
 };
-const NETWORK = /Need to install the following packages|ENOTCACHED|ECONNREFUSED 127\.0\.0\.1:9|ENOTFOUND|EAI_AGAIN|Could not resolve host|Temporary failure in name resolution|getaddrinfo|No matching distribution found|failed to download|module lookup disabled by GOPROXY=off|attempting to make an HTTP request, but --offline was specified/i;
+// A download a package manager tried (always a failure: a worker can't), and
+// network errors that count only when the run failed (a suite may test them).
+const DOWNLOAD = /Need to install the following packages|ENOTCACHED|attempting to make an HTTP request, but --offline was specified|module lookup disabled by GOPROXY=off|No matching distribution found/i;
+const NETWORK = /ECONNREFUSED 127\.0\.0\.1:9|ENOTFOUND|EAI_AGAIN|Could not resolve host|Temporary failure in name resolution|getaddrinfo|failed to download/i;
 const NOT_STARTED = /command not found|: not found|No module named|No such file or directory|Cannot find module|ENOENT|is not recognized as/i;
-let tmp = "";
 
+// One command, in its own process group, so a timeout or Ctrl-C stops all of
+// it (jest workers, servers) and not just bash.
+let running = null, interrupted = false;
+const killGroup = (child) => { try { process.kill(-child.pid, "SIGKILL"); } catch {} };
+for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => { interrupted = true; if (running) killGroup(running); else process.exit(130); });
 function run(label, cmd, cwd, env) {
-  const t0 = Date.now();
-  const r = spawnSync("bash", ["-c", cmd], { cwd, env, encoding: "utf8", timeout: timeoutS * 1000, maxBuffer: 64 * 1024 * 1024 });
-  const text = (r.stdout || "") + (r.stderr || "");
-  try { mkdirSync(logDir, { recursive: true }); writeFileSync(join(logDir, `${label}.log`), redact(`$ ${cmd}\n${text}`)); } catch {}
-  const code = r.error?.code === "ETIMEDOUT" ? "timeout" : r.status ?? (r.signal ? `signal ${r.signal}` : 1);
-  return { code, text, secs: ((Date.now() - t0) / 1000).toFixed(1), tail: redact(text.trimEnd().split("\n").slice(-12).join("\n")) };
+  return new Promise((done) => {
+    const t0 = Date.now();
+    const child = spawn("bash", ["-c", cmd], { cwd, env, detached: true, stdio: ["ignore", "pipe", "pipe"] });
+    running = child;
+    let text = "", timedOut = false;
+    child.stdout.on("data", (d) => { if (text.length < 8e6) text += d; });
+    child.stderr.on("data", (d) => { if (text.length < 8e6) text += d; });
+    const timer = setTimeout(() => { timedOut = true; killGroup(child); }, timeoutS * 1000);
+    child.on("close", (status, signal) => {
+      clearTimeout(timer); running = null; killGroup(child);   // anything it left behind in its group
+      if (interrupted) { console.error("factory setup: interrupted"); process.exit(130); }
+      try { mkdirSync(logDir, { recursive: true }); writeFileSync(join(logDir, `${label}.log`), redact(`$ ${cmd}\n${text}`)); } catch {}
+      const code = timedOut ? "timeout" : status ?? `signal ${signal}`;
+      const tail = redact(text.trimEnd().split("\n").slice(-12).join("\n")).split(tmp).join("<worktree>");
+      done({ code, text, secs: ((Date.now() - t0) / 1000).toFixed(1), tail });
+    });
+  });
 }
+const failText = (r, what) => r.code === "timeout" ? `it timed out after ${timeoutS}s (--timeout to allow more)` : what;
+const lines0 = (out) => out.split("\0").filter(Boolean);
+const gitZ = (...a) => { const r = spawnSync("git", ["-c", "core.quotePath=false", ...a], { encoding: "utf8" }); return r.status === 0 ? r.stdout : ""; };
 
-if (rehearse && chosen.test) {
+if (rehearse && chosen.test && !sh("git", ["rev-parse", "--verify", "-q", "HEAD"])) {
+  results.snapshot = { error: "the repository has no commit yet: commit once, then run factory setup" };
+} else if (rehearse && chosen.test) {
   tmp = mkdtempSync(join(tmpdir(), "factory-setup-"));
   const wt = join(tmp, "wt");
-  // Your working tree as it is: tracked changes (git stash create) plus new,
-  // non-ignored files. What you haven't committed is rehearsed, and named.
-  snapshot = sh("git", ["stash", "create"]) || "HEAD";
-  const untracked = sh("git", ["-C", gitRoot, "ls-files", "--others", "--exclude-standard"]).split("\n").filter(Boolean);
-  const changed = sh("git", ["-C", gitRoot, "status", "--porcelain", "--untracked-files=no"]).split("\n").filter(Boolean);
-  results.snapshot = { changed: changed.length, added: untracked.length, ref: snapshot === "HEAD" ? sh("git", ["rev-parse", "--short", "HEAD"]) : "working tree" };
   const cleanup = () => { try { execFileSync("git", ["-C", gitRoot, "worktree", "remove", "--force", wt], { stdio: "ignore" }); } catch {} try { rmSync(tmp, { recursive: true, force: true }); } catch {} };
   process.on("exit", cleanup);
-  for (const s of ["SIGINT", "SIGTERM"]) process.on(s, () => process.exit(130));
-  execFileSync("git", ["-C", gitRoot, "worktree", "add", "-q", "--detach", wt, snapshot], { stdio: "ignore" });
+  // Your working tree as it is: tracked changes (git stash create) plus new,
+  // non-ignored files. What you haven't committed is rehearsed, and named.
+  const st = spawnSync("git", ["stash", "create"], { encoding: "utf8" });
+  const snapshot = st.status === 0 ? st.stdout.trim() || "HEAD" : "HEAD";
+  const snapshotError = st.status === 0 ? "" : (st.stderr || "").trim().split("\n").pop();
+  const untracked = lines0(gitZ("-C", gitRoot, "ls-files", "-z", "--others", "--exclude-standard"));
+  const changed = lines0(gitZ("-C", gitRoot, "status", "-z", "--porcelain", "--untracked-files=no"));
+  results.snapshot = { changed: changed.length, added: untracked.length, ref: snapshot === "HEAD" ? sh("git", ["rev-parse", "--short", "HEAD"]) : "working tree", error: snapshotError };
+  // Hooks off: a post-checkout hook (husky) is project code setup didn't ask to run.
+  execFileSync("git", ["-c", "core.hooksPath=/dev/null", "-C", gitRoot, "worktree", "add", "-q", "--detach", wt, snapshot], { stdio: "ignore" });
   for (const f of untracked) {
     const from = join(gitRoot, f), to = join(wt, f);
     try { if (lstatSync(from).isFile()) { mkdirSync(dirname(to), { recursive: true }); copyFileSync(from, to); } } catch {}
   }
-  // Dependencies and factory links, exactly as a worker gets them (D65, D92).
+  // Dependencies and factory links, exactly as a worker gets them (D65, D92);
+  // no sparse checkout of the instrument: it would turn on worktreeConfig in
+  // your .git/config for a check that doesn't need it.
   const hook = spawnSync(process.execPath, [join(here, "worktree-hook.mjs")], {
     input: JSON.stringify({ repoRoot: gitRoot, worktreePath: wt, agentCwd: join(wt, prefix), index: 0 }),
-    env: { ...process.env, FACTORY_PROJECT_PREFIX: prefix }, encoding: "utf8",
+    env: { ...process.env, FACTORY_PROJECT_PREFIX: prefix, FACTORY_HOOK_NO_SPARSE: "1" }, encoding: "utf8",
   });
   let synthetic = [];
   try { synthetic = JSON.parse(hook.stdout).syntheticPaths || []; } catch {}
   const cwd = join(wt, prefix);
   const env = workerEnv();
-  const leftovers = () => sh("git", ["-C", wt, "status", "--porcelain", "--untracked-files=all"]).split("\n").filter(Boolean)
-    .map((l) => l.slice(3)).filter((p) => !synthetic.some((s) => p === s || p.startsWith(s + "/")) && !untracked.includes(p));
+  const leftovers = () => {
+    const z = lines0(gitZ("-C", wt, "status", "-z", "--porcelain", "--untracked-files=all"));
+    const paths = [];
+    for (let i = 0; i < z.length; i++) { const e = z[i]; paths.push(e.slice(3)); if (/^[RC]/.test(e)) i++; }
+    return paths.filter((p) => !synthetic.some((s) => p === s || p.startsWith(s + "/")) && !untracked.includes(p));
+  };
   const probeHit = (t) => /factory[- ]setup[- ]probe/i.test(t);
 
   // The test command: twice on the base, then with a failing file.
@@ -127,12 +158,14 @@ if (rehearse && chosen.test) {
     const npx = c.match(/^\s*npx\s+(?:--?\S+\s+)*([@\w./-]+)/);
     if (npx && !existsSync(join(cwd, "node_modules/.bin", npx[1].split("/").pop())) && !existsSync(join(wt, "node_modules/.bin", npx[1].split("/").pop())))
       checks.push({ ok: false, text: `\`npx ${npx[1]}\` isn't installed in the project: npx would download it, and a worker is offline` });
-    const a = run("test-1", c, cwd, env), b = run("test-2", c, cwd, env);
+    const a = await run("test-1", c, cwd, env), b = await run("test-2", c, cwd, env);
     const green = a.code === 0 && b.code === 0;
-    if (NETWORK.test(a.text + b.text)) checks.push({ ok: false, text: "it reached for the network (a download or a lookup); a worker is offline" });
-    const notStarted = a.code !== 0 && (a.code === 127 || NOT_STARTED.test(a.text));
+    if (DOWNLOAD.test(a.text + b.text)) checks.push({ ok: false, text: "it tried to download a package; a worker is offline" });
+    else if (!green && NETWORK.test(a.text + b.text)) checks.push({ ok: false, text: "it failed reaching for the network (a lookup or a connection); a worker is offline" });
+    const notStarted = a.code !== 0 && a.code !== "timeout" && (a.code === 127 || NOT_STARTED.test(a.text));
     if (notStarted) checks.push({ ok: false, text: `it didn't start (exit ${a.code}): ${(a.text.match(new RegExp(`.*(${NOT_STARTED.source}).*`, "i")) || [""])[0].trim().slice(0, 160)}` });
     else checks.push(green ? { ok: true, text: `green twice offline, credentials unset (${a.secs}s, ${b.secs}s)` }
+      : a.code === "timeout" || b.code === "timeout" ? { ok: false, text: failText({ code: "timeout" }) }
       : a.code !== b.code ? { ok: false, text: `flaky: exit ${a.code}, then ${b.code}` }
       : { ok: false, text: `red on your code: exit ${a.code}; the base must be green before a mission` });
     const left = leftovers();
@@ -141,16 +174,18 @@ if (rehearse && chosen.test) {
     if (green && disc.probe) {
       const pf = join(cwd, disc.probe.file);
       mkdirSync(dirname(pf), { recursive: true }); writeFileSync(pf, disc.probe.content);
-      const p = run("test-probe", c, cwd, env);
+      const p = await run("test-probe", c, cwd, env);
       if (p.code === 0) checks.push({ ok: false, text: `a failing test file (${disc.probe.file}) leaves it green: it doesn't run that kind of file, or not from there` });
+      else if (p.code === "timeout") checks.push({ ok: false, text: failText(p) });
       else if (probeHit(p.text)) checks.push({ ok: true, text: `a failing test file (${disc.probe.file}) turns it red, because of that file` });
       else { checks.push({ ok: "warn", text: `with a failing test file it goes red, but its output doesn't name the file: check that the runner loads ${disc.probe.file}` }); tail = p.tail; }
       if (chosen.testFiles) {
         const fc = chosen.testFiles.cmd.split("{files}").join(disc.probe.file);
-        const f = run("test-files-probe", fc, cwd, env);
+        const f = await run("test-files-probe", fc, cwd, env);
         const fr = { status: "pass", checks: [] };
         if (!chosen.testFiles.cmd.includes("{files}")) fr.checks.push({ ok: false, text: "it has no {files} placeholder" });
         else if (f.code === 0) fr.checks.push({ ok: false, text: `on the failing file alone it is green: it doesn't run the files it's given` });
+        else if (f.code === "timeout") fr.checks.push({ ok: false, text: failText(f) });
         else if (NOT_STARTED.test(f.text) && !probeHit(f.text)) fr.checks.push({ ok: false, text: `it didn't start (exit ${f.code})` });
         else if (probeHit(f.text)) fr.checks.push({ ok: true, text: "on the failing file alone it is red, because of that file" });
         else fr.checks.push({ ok: "warn", text: "on the failing file alone it is red, but its output doesn't name the file" });
@@ -163,16 +198,18 @@ if (rehearse && chosen.test) {
     if (!green && chosen.testFiles) results.testFiles = { status: "skip", checks: [{ ok: "warn", text: "not rehearsed: the test command isn't green yet" }] };
     results.test = { status: checks.some((x) => x.ok === false) ? "fail" : checks.some((x) => x.ok === "warn") ? "warn" : "pass", checks, tail };
   }
-  // Lint: runs to the end (its errors are baselined, D62); the extra check: green.
+  // Lint: runs to the end, its errors are the baseline (D62); a crash is not a
+  // baseline. The extra check: green.
   for (const k of ["lint", "extra"]) {
     if (!chosen[k]) continue;
-    const r = run(k, chosen[k].cmd, cwd, env), checks = [];
-    if (NETWORK.test(r.text)) checks.push({ ok: false, text: "it reached for the network" });
-    if (r.code === 127 || r.code === "timeout" || (r.code !== 0 && NOT_STARTED.test(r.text) && !/error/i.test(r.text.replace(NOT_STARTED, ""))))
-      checks.push({ ok: false, text: `it didn't run (exit ${r.code})` });
+    const r = await run(k, chosen[k].cmd, cwd, env), checks = [];
+    if (DOWNLOAD.test(r.text)) checks.push({ ok: false, text: "it tried to download a package; a worker is offline" });
+    if (r.code === "timeout") checks.push({ ok: false, text: failText(r) });
     else if (k === "lint") {
-      const errors = r.text.split("\n").filter((l) => /(^|[^A-Za-z])error([^A-Za-z]|$)/i.test(l)).length;
-      checks.push({ ok: true, text: `ran offline (${r.secs}s): ${errors} error line(s) today, the baseline (factory health baseline)` });
+      const keys = spawnSync(process.execPath, [join(here, "lint-keys.mjs"), cwd], { input: r.text, encoding: "utf8" }).stdout.split("\n").filter(Boolean);
+      const crashed = r.code !== 0 && (r.code === 127 || keys.length === 0 || (/eslint/.test(chosen[k].cmd) && r.code === 2) || /Oops! Something went wrong/.test(r.text));
+      if (crashed) checks.push({ ok: false, text: `it didn't run to the end (exit ${r.code}${keys.length ? "" : ", no lint error it can read"}): a crash is not a baseline` });
+      else checks.push({ ok: true, text: `ran offline (${r.secs}s): ${keys.length} lint error(s) today, the baseline (factory health baseline)` });
     } else checks.push(r.code === 0 ? { ok: true, text: `green offline (${r.secs}s)` } : { ok: false, text: `red on your code (exit ${r.code}): an extra check must be green before a mission` });
     results[k] = { status: checks.some((x) => x.ok === false) ? "fail" : "pass", checks, tail: checks.some((x) => x.ok === false) ? r.tail : "" };
   }
@@ -186,14 +223,16 @@ const envCheck = (() => {
 
 // ------------------------------------------------------------------ 4. report
 const icon = (s) => ({ pass: "✓", fail: "✗", warn: "!", skip: "–" }[s] || "–");
-const decide = (disc.findings || []).filter((f) => f.level === "decide");
+const decide = (disc.findings || []).filter((f) => f.level === "decide" && !(chosen.test && f.topic === "tests" && /no test command found/.test(f.text)));
 const warns = (disc.findings || []).filter((f) => f.level === "warn");
 const infos = (disc.findings || []).filter((f) => f.level === "info");
 const machineBad = envCheck.filter((f) => f.level === "bad");
 const testOk = !rehearse ? Boolean(chosen.test) : results.test?.status === "pass" || results.test?.status === "warn";
 const L = [];
 L.push(`# Factory setup`, "", `Generated by \`factory setup\` (D102) on ${new Date().toISOString().slice(0, 10)}${prefix ? `, project \`${prefix}\`` : ""}. Ecosystems: ${(disc.ecosystems || []).join(", ") || "none found"}.`);
-if (results.snapshot) L.push("", `Rehearsed on ${results.snapshot.ref === "working tree" ? `your working tree (${results.snapshot.changed} changed and ${results.snapshot.added} new file(s) not committed yet: a worker gets only what is committed)` : `commit ${results.snapshot.ref}`}, offline, credential variables unset, dependencies linked as a worker gets them.`);
+if (results.snapshot?.error && !results.snapshot.ref) L.push("", `Not rehearsed: ${results.snapshot.error}.`);
+else if (results.snapshot?.error) L.push("", `! Your uncommitted changes could not be snapshotted (${results.snapshot.error}): this rehearsal ran on the last commit and new files only. Run it again when git is free.`);
+if (results.snapshot?.ref) L.push("", `Rehearsed on ${results.snapshot.ref === "working tree" ? `your working tree (${results.snapshot.changed} changed and ${results.snapshot.added} new file(s) not committed yet: a worker gets only what is committed)` : `commit ${results.snapshot.ref}`}, offline, credential variables unset, dependencies linked as a worker gets them.`);
 L.push("", "## Commands", "");
 for (const [k, envName] of Object.entries(KINDS)) {
   const c = chosen[k];
@@ -208,8 +247,7 @@ for (const [k, envName] of Object.entries(KINDS)) {
 if ((disc.ci || []).length) { L.push("", "What the team's CI runs:", ""); for (const c of disc.ci) L.push(`- ${c.kind}: \`${c.cmd}\` (${c.source})`); }
 if (decide.length) { L.push("", "## Decisions for you", ""); decide.forEach((f, i) => L.push(`${i + 1}. **${f.topic}**: ${f.text}`)); }
 if (warns.length || infos.length) { L.push("", "## Findings", ""); for (const f of [...warns, ...infos]) L.push(`- ${f.level === "warn" ? "!" : "·"} **${f.topic}**: ${f.text}`); }
-L.push("", "## This machine", "", "How this project's missions will run here (not part of the project; `factory doctor` checks the same):", "");
-for (const f of envCheck) L.push(`- ${{ ok: "✓", warn: "!", bad: "✗" }[f.level]} ${f.text}`);
+L.push("", "## This machine", "", "Not in this file: it differs on each machine. `factory setup` prints it, and `factory doctor` checks it.");
 writeFileSync(".factory/setup.md", redact(L.join("\n")) + "\n");
 
 // --write: the commands that passed, into empty lines only.

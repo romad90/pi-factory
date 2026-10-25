@@ -1388,6 +1388,25 @@ printf 'FACTORY_TEST_CMD="node check-env.js"\n' > .factory/commands.env
 out="$(MY_API_TOKEN=s3cr3t node "$root/scripts/factory/setup.mjs" 2>&1)" || true
 grep -q 'green twice offline, credentials unset' .factory/setup.md && t "setup rehearses with credential variables unset, package managers offline and the proxies on a closed port" || fail "setup env" "$out"$'\n'"$(cat .factory/setup.md)"
 
+# Review fixes: verdicts from exit codes, process groups, quoting, the user's .git untouched.
+echo 'console.log("getaddrinfo ENOTFOUND api.example.invalid (handled)");' > net-ok.js
+echo 'process.exit(require("fs").existsSync("café new.txt") ? 0 : 5);' > new-file.js
+printf 'console.error("Oops! Something went wrong! couldn'"'"'t find the plugin"); process.exit(2);\n' > lint-crash.js
+git add net-ok.js new-file.js lint-crash.js; git commit -qm "review fixtures"
+echo x > "café new.txt"
+printf 'FACTORY_TEST_CMD="node net-ok.js && node new-file.js"\nFACTORY_LINT_CMD="node lint-crash.js"\n' > .factory/commands.env
+out="$(node "$root/scripts/factory/setup.mjs" 2>&1)" || true
+grep -q 'green twice offline' .factory/setup.md && ! grep -q 'reaching for the network' .factory/setup.md \
+  && grep -q "didn't run to the end (exit 2" .factory/setup.md && ! grep -q 'leaves files in the tree' .factory/setup.md \
+  && ! grep -q 'no test command found' .factory/setup.md && ! grep -q 'worktreeConfig' .git/config \
+  && t "setup: a passing suite that logs a network error passes; a crashing lint fails; new files with unusual names are rehearsed; .git/config untouched" || fail "review fixes" "$out"$'\n'"$(cat .factory/setup.md)"
+rm -f "café new.txt"
+printf 'FACTORY_TEST_CMD="sleep 41.37; true"\n' > .factory/commands.env
+out="$(node "$root/scripts/factory/setup.mjs" --timeout 1 2>&1)" || true
+sleep 1
+grep -q 'timed out after 1s' .factory/setup.md && ! pgrep -f '^sleep 41[.]37' >/dev/null && [ "$(git worktree list | wc -l | tr -d ' ')" = 1 ] \
+  && t "setup: a command that times out is stopped with everything it started" || fail "setup timeout" "$out"$'\n'"$(pgrep -fa '^sleep 41[.]37')"
+
 # This machine: floating aliases, production routes, TLS checks off.
 mkdir -p "$PI_CODING_AGENT_DIR"
 printf '{"providers":{"gw":{"baseUrl":"https://llm-prod.example/v1","api":"openai-completions","apiKey":"GW_KEY"}}}' > "$PI_CODING_AGENT_DIR/models.json"

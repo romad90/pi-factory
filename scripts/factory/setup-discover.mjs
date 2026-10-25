@@ -90,6 +90,20 @@ if (pkg) {
   if (!testFiles.length) finding("info", "tests", "the repository tracks no test files: the base is green with an empty suite, and the mission's first tests are the only ones");
 
   // Candidates, the most precise first: the local runner binary.
+  // The project's own test script, when it is one runner call with its
+  // options (a config file, a project): the same run, through the local binary.
+  const own = (scripts.test || "").match(/^\s*(jest|vitest|mocha)\b((?:\s+[-\w=.,/:@'"]+)*)\s*$/);
+  if (own && binPath(own[1])) {
+    const opts = own[2].replace(/\s+--?(watch|watchAll)\b/g, "").trim();
+    const pass = /jest|vitest/.test(own[1]) && !/passWithNoTests/.test(opts) ? " --passWithNoTests" : "";
+    const sub = own[1] === "vitest" && !/^\s*run\b/.test(opts) ? " run" : "";
+    if (opts) {
+      cand("test", `${binPath(own[1])}${sub}${opts ? " " + opts : ""}${pass}`, `package.json scripts.test (${scripts.test}), through the local binary`);
+      cand("testFiles", `${binPath(own[1])}${sub}${opts ? " " + opts : ""}${pass} {files}`, "package.json scripts.test, through the local binary");
+    }
+  } else if (scripts.test && !/no test specified/.test(scripts.test) && !/^\s*(jest|vitest|mocha)\s*$/.test(scripts.test)) {
+    cand("test", `${pm} test`, `package.json scripts.test (${scripts.test}): more than one runner call, run as the team runs it`);
+  }
   const jest = binPath("jest"), vitest = binPath("vitest"), mocha = binPath("mocha");
   if (jest) { cand("test", `${jest} --passWithNoTests`, "jest, installed"); cand("testFiles", `${jest} --passWithNoTests {files}`, "jest, installed"); }
   if (vitest) { cand("test", `${vitest} run --passWithNoTests`, "vitest, installed"); cand("testFiles", `${vitest} run --passWithNoTests {files}`, "vitest, installed"); }
