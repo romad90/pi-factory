@@ -43,7 +43,13 @@ read -r -a pi_cmd <<<"${FACTORY_PI_CMD:-pi}"
 [ -z "${FACTORY_PI_BIN:-}" ] || pi_cmd=("$FACTORY_PI_BIN")    # one path, spaces kept
 
 say()  { printf 'run: %s\n' "$*"; }
-stop() { local code="$1"; shift; printf 'run: STOP — %s\n' "$*"; exit "$code"; }
+# Every stop archives the runs so far (D103): pi-subagents keeps them in temp
+# folders a reboot or a cleaner can empty before anyone runs archive.sh.
+stop() {
+  local code="$1"; shift
+  [ "$runner" = fake ] || bash "$here/archive.sh" collect "$feature" >/dev/null 2>&1 || true
+  printf 'run: STOP — %s\n' "$*"; exit "$code"
+}
 
 # --- running one workflow file -----------------------------------------------
 # run_workflow <file>: prints the workflow's return value as JSON; non-zero

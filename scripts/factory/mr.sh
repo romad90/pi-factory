@@ -76,6 +76,22 @@ if [ -n "$dry" ]; then echo "(dry run: nothing pushed)"; exit 0; fi
 
 url_file="$dir/mr.url"
 record() { [ -n "$1" ] || return 0; printf '%s\n' "$1" > "$url_file"; echo "MR: $1"; }
+# D103: the mission's data, kept without anyone asking: the last runs go into
+# the archive, the metrics next to them, and one export per mission lands in
+# this machine's data folder (FACTORY_DATA_DIR, default ~/.pi-factory/data),
+# outside every repository. Best effort: never a reason not to open the MR.
+mission_data() {
+  bash "$here/archive.sh" collect "$feature" >/dev/null 2>&1 || true
+  local arch data repo prefix
+  prefix="$(git rev-parse --show-prefix)"; prefix="${prefix%/}"
+  arch="$(dirname "$(dirname "$(dirname "$(draft_patch "$feature" x)")")")/archive/$feature"
+  mkdir -p "$arch" || return 0                 # no runs found: the metrics alone are still data
+  bash "$here/metrics.sh" "$feature" --json > "$arch/metrics.json" 2>/dev/null || rm -f "$arch/metrics.json"
+  repo="$(basename "$(git rev-parse --show-toplevel)")${prefix:+-${prefix//\//-}}"
+  data="${FACTORY_DATA_DIR:-$HOME/.pi-factory/data}/$repo"; mkdir -p "$data" || return 0
+  bash "$here/archive.sh" export "$feature" "$data/$feature-$(date +%Y%m%d).tar.gz" 2>/dev/null | sed 's/^/  /' || true
+}
+mission_data
 
 # 1. glab
 if command -v glab >/dev/null 2>&1 && glab auth status >/dev/null 2>&1; then
