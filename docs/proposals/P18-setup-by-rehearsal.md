@@ -18,6 +18,10 @@ Onboarding the first project on the installed package (mission 4, a TypeScript w
 | No tests: plain `jest` exits red | Every round fails on "base already red" |
 | The skills pin compares absolute and relative paths | `doctor` reports tampering that isn't there |
 | The deploy-on-push branch pattern and the forge's push rules | The MR push deploys a branch, or is refused at the end |
+| `head` missing from the workspace image | Every script that pipes into `head -1` stops with "command not found" under `pipefail` |
+| The only test file was commented out since 2021 | "Your test suite must contain at least one test": a red base |
+| An empty `tests/` folder named in jest's `roots` | Missing in a fresh worktree: every worker's test run errors |
+| `.env*` files at the project root, and a build step that inlines environment variables | Secrets checked out into every worktree; behavior that depends on the build environment |
 
 Each of these is a fact about the machine or the repo that a script can read or test. None needed a person, except to decide what to do about it.
 
@@ -42,6 +46,8 @@ A candidate is kept only if it works **under a worker's conditions**, the ones D
 - in a fresh worktree of the base commit, dependencies linked the way the worktree hook links them;
 - network off, credential variables scrubbed, the command guard on;
 - run twice: green, and the same result both times (a flaky base is a finding).
+
+Before any of it: every external command the factory's scripts call (`head`, `sed`, `awk`, `cut`, `git`, `node`, `sha256sum` or `shasum`) is on the PATH.
 
 Then three properties, each a check:
 
@@ -84,7 +90,7 @@ The machine and the gateway get the same treatment, as `doctor` checks with the 
 
 ## Plan
 
-1. Fix the two bugs found: skills pin paths in package mode; `package-sha` with the factory in a subfolder (record the folder, CI links from it). **S**
+1. Fix the bugs found: skills pin paths in package mode; `package-sha` with the factory in a subfolder (record the folder, CI links from it); `onboard` names the agents without a model; the family lint covers designer, explorer and investigator. **S**
 2. `doctor` environment checks: placeholders named per agent, floating aliases, production routes, TLS off. **S**
 3. Discovery: CI file read, manifest tables (Node, Python, Go, Rust, JVM), lifecycle scripts. **M**
 4. Rehearsal in a worker worktree: offline, scrubbed, guard on, twice; the three checks. **M**
