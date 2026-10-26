@@ -218,6 +218,20 @@ Not borrowed: seen in our own evening of setup, each a person doing a script's j
 | The spec of a characterization mission written from an audit that already lists the workflows | Draft the spec skeleton (intent, workflows as stories, frozen paths) from the audit; the human edits instead of writing | P3 |
 | Vulnerabilities seen in install output, then forgotten | Setup writes them as findings for the owning team, never as work for the current mission | P18 |
 
+## From a proactive on-call agent's interface (talk on near-loop engineering, October 2026)
+
+A screenshot of an on-call agent: an incident on the left, the event stream it watches on the right.
+
+| Seen | For us | Fits |
+|---|---|---|
+| A stage strip per incident: detected, investigating, root cause found, fixing, ready for review, deployed | The mission's STEP as a strip in the cockpit, with the stage that waits on a person highlighted | cockpit, P10 |
+| An approval card: what ships, why, the commit, the diff stat, and "the regression tests fail on main and pass on this branch"; Decline or Approve | Every human gate (contract, design, tickets, MR) as one card built from files: the evidence lines come from verdicts and test-on-base (D96), not from the agent's own summary | cockpit, P16 |
+| The agent's tool calls listed with a check mark as they finish | The live worker pane from the run's last events | P10 |
+| "Talk to the agent", with Follow-up and Interrupt | `/factory-decide` and `pause.sh` from the page, once the page may write (P12) | P12 |
+| "Closing this window never interrupts the agent" | The durability promise, stated where the person looks | P12 |
+| The event stream with a decision and a confidence per row; counters for judged, normal, suspicious, incident; judge spend and decision latency | Classify with rules first (status codes, known signatures), the model only for what rules can't decide; show its cost and latency, as the talk itself advises | P19 use case |
+| Model, thinking level and cost of the incident in the header | Per mission: models in use, tokens and cost so far (`usage.tsv`) | cockpit |
+
 ## What to watch for
 
 Each of these tools keeps something we don't want to give away: the runtime (OpenCode Swarm needs OpenCode), the hosted control plane and its data (Factory, Port), or a maintainer we depend on. The test for anything we take: does it keep working if that vendor disappears tomorrow?
