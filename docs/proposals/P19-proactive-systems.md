@@ -24,6 +24,20 @@ Proposals P4, P6, P12 and P16 each build a part of that. This proposal lists **w
 | Sandbox | Worktrees, the command guard, network rules and scrubbed credentials today; separate compute when a shared runner exists (P6) |
 | Memory | Files in git, the run archive, `decisions.tsv`: already there |
 
+## The filter: one component between the triggers and the door
+
+Every trigger produces far more events than work. One component sits in front of the intake for all of them (traffic, CI results, advisories, audit findings, news about our tools), and sorts each event into three outputs:
+
+| Output | Means | What happens |
+|---|---|---|
+| **Noise** | Nothing to learn or do | Dropped, counted |
+| **Fact** | True and worth keeping, nothing to do now | Recorded: baselines, trends, the archive |
+| **Signal** | Something to act on | A work item through the one door |
+
+An event is **signal only when it can be acted on**: it maps to a lane (a P19 candidate), it has an owner (this repo, another team, the on-call), and the lane has an outside check that will say whether the action worked. Anything else is a fact, however alarming it looks: that keeps the factory from opening work it can't verify.
+
+The filter is built like detection above: rules and signatures first, rates against baselines, a model only for what is left and optional. Each signal carries its reason and its evidence; each human label that overturns a decision becomes a rule. Measured by its precision (signals that led to merged work, from the labels and the forge) and by the share of events decided without a model.
+
 ## Entry criteria: when the engine is efficient enough
 
 A proactive system multiplies whatever the engine does, its mistakes included. None of the candidates below starts until the measured data (P14, `metrics --all`) shows, over the last three missions:
