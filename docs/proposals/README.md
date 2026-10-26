@@ -24,6 +24,7 @@ Status: **draft** (open for discussion) · **accepted** (in the roadmap) · **re
 | P16 | [Issue in, MR out: the factory works where the team already looks](P16-issue-in-mr-out.md) | draft, after mission 4 | P2 (P12 keeps it running) |
 | P17 | [Plans that leave no decision: readiness, reuse, plain words, drift](P17-plans-that-leave-no-decision.md) | draft, after mission 4 | D94, P14 |
 | P18 | [Setup by rehearsal: the factory finds its own commands and proves them as a worker would](P18-setup-by-rehearsal.md) | accepted (D102) | P11 |
+| P19 | [Proactive systems: work that starts before anyone sits down](P19-proactive-systems.md) | draft, later (entry criteria) | P12, P16, P14, P4 |
 
 ## Why these four, in this order
 
@@ -65,3 +66,5 @@ P16 takes the experience Warp Factories sells, issue in and reviewed MR out, wit
 P17 takes four checks from Google's Elephant-Goldfish Model into roles we already have: a design that leaves the worker no decision, a code search before anything new is built, every term defined, and a drift check before the MR. Each one is kept only if the next missions' numbers show it helps.
 
 P18 comes from onboarding mission 4's project: ten problems found by hand at a red prompt, every one readable or testable by a script. Setup reads the project's CI file and manifests for its commands, rehearses them under a worker's conditions (fresh worktree, offline, no credentials, guard on), checks the machine and the gateway the same way, and hands the human one page to approve.
+
+P19 lists what to make proactive once the engine is efficient: triggers, one intake, a durable runner in a sandbox. Nine candidates are ranked by how much code, not a model, decides their outcome, starting with dependency bumps and a red main branch. Entry criteria from measured missions decide when the first one may start, and each lane leaves the loop only on its own record.
