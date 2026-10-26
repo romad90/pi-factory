@@ -66,6 +66,8 @@ Candidate 5 in full, with an SRE agent that reads the observability platform's t
 
 The model's real place is later, in investigation and root cause, where reasoning over evidence is the job.
 
+**The engineer near the loop classifies too, and each answer becomes code.** Two kinds of human touch, both near the loop: approving a fix, and labeling an event the tiers couldn't decide ("known, harmless", "a new incident", "belongs to another team"). A label is not just feedback for a model: it becomes a rule or a signature in the KBA, with the event that produced it as its example, so the same case is decided by code next time. The share of events reaching tier 4 should fall week after week; if it doesn't, the labels aren't turning into rules. A confidence shown on every row means something only if it is calibrated against those labels; a classifier that says 1.00 on everything says nothing.
+
 **3:46 AM, out of the loop: the agent works.**
 
 1. **Detect.** The platform raises a problem (a webhook from its problem notifications), or the tiers above flag a signature. The agent deduplicates it against open incidents, checks a severity threshold, and matches it against the knowledge base (KBA). Known problem with a runbook: it posts the runbook steps for the on-call (or NOC) team and stops; runbook actions on production stay human. Unknown, or a known one whose runbook points to code: it continues.
