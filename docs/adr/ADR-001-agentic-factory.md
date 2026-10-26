@@ -507,6 +507,8 @@ Steps: **1 Assisted** (one agent, you hold the context), **2 Parallel** (~10 age
 
 **D103. The archive collects itself.** The run archive (D97) only held what someone remembered to collect with `archive.sh collect`, while pi-subagents keeps run artifacts in temp folders that a reboot or a cleaner empties. The factory is now run to collect data first, so `run.sh` collects at every stop (each human step, error or pause) and `mr.sh` before opening the MR, where it also writes the mission's metrics next to its runs and exports the whole archive to this machine's data folder (`FACTORY_DATA_DIR`, default `~/.pi-factory/data/<repo>/<mission>-<date>.tar.gz`), outside every repository; best effort, never a reason to stop. Scoring stays a command: it spends judge calls. `archive.sh collect` takes only runs not archived yet, so collecting often costs nothing.
 
+**D104. Depth before the spec.** A task described in a few lines tends to become a spec of the same size: the ticket as asked, checked by the model that wrote it. The `deep-prompt` skill (from Felix Rieseberg's "How to be more ambitious", the Depth practice) runs before the grilling and answers four questions: what a top practitioner would do that wasn't asked, the rawest material they would start from, the methods and tools they would use, and what other than the model or the human shows the result is right. It writes `.scratch/<mission>/depth.md`; its outside checks are candidate contract assertions, and the human starts the grilling on it (the grilling skill is pinned upstream, so it is named as input, not wired in). Optional, human-invoked, and it never starts the work; small tasks get one line saying so.
+
 ## 11. Path to Step 2
 
 | Move | What | Exit |
