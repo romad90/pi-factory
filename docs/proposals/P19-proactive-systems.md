@@ -53,6 +53,35 @@ Ordered by how much the outcome is decided by code, which is what makes it safe 
 
 Not candidates, on purpose: feature work (the contract needs a person), anything that deploys, and anything that changes the guards or the gates (P15's forbidden list).
 
+## Worked use case: the 3:46 AM incident
+
+Candidate 5 in full, with an SRE agent that reads the observability platform's traffic (problems, traces, logs, deployment events) and never writes to production.
+
+**3:46 AM, out of the loop: the agent works.**
+
+1. **Detect.** The platform raises a problem (a webhook from its problem notifications, or the SRE agent's own queries on traffic every few minutes). The agent deduplicates it against open incidents, checks a severity threshold, and matches it against the knowledge base (KBA). Known problem with a runbook: it posts the runbook steps for the on-call (or NOC) team and stops; runbook actions on production stay human. Unknown, or a known one whose runbook points to code: it continues.
+2. **Investigate.** Read-only: the failing requests' traces, the logs around the first occurrence, the affected services and their dependencies, error rate against its baseline, and the deployment events (which release went out, when). It writes an incident issue (P16) with this evidence, redacted, and labels it `factory:incident`.
+3. **Root cause.** The intake (one door) opens an incident mission. The factory's investigator (D99, P13 when the cause may be in another service) takes the commit range between the last good release and the current one, forms hypotheses with evidence, and asks the explorers for detail. Its conclusion names where the fix belongs: here, another team's repo (a finding for them), or configuration (a finding for the on-call).
+4. **Reproduce, then fix.** From a captured failing request (scrubbed into a fixture), a test that fails on today's code for the stated reason; then the fix, through the usual gates: test on base (red, then green), lint, the frozen characterization tests, review by another family.
+5. **Ready for review.** The MR is open, the issue holds the timeline, the evidence, the reproduction and the fix, and the on-call is notified through the forge.
+
+**7:00 AM, near the loop: the human decides.** The engineer reads one issue: what happened, why, the test that proves it, the fix. They approve, or redirect with one comment. The merge and the deployment go through the team's own pipeline and its approvals: the factory never deploys.
+
+**What, other than the agent or the engineer, shows it was right:**
+- the reproduction test fails before the fix and passes after;
+- replaying the captured failing requests against staging no longer produces the error signature;
+- after the release, the platform's own error rate for that service returns to its baseline, and the problem closes. The observability platform is the outside judge, which is what makes this candidate worth the effort.
+
+**Data it produces:** time from first occurrence to ready-for-review, against today's time to resolution; hypotheses ruled out per incident; how often the KBA match was right; how often the fix belonged elsewhere.
+
+**Risks, and what holds them:**
+- **Logs are untrusted input.** Anyone who can make the service log a line can write text the agent reads (prompt injection). The agent treats log and payload content as data, never as instructions; it has no tool that writes to production; the factory's guards and gates apply to anything it proposes.
+- **Personal and secret data in traffic.** Fixtures and evidence go through redaction before they reach an issue or a repo; payloads are minimized to the fields the reproduction needs.
+- **Alert storms.** Deduplication, one incident mission per problem, a cap per night, and quiet hours for low severities.
+- **A wrong root cause at 4 AM.** Nothing ships without the 7 AM review; the reproduction test and the staging replay are what the reviewer checks first.
+
+**First step, with no risk at all:** a daily digest. The SRE agent reads the last 24 hours of problems and writes, for each one, its classification (known or not, which KBA, which release, a suspected service), without opening anything. For two weeks the on-call team marks each line right or wrong. That accuracy decides whether step 2 may open issues on its own, and it doubles as the status chatbot's first content for the NOC team.
+
 ## The order
 
 1. **Make the engine durable and reachable** (P12, P16): a mission waits at a gate without a terminal, and the gate is answered from the forge. Nothing above starts before this.
