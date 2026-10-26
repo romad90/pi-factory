@@ -57,9 +57,18 @@ Not candidates, on purpose: feature work (the contract needs a person), anything
 
 Candidate 5 in full, with an SRE agent that reads the observability platform's traffic (problems, traces, logs, deployment events) and never writes to production.
 
+**Detection is code first; a model is optional.** Classifying traffic must stay predictable and keep working when no model is reachable. Four tiers, each one only sees what the previous one couldn't decide:
+
+1. **Rules:** status codes (5xx is an error, 4xx is the caller's), timeouts, known exception types, health checks. Deterministic, free, instant.
+2. **Known signatures:** an error message turned into a template (variables replaced: ids, numbers, paths; the Drain algorithm does this for logs) and matched against the KBA's signatures. A new template is itself a signal.
+3. **Rates against a baseline:** a signature's rate compared with its usual level (a moving average and a threshold, or the platform's own anomaly detection, which already does this: its problems are a better trigger than raw lines).
+4. **A model, optional:** only for what is left (a new signature with no rule), using a model the gateway already serves. If it is unavailable or too slow, the row goes to a "suspicious" list for the morning, and nothing else changes.
+
+The model's real place is later, in investigation and root cause, where reasoning over evidence is the job.
+
 **3:46 AM, out of the loop: the agent works.**
 
-1. **Detect.** The platform raises a problem (a webhook from its problem notifications, or the SRE agent's own queries on traffic every few minutes). The agent deduplicates it against open incidents, checks a severity threshold, and matches it against the knowledge base (KBA). Known problem with a runbook: it posts the runbook steps for the on-call (or NOC) team and stops; runbook actions on production stay human. Unknown, or a known one whose runbook points to code: it continues.
+1. **Detect.** The platform raises a problem (a webhook from its problem notifications), or the tiers above flag a signature. The agent deduplicates it against open incidents, checks a severity threshold, and matches it against the knowledge base (KBA). Known problem with a runbook: it posts the runbook steps for the on-call (or NOC) team and stops; runbook actions on production stay human. Unknown, or a known one whose runbook points to code: it continues.
 2. **Investigate.** Read-only: the failing requests' traces, the logs around the first occurrence, the affected services and their dependencies, error rate against its baseline, and the deployment events (which release went out, when). It writes an incident issue (P16) with this evidence, redacted, and labels it `factory:incident`.
 3. **Root cause.** The intake (one door) opens an incident mission. The factory's investigator (D99, P13 when the cause may be in another service) takes the commit range between the last good release and the current one, forms hypotheses with evidence, and asks the explorers for detail. Its conclusion names where the fix belongs: here, another team's repo (a finding for them), or configuration (a finding for the on-call).
 4. **Reproduce, then fix.** From a captured failing request (scrubbed into a fixture), a test that fails on today's code for the stated reason; then the fix, through the usual gates: test on base (red, then green), lint, the frozen characterization tests, review by another family.

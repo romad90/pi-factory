@@ -229,7 +229,7 @@ A screenshot of an on-call agent: an incident on the left, the event stream it w
 | The agent's tool calls listed with a check mark as they finish | The live worker pane from the run's last events | P10 |
 | "Talk to the agent", with Follow-up and Interrupt | `/factory-decide` and `pause.sh` from the page, once the page may write (P12) | P12 |
 | "Closing this window never interrupts the agent" | The durability promise, stated where the person looks | P12 |
-| The event stream with a decision and a confidence per row; counters for judged, normal, suspicious, incident; judge spend and decision latency | Classify with rules first (status codes, known signatures), the model only for what rules can't decide; show its cost and latency, as the talk itself advises | P19 use case |
+| The event stream with a decision and a confidence per row; counters for judged, normal, suspicious, incident; judge spend and decision latency | Not a model per row: rules (status codes), signatures (log templates), rates against a baseline, and a model only for what is left, optional (P19's detection tiers) | P19 use case |
 | Model, thinking level and cost of the incident in the header | Per mission: models in use, tokens and cost so far (`usage.tsv`) | cockpit |
 
 ## What to watch for
