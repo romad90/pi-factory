@@ -232,6 +232,19 @@ A screenshot of an on-call agent: an incident on the left, the event stream it w
 | The event stream with a decision and a confidence per row; counters for judged, normal, suspicious, incident; judge spend and decision latency | Not a model per row: rules (status codes), signatures (log templates), rates against a baseline, and a model only for what is left, optional (P19's detection tiers) | P19 use case |
 | Model, thinking level and cost of the incident in the header | Per mission: models in use, tokens and cost so far (`usage.tsv`) | cockpit |
 
+## An external coding CLI as a read-only reviewer (October 2026)
+
+A vendor's coding CLI can run headless (a JSON event stream with cost, duration and tool calls) and speaks ACP. But the vendor routes the model on its side: neither the stream nor the debug log names it. So it can't be a measured role: no pinned model, no one-variable benchmark, no proof of family separation (D31).
+
+Reserved, not built. It may take a read-only reviewer slot when all four hold:
+
+1. The model can be read from the system or pinned (the model's own answer doesn't count).
+2. The terms allow automated use.
+3. It runs through ACP, so our guard answers its permission requests (never auto-approve).
+4. Cost and duration go to the run archive (D97).
+
+The test that decides, after a mission and without touching the loop: replay the archived tickets' diffs to it offline, then compare its findings with our reviewer's on the same tickets. It earns the slot if it catches real misses at an acceptable false-finding rate. In the family lint it counts as its own family: unknown model.
+
 ## What to watch for
 
 Each of these tools keeps something we don't want to give away: the runtime (OpenCode Swarm needs OpenCode), the hosted control plane and its data (Factory, Port), or a maintainer we depend on. The test for anything we take: does it keep working if that vendor disappears tomorrow?
