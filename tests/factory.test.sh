@@ -1310,6 +1310,10 @@ bash "$root/scripts/factory/onboard.sh" --migrate >"$work/migrate.log" 2>&1 || f
   && t "onboard --migrate removes the copied factory, keeps the project's own files, links the package" || fail "migrate result" "$(git status --short | head -20)"
 cd "$repo"
 
+echo "Vendored skills"
+( cd "$root/.pi/skills/deepen-prompt" && sed -n '/^```$/,/^```$/p' SOURCE.md | grep -v '^```' | if command -v sha256sum >/dev/null; then sha256sum -c --quiet -; else shasum -a 256 -c --quiet -; fi ) >"$work/vendor.log" 2>&1 \
+  && t "deepen-prompt is vendored unchanged (hashes in its SOURCE.md)" || fail "deepen-prompt changed: update SOURCE.md on purpose, or restore the files" "$(cat "$work/vendor.log")"
+
 echo "Setup by rehearsal (D102)"
 # head missing from the image: lib.sh's stand-in covers what the scripts call.
 nohead="$work/nohead"; mkdir -p "$nohead"
