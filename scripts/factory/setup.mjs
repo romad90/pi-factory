@@ -175,9 +175,9 @@ if (rehearse && chosen.test && !sh("git", ["rev-parse", "--verify", "-q", "HEAD"
       const pf = join(cwd, disc.probe.file);
       mkdirSync(dirname(pf), { recursive: true }); writeFileSync(pf, disc.probe.content);
       const p = await run("test-probe", c, cwd, env);
-      if (p.code === 0) checks.push({ ok: false, text: `a failing test file (${disc.probe.file}) leaves it green: it doesn't run that kind of file, or not from there` });
+      if (p.code === 0) checks.push({ ok: false, text: `a failing test file (${disc.probe.file}) leaves it green: it doesn't run that kind of file, or not from there${disc.probe.source ? ` (placed by ${disc.probe.source})` : ""}` });
       else if (p.code === "timeout") checks.push({ ok: false, text: failText(p) });
-      else if (probeHit(p.text)) checks.push({ ok: true, text: `a failing test file (${disc.probe.file}) turns it red, because of that file` });
+      else if (probeHit(p.text)) checks.push({ ok: true, text: `a failing test file (${disc.probe.file}${disc.probe.source ? `, placed by ${disc.probe.source}` : ""}) turns it red, because of that file` });
       else { checks.push({ ok: "warn", text: `with a failing test file it goes red, but its output doesn't name the file: check that the runner loads ${disc.probe.file}` }); tail = p.tail; }
       if (chosen.testFiles) {
         const fc = chosen.testFiles.cmd.split("{files}").join(disc.probe.file);

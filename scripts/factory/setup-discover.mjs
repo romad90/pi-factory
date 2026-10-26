@@ -134,10 +134,34 @@ if (pkg) {
     const best = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
     return best ? best[0] : ts ? ".ts" : ".js";
   })();
+  // Name it the way the project's tests are named (spec or test), and where
+  // jest's own config says tests live: a probe the runner never collects
+  // proves nothing (api-toolbox: testMatch **/test/**/*.spec.ts, no tests yet).
+  const infix = (() => {
+    const n = { spec: 0, test: 0 };
+    for (const f of testFiles) { const m = f.match(/[._-](spec|test)\.[a-z]+$/); if (m) n[m[1]]++; }
+    return n.spec > n.test ? "spec" : "test";
+  })();
+  const jestCfg = runners.includes("jest") ? glob(/^jest\.config\./).map(read).join("\n") + JSON.stringify(pkg.jest || {}) : "";
+  const fromConfig = (() => {
+    const tm = jestCfg.match(/["']?testMatch["']?\s*:\s*\[\s*["'`]([^"'`]+)["'`]/);
+    if (tm) {
+      let p = tm[1].replace(/^<rootDir>\//, "").replace(/^(\*\*\/)+/, "").replace(/\/(\*\*\/)+/g, "/").replace(/\{([^,}]+)[^}]*\}/g, "$1");
+      const i = p.lastIndexOf("/"), d = i < 0 ? "" : p.slice(0, i), name = p.slice(i + 1);
+      if (!/[*?()[\]!{}]/.test(d) && /^[^*?()[\]!{}]*\*[^*?()[\]!{}]*$/.test(name))
+        return { file: join(d || ".", name.replace("*", "factory-setup-probe")), source: `jest testMatch ${tm[1]}` };
+    }
+    const roots = jestCfg.match(/["']?roots["']?\s*:\s*\[\s*["'`]([^"'`]+)["'`]/);
+    if (roots && !testFiles.length) {
+      const d = roots[1].replace(/^<rootDir>\/?/, "") || ".";
+      if (!/[*?]/.test(d)) return { file: join(d, `factory-setup-probe.${infix}${ext}`), source: `jest roots ${roots[1]}` };
+    }
+    return null;
+  })();
   const testDir = testFiles.length ? dirname(testFiles.find((f) => extname(f) === ext) || testFiles[0])
     : ["tests", "test", "__tests__", "src"].find((d) => tracked.some((f) => f.startsWith(d + "/"))) || ".";
   if (runners.length || out.candidates.test.length)
-    out.probe = { file: join(testDir, `factory-setup-probe.test${ext}`).replace(/^\.\//, ""), content: 'throw new Error("factory setup probe: this file must fail");\n' };
+    out.probe = { file: (fromConfig ? fromConfig.file : join(testDir, `factory-setup-probe.${infix}${ext}`)).replace(/^\.\//, ""), content: 'throw new Error("factory setup probe: this file must fail");\n', ...(fromConfig ? { source: fromConfig.source } : {}) };
 }
 
 // ---------------------------------------------------------------- Python

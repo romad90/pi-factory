@@ -1349,6 +1349,21 @@ echo ../x > "$work/ci-mirror/.factory/package-dir"; rm -rf "$work/ci-mirror/scri
 (cd "$work/ci-mirror" && FACTORY_PACKAGE_GIT="$mirror" bash -c "$fetch" >"$work/fetch.log" 2>&1) && fail "CI must refuse a package-dir outside the repository"
 grep -q 'package-dir must be a folder inside' "$work/fetch.log" && t "CI refuses a package-dir that leaves the factory repository" || fail "package-dir check" "$(cat "$work/fetch.log")"
 
+# The probe goes where the runner looks: jest's testMatch (api-toolbox, no tests
+# yet), else the project's own naming (spec or test).
+pm="$work/probe-match"; mkdir -p "$pm/src" "$pm/node_modules/.bin"; cd "$pm"; git init -q
+printf '{"name":"p","private":true,"scripts":{"test":"jest --coverage"},"devDependencies":{"jest":"0.0.0","ts-jest":"0.0.0"}}\n' > package.json
+printf 'export default {\n  preset: "ts-jest",\n  testMatch: ["**/test/**/*.spec.ts"],\n};\n' > jest.config.ts
+echo '{}' > tsconfig.json; echo 'export const a = 1;' > src/a.ts; printf 'node_modules\n' > .gitignore
+printf '#!/bin/sh\nexit 0\n' > node_modules/.bin/jest; chmod +x node_modules/.bin/jest
+git add -A; git commit -qm init
+f1="$(node "$root/scripts/factory/setup-discover.mjs" | node -e 'let s="";process.stdin.on("data",(c)=>s+=c).on("end",()=>console.log(JSON.parse(s).probe.file))')"
+sed -i 's|testMatch: \[.*\],|roots: ["<rootDir>/src"],|' jest.config.ts; mkdir -p src/x; echo 'it("a",()=>{});' > src/x/a.spec.ts; git add -A; git commit -qm spec
+f2="$(node "$root/scripts/factory/setup-discover.mjs" | node -e 'let s="";process.stdin.on("data",(c)=>s+=c).on("end",()=>console.log(JSON.parse(s).probe.file))')"
+[ "$f1" = "test/factory-setup-probe.spec.ts" ] && [ "$f2" = "src/x/factory-setup-probe.spec.ts" ] \
+  && t "discover: the probe follows jest's testMatch, else the project's spec/test naming" || fail "probe placement" "testMatch → $f1; spec files → $f2"
+cd "$root"
+
 # A Node project: a stand-in runner (node_modules/.bin/jest), one passing test.
 sp="$work/setup project"; mkdir -p "$sp/tests" "$sp/node_modules/.bin"; cd "$sp"; git init -q
 printf '{"name":"s","private":true,"scripts":{"test":"jest","postinstall":"npm audit fix"},"devDependencies":{"jest":"0.0.0"}}\n' > package.json
