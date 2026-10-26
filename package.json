@@ -1,6 +1,6 @@
 {
   "name": "pi-factory",
-  "version": "1.4.0-rc.25",
+  "version": "1.4.0-rc.26",
   "description": "An agentic software factory on Pi: deterministic loop, gates and state in git; models, runtime and skills rented behind thin pinned adapters.",
   "license": "MIT",
   "private": true,
