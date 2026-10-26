@@ -1,49 +1,35 @@
 ---
 name: deep-prompt
-description: Turn a task described in a few lines into a deeper version before a spec is written, by answering four questions (what an expert would add, the rawest material, the methods and tools, what outside check proves it right). Use before /grill-with-docs, or when the human says deep-prompt or genius-mode.
+description: The factory's depth step before a spec. Applies the deepen-prompt method (what a top practitioner would add, the rawest material, the methods and tools, an outside check) to a mission's task and writes .scratch/<mission>/depth.md, whose outside checks become candidate contract assertions. Use before /grill-with-docs, or when the human says deep-prompt or genius-mode.
 ---
 
-# Deep prompt
+# Deep prompt (factory)
 
-A deeper version of a task, not a bigger one: done the way the best practitioners of the field would do it, with a check that doesn't depend on the model or the human. From Felix Rieseberg, "How to be more ambitious: a tutorial for humans with models" (the Depth practice).
+The method is the `deepen-prompt` skill, vendored unchanged in `.pi/skills/deepen-prompt/` (MIT, from r3dlex/deepen-prompt, after Felix Rieseberg's depth prompt). Read its `SKILL.md` and follow it: identify the field and the unchanged goal, answer its four questions, rewrite the prompt, and respect its anti-patterns (deeper, not bigger; methods, not persona; no self-grading). Its `references/domains.md` and `references/examples.md` are starting points.
 
-In the factory it runs before the grilling: its answers become the spec's starting point, and its outside check becomes candidate contract assertions. It never starts the work.
+This skill only adds what the factory needs from it (D104).
 
-## Step 0: size it
+## Size it first
 
-If the task is small, mechanical or already precise (a rename, a one-line fix, a fix-lane change), say so in one line and stop: the fix lane or the original request is the right size. Depth costs time and tokens.
+A fix-lane change, a rename or a one-line correction: say in one line that it doesn't need depth, and stop.
 
-## Step 1: answer four questions, concretely
+## Raw material in a factory mission
 
-1. **What a top professional in this field would do here that wasn't asked for.** Name the practitioner (SRE, staff engineer on developer platforms, data engineer, security reviewer…) and the moves they would make. Their methods, never their voice: no role-play.
-2. **The rawest material they would start from**, instead of what has already been digested: the code and its git history, logs, run transcripts, real payloads, the CI file, production signals; not a summary, an audit report or a retro. Say where each one lives in this repo or system, and what reading it needs.
-3. **The specific methods and tools they would use**: named techniques and instruments (characterization tests, mutation testing, golden files from real payloads, property-based tests, a profiler, a query on the real table), not vocabulary.
-4. **What, other than the model or the human, would show the result is right**: a test that fails before and passes after, a tool's measurement (mutation score, latency, error rate), a third person, a reproduction on another machine, production data. If none exists, say so plainly: that is the first thing to build.
+Look here before anything digested (an audit report, a retro, a ticket's summary): the code and its git history (`git log -p` on the paths involved), the tests that exist and the ones that don't, the CI file, real payloads or fixtures, run logs, and, for an existing mission, its run archive (`factory archive list <mission>`). Name what exists in this repo and how to reach it; name what is missing and the access it needs.
 
-When it changes the answer, also:
-- **Altitude**: the outcome wanted after this task, and whether another task reaches it better.
-- **Range**: one method borrowed from another field.
+## Write depth.md
 
-## Step 2: write it down
-
-Write `.scratch/<mission>/depth.md` (or show it, when there is no mission yet):
+Write `.scratch/<mission>/depth.md` (show it instead when there is no mission folder yet), in deepen-prompt's output template, plus two factory sections:
 
 ```markdown
-# Depth: <task in one line>
-
-**Outcome:** <what should be true after, at altitude>
-## Expert moves
-## Raw material
-- <source> — <where> — <how to read it>
-## Methods and tools
-## Outside check
-- <check> — passes when <observable condition>   (candidate assertion)
+## Outside checks (candidate assertions)
+- <check> — passes when <observable condition>, run by <test, tool or person>
 ## Not doing
-- <what was considered and left out, and why>
+- <the "bigger" temptations cut, and why>
 ```
 
-Each outside check is written so the contract author can turn it into an assertion with an ID. Then start the grilling on it: `/grill-with-docs` with `depth.md` named as its first input, so it asks only what `depth.md` leaves open.
+Write each outside check so the contract author can turn it into an assertion with an ID. At least one must be a check a tool runs (a test, a mutation score, a benchmark), not a model's opinion.
 
-## Step 3: stop
+## Then stop
 
-End with one question: go with the deeper version, edit it, or keep the original. Nothing else happens until the human answers.
+Ask one question: go with the deeper version, edit it, or keep the original. Then the human starts `/grill-with-docs` with `depth.md` named as its first input, so the grilling asks only what it leaves open. This skill never starts the work.
