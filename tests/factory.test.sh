@@ -686,6 +686,12 @@ hs="$work/health-skip"; mkdir -p "$hs/src" "$hs/test"; (cd "$hs" && git init -q 
 m1="$(cd "$hs" && bash "$root/scripts/factory/health.sh" metrics 2>&1)"
 grep -q '"skipped_tests": 1' <<<"$m1" && t "health: skipped tests count in test files only (a query's .skip( isn't one)" || fail "skip counter" "$m1"
 
+hd="$work/health-details"; mkdir -p "$hd/src"; (cd "$hd" && git init -q \
+  && for f in one two; do printf 'export function %s(a, b) {\n  const x = a + b;\n  const y = x * 2;\n  const z = y - a;\n  const w = z / b;\n  const v = w + x;\n  return v + y + z;\n}\n' "$f" > src/$f.js; done \
+  && git add -A && git commit -qm init)
+d1="$(cd "$hd" && bash "$root/scripts/factory/health.sh" details 2>&1)"
+grep -qE '^dup src/two.js:[0-9]+ = src/one.js:[0-9]+$' <<<"$d1" && t "health details: where each finding is, for the depth step (D104)" || fail "health details" "$d1"
+
 echo "Staleness and pause"
 echo '# docs' >> README.md; git commit -q -am "docs: readme"
 expect_step pr "docs change keeps behavior and health verdicts fresh"
