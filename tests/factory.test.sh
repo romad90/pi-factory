@@ -1263,7 +1263,7 @@ cp "$work/settings.keep" .pi/settings.json; rm -f "$PI_CODING_AGENT_DIR/settings
   && t "package.json: the version of .factory/VERSION; every Pi resource it declares exists" || fail "package manifest"
 
 pk="$work/pkg repo"; mkdir -p "$pk/apps/svc"; git -C "$pk" init -q
-( cd "$pk"; echo root > README.md; mkdir -p apps/svc/src; echo 'export const s = 1;' > apps/svc/src/s.js; git add -A; git commit -qm init )
+( cd "$pk"; echo root > README.md; mkdir -p apps/svc/src; echo 'export const s = 1;' > apps/svc/src/s.js; printf 'coverage' > apps/svc/.gitignore; git add -A; git commit -qm init )
 cd "$pk/apps/svc"
 bash "$root/scripts/factory/onboard.sh" >"$work/onboard.log" 2>&1 || fail "onboard" "$(cat "$work/onboard.log")"
 changed="$(git status --porcelain --untracked-files=all -- . | awk '{ print $2 }' | sed 's#^apps/svc/##' | sort | tr '\n' ' ')"
@@ -1272,6 +1272,10 @@ for f in .factory/commands.env .factory/VERSION .factory/ci/factory.gitlab-ci.ym
   grep -q "$f" <<<"$changed" || fail "onboard: $f missing" "$changed"
 done
 t "onboard writes only the project's own files ($(wc -w <<<"$changed" | tr -d ' ') files)"
+bash "$root/scripts/factory/onboard.sh" --no-setup >"$work/onboard2.log" 2>&1 || fail "onboard again" "$(cat "$work/onboard2.log")"
+[ "$(grep -cx 'instrument/results/' .gitignore)" = 1 ] && grep -qx coverage .gitignore \
+  && t "onboard twice: a .gitignore without a final newline keeps its last line, nothing appended twice" || fail "gitignore append" "$(cat -A .gitignore)"
+
 [ "$(readlink scripts/factory)" = "$root/scripts/factory" ] && [ "$(readlink docs/agents/factory.md)" = "$root/docs/agents/factory.md" ] \
   && grep -qx '/apps/svc/scripts/factory' "$pk/.git/info/exclude" && bash scripts/factory/link.sh --check >/dev/null \
   && t "factory scripts, briefs and docs are local links, excluded from git (monorepo folder)" || fail "links" "$(ls -la scripts; cat "$pk/.git/info/exclude")"
