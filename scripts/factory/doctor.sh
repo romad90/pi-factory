@@ -90,7 +90,10 @@ fi
 
 echo "pi-subagents config (user level)"
 cfg="$HOME/.pi/agent/extensions/subagent/config.json"
-if [ -f "$cfg" ] && grep -q 'factory-worktree-hook.mjs' "$cfg"; then ok "worktree hook shim configured"
+shim="$HOME/.pi/agent/extensions/subagent/factory-worktree-hook.mjs"
+if [ -f "$cfg" ] && grep -q 'factory-worktree-hook.mjs' "$cfg"; then
+  if [ -x "$shim" ]; then ok "worktree hook shim configured and executable"
+  else bad "worktree hook shim is not executable: every worker fails with EACCES (chmod +x $shim, or rerun scripts/factory/install-pi-config.sh)"; fi
 else bad "run scripts/factory/install-pi-config.sh (worktree hook hides the instrument, D35)"; fi
 
 echo

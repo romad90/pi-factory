@@ -31,6 +31,9 @@ const hook = join(repoRoot, rel, "scripts/factory/worktree-hook.mjs");
 const r = spawnSync(process.execPath, [hook], { input: data, encoding: "utf8", env: { ...process.env, FACTORY_PROJECT_PREFIX: rel } });
 process.stderr.write(r.stderr || ""); process.stdout.write(r.stdout || ""); process.exit(r.status ?? 1);
 SHIM
+# pi-subagents may spawn the hook directly (not through node): without the
+# execute bit every worker dies with EACCES before it starts (2026-10-27).
+chmod +x "$shim"
 
 [ -f "$cfg" ] && cp "$cfg" "$cfg.bak.$(date +%Y%m%d%H%M%S)"
 node - "$cfg" "$shim" <<'NODE'

@@ -59,6 +59,8 @@ mkdir -p "$work/home/.pi/agent/extensions/subagent"; echo '{"timeoutMs": 600000,
 HOME="$work/home" bash "$root/scripts/factory/install-pi-config.sh" >/dev/null 2>&1
 node -e 'const c=require(process.argv[1]); process.exit(c.timeoutMs===7200000 && c.parallel.concurrency===1 && /factory-worktree-hook/.test(c.worktreeSetupHook) ? 0 : 1)' "$work/home/.pi/agent/extensions/subagent/config.json" \
   && t "pi config: waves may run 2 h (D72), concurrency and hook kept" || fail "pi config timeout" "$(cat "$work/home/.pi/agent/extensions/subagent/config.json")"
+[ -x "$work/home/.pi/agent/extensions/subagent/factory-worktree-hook.mjs" ] \
+  && t "pi config: the hook shim is executable (spawned directly, EACCES otherwise)" || fail "hook shim not executable" "$(ls -l "$work/home/.pi/agent/extensions/subagent/")"
 if bash "$root/scripts/factory/install-into.sh" "$repo" --pack nope --no-branch >/dev/null 2>&1; then fail "unknown pack must fail"; fi
 t "an unknown pack is refused"
 
