@@ -6,6 +6,7 @@
 #
 # Usage:
 #   health.sh metrics             print the metrics (JSON)
+#   health.sh details             where each finding is (dup, large, deep, skip), one per line
 #   health.sh baseline            write .factory/health-baseline.json and, with FACTORY_LINT_CMD,
 #                                 .factory/lint-baseline.txt (after install, or to lock in an improvement)
 #   health.sh check <feature>     ratchet + FACTORY_HEALTH_CMD → .scratch/<feature>/health/report.md
@@ -85,11 +86,13 @@ baseline_value() {                     # <metric>
   grep -oE "\"$1\": *[0-9]+" "$FACTORY_HEALTH_BASELINE" | grep -oE '[0-9]+$' || true
 }
 
-cmd="${1:?usage: health.sh metrics | baseline | check <feature>}"
+cmd="${1:?usage: health.sh metrics | details | baseline | check <feature>}"
 details="$(mktemp)"; trap 'rm -f "$details"' EXIT
 
 case "$cmd" in
   metrics) measure "$details" | to_json ;;
+  # Where each finding is: "dup <file:line> = <file:line>", "large", "deep", "skip".
+  details) measure "$details" >/dev/null; cat "$details" ;;
 
   baseline)
     mkdir -p "$(dirname "$FACTORY_HEALTH_BASELINE")"
@@ -150,5 +153,5 @@ case "$cmd" in
     exit "$fail"
     ;;
 
-  *) die "usage: health.sh metrics | baseline | check <feature>" ;;
+  *) die "usage: health.sh metrics | details | baseline | check <feature>" ;;
 esac
