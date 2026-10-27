@@ -64,9 +64,14 @@ measure() {
     printf 'duplicate_blocks 0\nlarge_files 0\ndeep_lines 0\n'
   fi
   if [ -s "$all" ]; then
-    tr '\n' '\0' < "$all" | xargs -0 awk -v out="$details" '
+    # Skipped tests count in test files only: .skip( in source code is a
+    # query builder's pagination (api-toolbox), not a skipped test.
+    while IFS= read -r f; do is_test_file "$f" && echo "$f"; done < "$all" > "$src"
+    tr '\n' '\0' < "$all" | xargs -0 awk -v out="$details" -v tests="$src" '
+      BEGIN { while ((getline l < tests) > 0) tf[l] = 1; close(tests) }
+      FNR == 1 { t = (FILENAME in tf) }
       /(TODO|FIXME|HACK|XXX)([^A-Za-z]|$)/ { debt++ }
-      /\.(skip|only)\(|(^|[^A-Za-z])x(it|describe|test)\(|@pytest\.mark\.skip|t\.Skip\(|@Disabled|@Ignore/ { skip++; print "skip " FILENAME ":" FNR >> out }
+      t && /\.(skip|only)\(|(^|[^A-Za-z])x(it|describe|test)\(|@pytest\.mark\.skip|t\.Skip\(|@Disabled|@Ignore/ { skip++; print "skip " FILENAME ":" FNR >> out }
       END { print "debt_markers", debt + 0; print "skipped_tests", skip + 0 }'
   else
     printf 'debt_markers 0\nskipped_tests 0\n'
