@@ -47,11 +47,22 @@ if (cmd === "capture") {
     agents[name] = thinking ? { model, thinking } : { model };
   }
   if (!Object.keys(agents).length) { console.error("no configured models here (only placeholders): nothing to capture"); process.exit(1); }
-  const allow = (existsSync(SETTINGS) ? readJson(SETTINGS).subagents?.modelScope?.allow : []) ?? [];
-  const families = existsSync(FAMILIES) ? readJson(FAMILIES).families : [];
+  // Merge into the existing profile: what this place doesn't define (no model
+  // scope, no families file: the factory's own folder, a mirror) is kept, never
+  // emptied. Captured agents win; agents only in the profile stay.
+  const prev = existsSync(profile) ? readJson(profile) : {};
+  const allow = ((existsSync(SETTINGS) ? readJson(SETTINGS).subagents?.modelScope?.allow : []) ?? []).filter((a) => !placeholder(a));
+  const families = (existsSync(FAMILIES) ? readJson(FAMILIES).families : []) ?? [];
+  const kept = [];
+  if (!allow.length && prev.allow?.length) kept.push("model scope");
+  if (!families.length && prev.families?.length) kept.push("families");
+  const onlyPrev = Object.keys(prev.agents ?? {}).filter((n) => !(n in agents));
+  if (onlyPrev.length) kept.push(`agents ${onlyPrev.join(", ")}`);
+  const merged = { ...prev, agents: { ...(prev.agents ?? {}), ...agents }, allow: allow.length ? allow : prev.allow ?? [], families: families.length ? families : prev.families ?? [] };
   mkdirSync(dirname(profile), { recursive: true });
-  writeFileSync(profile, JSON.stringify({ agents, allow: allow.filter((a) => !placeholder(a)), families }, null, 2) + "\n");
-  console.log(`captured ${Object.keys(agents).length} agents → ${profile}`);
+  if (existsSync(profile)) writeFileSync(`${profile}.bak`, readFileSync(profile));
+  writeFileSync(profile, JSON.stringify(merged, null, 2) + "\n");
+  console.log(`captured ${Object.keys(agents).length} agents → ${profile}${kept.length ? ` (kept from the profile: ${kept.join("; ")})` : ""}`);
 } else if (cmd === "apply" && userMode) {
   if (!existsSync(profile)) { console.error(`no profile at ${profile} (create it with: capture, from a configured repo)`); process.exit(1); }
   const p = readJson(profile), file = userSettingsFile();

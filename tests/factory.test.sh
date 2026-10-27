@@ -77,6 +77,21 @@ const s=".pi/settings.json"; const k=JSON.parse(fs.readFileSync(s,"utf8")); k.su
 node scripts/factory/models-lint.mjs >"$work/lint.log" 2>&1 && t "models-lint passes with separated families" || fail "models-lint" "$(cat "$work/lint.log")"
 export PI_FACTORY_MODELS="$work/home/models.json"
 node scripts/factory/models-profile.mjs capture >/dev/null && grep -q 'gw/judge-1' "$PI_FACTORY_MODELS" && t "models profile captured from a configured repo" || fail "models capture"
+# Capture from a place without model scope or families (the factory folder, a
+# mirror) keeps the profile's, and keeps agents only the profile has.
+cp "$PI_FACTORY_MODELS" "$work/profile.keep"
+node -e 'const f=require("fs"),p=process.argv[1],j=JSON.parse(f.readFileSync(p));j.agents["factory-extra"]={model:"gw/judge-9"};f.writeFileSync(p,JSON.stringify(j))' "$PI_FACTORY_MODELS"
+mv .factory/model-families.json "$work/fam.keep"; cp .pi/settings.json "$work/set.keep"
+node -e 'const f=require("fs"),s=".pi/settings.json",k=JSON.parse(f.readFileSync(s));delete k.subagents.modelScope;f.writeFileSync(s,JSON.stringify(k))'
+cap="$(node scripts/factory/models-profile.mjs capture 2>&1)"
+mv "$work/fam.keep" .factory/model-families.json; cp "$work/set.keep" .pi/settings.json
+node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1]));process.exit(j.allow.includes("gw/*")&&j.families.some(f=>f.family==="judges")&&j.agents["factory-extra"]&&j.agents["factory-reviewer"]?0:1)' "$PI_FACTORY_MODELS" \
+  && grep -q 'kept from the profile: model scope; families; agents factory-extra' <<<"$cap" && [ -f "$PI_FACTORY_MODELS.bak" ] \
+  && t "capture keeps the profile's model scope, families and agents it can't see; a .bak first" || fail "capture merge" "$cap"$'\n'"$(cat "$PI_FACTORY_MODELS")"
+cp "$work/profile.keep" "$PI_FACTORY_MODELS"
+rc=0; out="$(cd "$root" && node scripts/factory/models-lint.mjs 2>&1)" || rc=$?
+[ "$rc" = 2 ] && grep -q "the factory's own folder, not a project" <<<"$out" \
+  && t "models-lint in the factory's own folder says so instead of false failures" || fail "lint in factory folder" "rc=$rc $out"
 repo2="$work/second repo"; mkdir -p "$repo2"; git -C "$repo2" init -q; echo x > "$repo2/README.md"; git -C "$repo2" add -A; git -C "$repo2" commit -q -m init
 bash "$root/scripts/factory/install-into.sh" "$repo2" >"$work/install2.log" 2>&1 || fail "second install" "$(cat "$work/install2.log")"
 (cd "$repo2" && node scripts/factory/models-lint.mjs >/dev/null 2>&1) && t "a new repo gets the models from the profile at install" || fail "models apply" "$(cat "$work/install2.log")"
@@ -663,6 +678,13 @@ bash scripts/factory/human.sh approve demo tickets >/dev/null
 expect_step health "fix built, health checked again"
 bash scripts/factory/health.sh check demo >/dev/null && bash scripts/factory/checkpoint.sh demo >/dev/null
 expect_step pr "back to the measured baseline; steward verdict still fresh"
+
+# .skip( in source code is pagination, not a skipped test; in a test file it is.
+hs="$work/health-skip"; mkdir -p "$hs/src" "$hs/test"; (cd "$hs" && git init -q \
+  && printf 'export const page = (q) => q.skip(10).limit(5);\n' > src/repo.js \
+  && printf 'it.skip("later", () => {});\n' > test/a.spec.js && git add -A && git commit -qm init)
+m1="$(cd "$hs" && bash "$root/scripts/factory/health.sh" metrics 2>&1)"
+grep -q '"skipped_tests": 1' <<<"$m1" && t "health: skipped tests count in test files only (a query's .skip( isn't one)" || fail "skip counter" "$m1"
 
 echo "Staleness and pause"
 echo '# docs' >> README.md; git commit -q -am "docs: readme"

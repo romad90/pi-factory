@@ -24,6 +24,18 @@ const glob = (pattern) =>
   new RegExp("^" + pattern.split("*").map((s) => s.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*") + "$", "i");
 
 console.log("Factory models");
+// Run inside the factory's own folder (a mirror, ~/pi-factory), the template's
+// settings and families apply, not a project's: every model then looks out of
+// scope and familyless. Say so instead of printing a screen of false failures.
+{
+  let name = "";
+  try { name = JSON.parse(readFileSync("package.json", "utf8")).name; } catch {}
+  if (name === "pi-factory" && existsSync("scripts/factory/models-lint.mjs") && !process.argv.includes("--template")) {
+    console.log("  ! this is the factory's own folder, not a project: its template settings apply here, not yours.");
+    console.log("    Run factory models-lint in a project (or add --template to lint the template itself).");
+    process.exit(2);
+  }
+}
 if (!existsSync(SETTINGS) && !existsSync(userSettingsFile())) bad(`missing ${SETTINGS} (and no user settings)`);
 if (!existsSync(FAMILIES)) bad(`missing ${FAMILIES}`);
 if (failed) process.exit(1);
