@@ -280,6 +280,7 @@ If the merge left your branch's dependency versions, take the target's `package.
 | `scripts/factory/doctor.sh [--quick]` | after install or a model change / before a run |
 | `factory setup [--write]` | after onboarding or a change to the test setup: commands found, rehearsed offline, written (D102) |
 | `factory report [--full]` | something is wrong and you need help: one redacted text with what a diagnosis needs (D102) |
+| `factory tokens <f> [--budget N]` | a provider refused a request on tokens, or a mission costs too much: each run's request sizes and the tool results that fill them (P20) |
 | `scripts/factory/gate.sh mission <f>` | the gate CI will run |
 | `scripts/factory/metrics.sh <f>` | numbers for the MR |
 | `scripts/factory/metrics.sh --all` | every mission and the total: cost per MR, interventions per MR, first pass, scores (D97) |
