@@ -86,6 +86,9 @@ node "$pkg/scripts/factory/project-files.cjs" settings "$pkg/.pi/settings.json" 
 mkdir -p .factory/ci
 node "$pkg/scripts/factory/project-files.cjs" ci "$pkg/templates/gitlab/factory.gitlab-ci.yml" .factory/ci/factory.gitlab-ci.yml "$prefix" "$ci_mode" --package
 touch .gitignore
+# A last line without its newline would swallow the first appended line
+# ("coverageinstrument/results/"), breaking both, and the next run appends again.
+[ -n "$(tail -c1 .gitignore)" ] && printf '\n' >> .gitignore
 for line in "instrument/results/" ".env.factory" ".pi-subagents/"; do
   grep -qxF "$line" .gitignore || { printf '%s\n' "$line" >> .gitignore; note ".gitignore += $line"; }
 done
@@ -110,13 +113,19 @@ fi
 # D102: the project's commands, found and rehearsed as a worker would run them.
 if [ "$setup" -eq 1 ]; then echo; echo "factory setup runs this project's tests (twice, offline, credential variables unset) and its lint; --no-setup skips it."; node "$here/setup.mjs" || true; fi
 
+# Only point at setup --write while the test or lint command is still empty.
+if grep -qE '^FACTORY_TEST_CMD=".+"' .factory/commands.env 2>/dev/null && grep -qE '^FACTORY_LINT_CMD=".+"' .factory/commands.env 2>/dev/null; then
+  setup_next=""
+else
+  setup_next="the decisions in .factory/setup.md, then factory setup --write (it writes
+the commands that passed into .factory/commands.env; run it again after each
+decision),"
+fi
 cat <<MSG
 
 Nothing committed$( [ "$migrate" -eq 1 ] && printf ' (the removals of the copied files are staged)'). Review, commit on its own branch, MR (D48):
 $(git status --short -- . | sed 's/^/  /')
-Then: the decisions in .factory/setup.md, then factory setup --write (it writes
-the commands that passed into .factory/commands.env; run it again after each
-decision), the CI variable FACTORY_PACKAGE_GIT
+Then: ${setup_next:+$setup_next }the CI variable FACTORY_PACKAGE_GIT
 (the URL your CI may fetch pi-factory from, no default), the CI include
   include: [{ local: ${prefix:+$prefix/}.factory/ci/factory.gitlab-ci.yml }]
 and, in Pi from here: scripts/factory/doctor.sh.
