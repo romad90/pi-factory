@@ -611,6 +611,26 @@ node -e 'const r=require(process.argv[1]+"/run.json"); process.exit(r.agent==="f
   && grep -q 'npm test' "$arch/transcript.jsonl" && ! grep -q 'glpat-' "$arch/transcript.jsonl" && grep -q 'REDACTED' "$arch/transcript.jsonl" \
   && [ -z "$(git status --porcelain -- "$m" | grep -v usage.tsv)" ] \
   && t "archive: brief, transcript (secrets redacted), usage and outcome kept outside the repo (D97)" || fail "archive" "$(cat "$arch/run.json" "$arch/transcript.jsonl" 2>&1)"
+# P20: request sizes from the child transcript (pi-subagents' records): the
+# a 25k-token test log takes the reviewer's request from 10k to 35k; the next one would be 36.2k.
+ta="$work/tokens-archive/r7rev_factory-reviewer"; mkdir -p "$ta"
+printf '{"run":"r7rev","agent":"factory-reviewer","model":"j/gemma","ticket":"01-a"}' > "$ta/run.json"
+node -e '
+const big = "x".repeat(100000), w = (o) => JSON.stringify({ version: 1, recordType: "message", ...o });
+console.log([
+  w({ role: "user", text: "brief" }),
+  w({ role: "assistant", usage: { input: 2000, output: 300, cacheRead: 8000, cacheWrite: 0 } }),
+  JSON.stringify({ recordType: "tool_start", toolCallId: "c1", toolName: "bash", argsPreview: "node_modules/.bin/jest --coverage" }),
+  w({ role: "toolResult", toolCallId: "c1", toolName: "bash", text: big }),
+  w({ role: "assistant", usage: { input: 1000, output: 200, cacheRead: 34000, cacheWrite: 0 } }),
+  JSON.stringify({ recordType: "tool_start", toolCallId: "c2", toolName: "read", argsPreview: "src/a.ts" }),
+  w({ role: "toolResult", toolCallId: "c2", toolName: "read", text: "y".repeat(4000) }),
+  w({ role: "assistant", errorMessage: "429 Rate limit exceeded. Limit type: tokens. Current limit: 45000, Remaining: 45000" }),
+].join("\n"))' > "$ta/transcript.jsonl"
+out="$(node scripts/factory/tokens.mjs "$work/tokens-archive" --budget 45000)"
+grep -qE 'factory-reviewer +01 +2 +35.0k +36.2k' <<<"$out" && grep -q '25.0k  factory-reviewer.*bash.*jest --coverage' <<<"$out" \
+  && grep -q 'By tool: bash 96%' <<<"$out" && grep -q 'reviewer 36.2k' <<<"$out" && grep -q '429 Rate limit' <<<"$out" \
+  && t "tokens: request size per turn, the next request after the last results, the largest tool outputs (P20)" || fail "tokens report" "$out"
 bash scripts/factory/archive.sh export demo "$work/demo-archive.tar.gz" >/dev/null && rm -rf "$arch" \
   && bash scripts/factory/archive.sh import "$work/demo-archive.tar.gz" >/dev/null && [ -f "$arch/run.json" ] \
   && bash scripts/factory/archive.sh list demo | grep -q '^r1abc	factory-worker	gw/maker-1	01-hello' \
