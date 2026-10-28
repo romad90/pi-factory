@@ -70,7 +70,8 @@ for (const name of readdirSync(dir).sort()) {
   const meta = readJson(join(rd, "run.json")) || {};
   const tf = join(rd, "transcript.jsonl");
   const turns = [], results = [], calls = new Map();
-  let since = 0, lastReq = 0, lastOut = 0, error = "";
+  let since = 0, lastReq = 0, lastOut = 0, error = "", fixed = 0;
+  const textOf = (c) => (typeof c === "string" ? c : Array.isArray(c) ? c.map((x) => (x && (x.text || x.content)) || "").join("") : "");
   if (existsSync(tf)) {
     for (const line of readFileSync(tf, "utf8").split("\n")) {
       if (!line.trim()) continue;
@@ -79,6 +80,9 @@ for (const name of readdirSync(dir).sort()) {
       if (r.recordType && r.recordType !== "message") continue;
       const m = r.message && typeof r.message === "object" ? r.message : {};
       const role = r.role || m.role;
+      // What every request starts with: the system prompt and the brief (and
+      // any later user turn, which stays in the conversation too).
+      if (role === "system" || role === "user") { fixed += est(r.text !== undefined && role === "user" ? r.text : textOf(m.content) || r.text); continue; }
       if (role === "assistant") {
         const err = r.errorMessage || m.errorMessage;
         if (err) error = String(err).slice(0, 160);
@@ -97,10 +101,16 @@ for (const name of readdirSync(dir).sort()) {
       }
     }
   }
-  const peak = turns.length ? Math.max(...turns) : 0;
+  const toolTokens = results.reduce((a, b) => a + b.tokens, 0);
+  // No usage per turn in the transcript (pi-subagents 0.76 keeps no assistant
+  // records): estimate the last request from what it must carry: the fixed
+  // part, every tool result, and the run's own output (run.json usage).
+  const estimated = !turns.length;
+  const out = (meta.usage && meta.usage.output) || 0;
+  const peak = turns.length ? Math.max(...turns) : fixed + toolTokens + out;
   const next = turns.length && since ? lastReq + lastOut + since : 0;
   runs.push({ run: meta.run || name, agent: meta.agent || "?", model: meta.model || "", ticket: meta.ticket || "",
-    turns: turns.length, peak, next, error, results, toolTokens: results.reduce((a, b) => a + b.tokens, 0) });
+    turns: turns.length || (meta.usage && meta.usage.turns) || 0, fixed, peak, next, estimated, error, results, toolTokens });
 }
 
 if (asJson) { console.log(JSON.stringify({ budget, runs: runs.map(({ results, ...r }) => ({ ...r, largest: results.sort((a, b) => b.tokens - a.tokens).slice(0, top) })) }, null, 2)); process.exit(0); }
@@ -108,13 +118,14 @@ if (asJson) { console.log(JSON.stringify({ budget, runs: runs.map(({ results, ..
 if (!runs.length) { console.log("tokens: no archived runs yet"); process.exit(0); }
 const over = (n) => (budget && n > budget ? " OVER" : "");
 console.log(`Tokens per request (${runs.length} runs${budget ? `, budget ${k(budget)}` : ""})`);
-console.log(["run".padEnd(10), "agent".padEnd(22), "ticket".padEnd(6), "turns".padStart(5), "peak".padStart(8), "next*".padStart(8), " tool results"].join(" "));
+console.log(["run".padEnd(10), "agent".padEnd(22), "ticket".padEnd(6), "turns".padStart(5), "fixed".padStart(7), "peak".padStart(9), "next*".padStart(8), " tool results"].join(" "));
 for (const r of runs) {
   console.log([r.run.slice(0, 10).padEnd(10), r.agent.slice(0, 22).padEnd(22), r.ticket.slice(0, 2).padEnd(6), String(r.turns).padStart(5),
-    (k(r.peak) + over(r.peak)).padStart(8), (r.next ? k(r.next) + over(r.next) : "-").padStart(8), " " + k(r.toolTokens)].join(" ")
+    k(r.fixed).padStart(7), ((r.estimated ? "~" : "") + k(r.peak) + over(r.peak)).padStart(9), (r.next ? k(r.next) + over(r.next) : "-").padStart(8), " " + k(r.toolTokens)].join(" ")
     + (r.error ? `  ! ${r.error}` : ""));
 }
-console.log("* next: the request after the run's last tool results (last request + its output + those results), the one a size limit refuses.");
+console.log("fixed: system prompt and brief, sent with every request. * next: the request after the run's last tool results, the one a size limit refuses.");
+if (runs.some((r) => r.estimated)) console.log("~ estimated (no usage per turn in these transcripts): the last request = fixed + every tool result + the run's output, at 4 characters a token.");
 
 const all = runs.flatMap((r) => r.results.map((x) => ({ ...x, agent: r.agent, ticket: r.ticket })));
 const total = all.reduce((a, b) => a + b.tokens, 0);
