@@ -652,6 +652,15 @@ adir="$(dirname "$arch")"
 [ ! -e "$adir/r9zzz_factory-worker" ] && [ -f "$adir/r8own_factory-worker/run.json" ] && grep -q '1 run(s) of another checkout ignored' <<<"$out" \
   && t "archive collect keeps only this checkout's runs: a foreign run is ignored (D101)" || fail "archive foreign" "$out $(ls "$adir")"
 rm -f "$work/usage/run/r9zzz_"* "$work/usage/run/r8own_"*; rm -rf "$adir/r8own_factory-worker"
+# Pi's own layout: ~/.pi/agent/sessions/--<project path, / as ->--/subagent-artifacts/, the transcript beside the meta.
+enc="--$(sed 's#^/##; s#[/:]#-#g' <<<"$PWD")--"
+sd="$work/usage/sessions/$enc/subagent-artifacts"; od="$work/usage/sessions/--srv-other-project--/subagent-artifacts"; mkdir -p "$sd" "$od"
+printf '{"model":"j/gemma","usage":{"turns":3},"durationMs":1000,"transcriptPath":"%s/ca1c7009-15ec_factory-reviewer_transcript.jsonl"}' "$sd" > "$sd/ca1c7009-15ec_factory-reviewer_meta.json"
+printf '{"model":"j/gemma","usage":{"turns":3},"durationMs":1000,"transcriptPath":"%s/0bad0bad-0000_factory-reviewer_transcript.jsonl"}' "$od" > "$od/0bad0bad-0000_factory-reviewer_meta.json"
+out="$(FACTORY_USAGE_DIRS="$work/usage" bash scripts/factory/archive.sh collect demo)"
+[ -f "$adir/ca1c7009-15ec_factory-reviewer/run.json" ] && [ ! -e "$adir/0bad0bad-0000_factory-reviewer" ] \
+  && t "archive: a run in Pi's session folder named after this project is ours; another project's is not" || fail "archive pi sessions" "$out $(ls "$adir")"
+rm -rf "$work/usage/sessions" "$adir/ca1c7009-15ec_factory-reviewer"
 printf '#!/usr/bin/env bash\necho "$1" >> "%s"\nif grep -q "^# Failure mode" "$2" && grep -q "^# Tried to silence" "$2"; then echo "SCORE: fail"; echo "EVIDENCE: \\"added eslint-disable\\""; else echo "SCORE: pass"; echo "EVIDENCE: \\"none\\""; fi\n' "$work/judges.log" > "$work/judge.sh"; chmod +x "$work/judge.sh"
 FACTORY_JUDGE_BIN="$work/judge.sh" FACTORY_JUDGE_MODELS="gw/maker-9 gw/judge-1" bash scripts/factory/score.sh demo >"$work/score.log" 2>&1 || fail "score" "$(cat "$work/score.log")"
 grep -qx 'gw/judge-1' "$work/judges.log" && ! grep -q maker "$work/judges.log" \
