@@ -45,6 +45,20 @@ function thinkingOf(missionDir, agent) {   // runs.tsv (D77): date workflow key 
 const real = (p) => { try { return realpathSync(p); } catch { return resolve(p); } };
 const under = (p, roots) => { const a = [resolve(p), real(p)];
   return roots.some((r) => a.some((x) => x === r || x.startsWith(r.endsWith("/") ? r : r + "/"))); };
+// Pi keeps a project's sessions, and pi-subagents its runs' artifacts, under
+// ~/.pi/agent/sessions/--<cwd with / as ->--/: the folder name is the working
+// directory the run belonged to. One of ours: exactly a root (the project, a
+// worktree still listed), or a folder under the git common dir (a worker's
+// worktree, removed since).
+const piDir = (p) => `--${p.replace(/^[/\\]/, "").replace(/[/\\:]/g, "-")}--`;
+function sessionOwned(paths, roots) {
+  const exact = new Set(roots.map(piDir));
+  const prefixes = roots.filter((r) => /\.git$/.test(r)).map((r) => piDir(r).slice(0, -2) + "-");
+  return paths.some((p) => {
+    const m = p.match(/\/sessions\/(--[^/]*--)\//);
+    return !!m && (exact.has(m[1]) || prefixes.some((x) => m[1].startsWith(x)));
+  });
+}
 function pathsIn(v, out = []) {
   if (typeof v === "string") { if (isAbsolute(v)) out.push(v); }
   else if (Array.isArray(v)) v.forEach((x) => pathsIn(x, out));
@@ -82,7 +96,8 @@ if (cmd === "collect") {
     if (roots.length) {
       const input = read(join(dirname(meta), `${basename(meta).replace(/_meta\.json$/, "")}_input.md`)) || "";
       const id = (input.match(/^brief-id:\s*(\S+)/m) || [])[1] || "";
-      const ours = under(meta, roots) || pathsIn(j).some((p) => under(p, roots)) || (id.length >= 6 && recorded.includes(id));
+      const ours = under(meta, roots) || pathsIn(j).some((p) => under(p, roots)) || sessionOwned([meta, ...pathsIn(j)], roots)
+        || (id.length >= 6 && recorded.includes(id));
       if (!ours) { foreign++; continue; }
     }
     const key = `${runId}_${agent}`.replace(/[^\w.-]/g, "_");

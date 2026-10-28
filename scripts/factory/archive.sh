@@ -51,7 +51,7 @@ case "$cmd" in
     existing=()
     for r in "${roots[@]}"; do [ -d "$r" ] && existing+=("$r"); done
     [ ${#existing[@]} -gt 0 ] || { echo "archive: nothing to collect"; exit 0; }
-    owned=("$(git rev-parse --show-toplevel)" "$(git rev-parse --path-format=absolute --git-common-dir)")
+    owned=("$(git rev-parse --show-toplevel)" "$(git rev-parse --path-format=absolute --git-common-dir)" "$PWD")
     while IFS= read -r w; do owned+=("$w"); done < <(git worktree list --porcelain | sed -n 's/^worktree //p')
     find "${existing[@]}" -maxdepth 7 -type f -name '*_meta.json' -newer "$dir/spec.md" 2>/dev/null \
       | node "$here/archive.mjs" collect "$out" "$dir" "$(git rev-parse HEAD 2>/dev/null || echo none)" "$(dirname "$(archive_root)")/guard.log" "${owned[@]}"
