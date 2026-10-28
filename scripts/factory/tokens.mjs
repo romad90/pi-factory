@@ -5,7 +5,7 @@
 // per-request or per-window token limit is hit by what accumulates: files
 // read, test and lint logs, subagent reports. This names them.
 //
-// Usage: node tokens.mjs <archive-dir-of-a-mission> [--budget N] [--top N] [--json]
+// Usage: node tokens.mjs <archive-dir-of-a-mission> [--budget N] [--top N] [--json | --shape]
 //   (scripts/factory/archive.sh tokens <mission> collects first, then calls this)
 //
 // Reads each run's run.json and transcript.jsonl (pi-subagents' child
@@ -27,6 +27,38 @@ const top = Number(opt("--top", 10)) || 10;
 const asJson = argv.includes("--json");
 if (!dir || !existsSync(dir)) { console.error(`tokens: no archive at ${dir || "(none)"} (run archive.sh collect <mission> first)`); process.exit(2); }
 
+// --shape: the kinds of records in the transcripts, their field names and
+// usage numbers, never their text: what to look at when a Pi or pi-subagents
+// update changes the format and the table comes out empty.
+if (argv.includes("--shape")) {
+  const kinds = {};
+  for (const name of readdirSync(dir).sort()) {
+    const tf = join(dir, name, "transcript.jsonl");
+    if (!existsSync(tf)) continue;
+    for (const line of readFileSync(tf, "utf8").split("\n")) {
+      let r; try { r = JSON.parse(line); } catch { continue; }
+      const m = r.message && typeof r.message === "object" ? r.message : {};
+      const key = [r.recordType, r.type, r.role, m.role].map((x) => x || "-").join(" | ");
+      const k = (kinds[key] ??= { n: 0, fields: new Set(), message: new Set(), usage: null });
+      k.n++; Object.keys(r).forEach((f) => k.fields.add(f)); Object.keys(m).forEach((f) => k.message.add(f));
+      const u = r.usage || m.usage;
+      if (u && !k.usage) k.usage = JSON.stringify(u).slice(0, 200);
+    }
+  }
+  for (const [key, k] of Object.entries(kinds))
+    console.log(`${key}  ×${k.n}\n  fields: ${[...k.fields].join(", ")}${k.message.size ? `\n  message: ${[...k.message].join(", ")}` : ""}${k.usage ? `\n  usage: ${k.usage}` : ""}`);
+  process.exit(0);
+}
+
+// Usage field names differ across Pi, pi-subagents and providers.
+const num = (u, ...keys) => { for (const key of keys) if (u && Number.isFinite(u[key])) return u[key]; return 0; };
+function requestSize(u) {
+  if (!u || typeof u !== "object") return 0;
+  const parts = num(u, "input", "inputTokens", "input_tokens", "prompt_tokens")
+    + num(u, "cacheRead", "cacheReadTokens", "cache_read_input_tokens")
+    + num(u, "cacheWrite", "cacheWriteTokens", "cache_creation_input_tokens");
+  return parts || Math.max(0, num(u, "totalTokens", "total_tokens") - num(u, "output", "outputTokens", "output_tokens", "completion_tokens"));
+}
 const est = (s) => Math.ceil(String(s || "").length / 4);
 const k = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
 const readJson = (f) => { try { return JSON.parse(readFileSync(f, "utf8")); } catch { return null; } };
@@ -44,16 +76,21 @@ for (const name of readdirSync(dir).sort()) {
       if (!line.trim()) continue;
       let r; try { r = JSON.parse(line); } catch { continue; }
       if (r.recordType === "tool_start" && r.toolCallId) calls.set(r.toolCallId, r.argsPreview || "");
-      if (r.recordType !== "message") continue;
-      if (r.role === "assistant") {
-        if (r.errorMessage) error = String(r.errorMessage).slice(0, 160);
-        const u = r.usage;
-        if (u && (u.input || u.cacheRead || u.cacheWrite)) {
-          lastReq = (u.input || 0) + (u.cacheRead || 0) + (u.cacheWrite || 0);
-          lastOut = u.output || 0; since = 0;
+      if (r.recordType && r.recordType !== "message") continue;
+      const m = r.message && typeof r.message === "object" ? r.message : {};
+      const role = r.role || m.role;
+      if (role === "assistant") {
+        const err = r.errorMessage || m.errorMessage;
+        if (err) error = String(err).slice(0, 160);
+        const req = requestSize(r.usage || m.usage);
+        if (req) {
+          lastReq = req; lastOut = num(r.usage || m.usage, "output", "outputTokens", "output_tokens"); since = 0;
           turns.push(lastReq);
         }
-      } else if (r.role === "toolResult") {
+      } else if (role === "toolResult" || role === "tool") {
+        if (r.text === undefined && Array.isArray(m.content)) r.text = m.content.map((c) => (c && c.text) || "").join("");
+        if (!r.toolName && m.toolName) r.toolName = m.toolName;
+        if (!r.toolCallId && m.toolCallId) r.toolCallId = m.toolCallId;
         const t = est(r.text);
         since += t;
         results.push({ tokens: t, tool: r.toolName || "?", args: String(calls.get(r.toolCallId) || "").replace(/\s+/g, " ").slice(0, 90), truncated: !!r.outputTruncated });

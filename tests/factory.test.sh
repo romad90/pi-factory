@@ -631,6 +631,13 @@ out="$(node scripts/factory/tokens.mjs "$work/tokens-archive" --budget 45000)"
 grep -qE 'factory-reviewer +01 +2 +35.0k +36.2k' <<<"$out" && grep -q '25.0k  factory-reviewer.*bash.*jest --coverage' <<<"$out" \
   && grep -q 'By tool: bash 96%' <<<"$out" && grep -q 'reviewer 36.2k' <<<"$out" && grep -q '429 Rate limit' <<<"$out" \
   && t "tokens: request size per turn, the next request after the last results, the largest tool outputs (P20)" || fail "tokens report" "$out"
+# Other shapes: usage and role inside message, provider field names; --shape shows keys, never text.
+mkdir -p "$work/tokens-archive2/r2"; printf '{"run":"r2","agent":"factory-reviewer"}' > "$work/tokens-archive2/r2/run.json"
+printf '%s\n' '{"recordType":"message","message":{"role":"assistant","usage":{"input_tokens":30000,"output_tokens":100,"cache_read_input_tokens":12000}}}' \
+  '{"recordType":"message","message":{"role":"toolResult","toolName":"read","content":[{"type":"text","text":"secret-ish body text"}]}}' > "$work/tokens-archive2/r2/transcript.jsonl"
+out="$(node scripts/factory/tokens.mjs "$work/tokens-archive2")"; shape="$(node scripts/factory/tokens.mjs "$work/tokens-archive2" --shape)"
+grep -qE 'factory-reviewer +1 +42.0k' <<<"$out" && grep -q 'message | - | - | assistant' <<<"$shape" && grep -q 'input_tokens' <<<"$shape" && ! grep -q 'body text' <<<"$shape" \
+  && t "tokens: usage inside message and provider field names are read; --shape prints keys, never text" || fail "tokens shapes" "$out"$'\n'"$shape"
 bash scripts/factory/archive.sh export demo "$work/demo-archive.tar.gz" >/dev/null && rm -rf "$arch" \
   && bash scripts/factory/archive.sh import "$work/demo-archive.tar.gz" >/dev/null && [ -f "$arch/run.json" ] \
   && bash scripts/factory/archive.sh list demo | grep -q '^r1abc	factory-worker	gw/maker-1	01-hello' \
