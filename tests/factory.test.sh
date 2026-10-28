@@ -628,7 +628,7 @@ console.log([
   w({ role: "assistant", errorMessage: "429 Rate limit exceeded. Limit type: tokens. Current limit: 45000, Remaining: 45000" }),
 ].join("\n"))' > "$ta/transcript.jsonl"
 out="$(node scripts/factory/tokens.mjs "$work/tokens-archive" --budget 45000)"
-grep -qE 'factory-reviewer +01 +2 +35.0k +36.2k' <<<"$out" && grep -q '25.0k  factory-reviewer.*bash.*jest --coverage' <<<"$out" \
+grep -qE 'factory-reviewer +01 +2 +[0-9.k]+ +35.0k +36.2k' <<<"$out" && grep -q '25.0k  factory-reviewer.*bash.*jest --coverage' <<<"$out" \
   && grep -q 'By tool: bash 96%' <<<"$out" && grep -q 'reviewer 36.2k' <<<"$out" && grep -q '429 Rate limit' <<<"$out" \
   && t "tokens: request size per turn, the next request after the last results, the largest tool outputs (P20)" || fail "tokens report" "$out"
 # Other shapes: usage and role inside message, provider field names; --shape shows keys, never text.
@@ -636,8 +636,17 @@ mkdir -p "$work/tokens-archive2/r2"; printf '{"run":"r2","agent":"factory-review
 printf '%s\n' '{"recordType":"message","message":{"role":"assistant","usage":{"input_tokens":30000,"output_tokens":100,"cache_read_input_tokens":12000}}}' \
   '{"recordType":"message","message":{"role":"toolResult","toolName":"read","content":[{"type":"text","text":"secret-ish body text"}]}}' > "$work/tokens-archive2/r2/transcript.jsonl"
 out="$(node scripts/factory/tokens.mjs "$work/tokens-archive2")"; shape="$(node scripts/factory/tokens.mjs "$work/tokens-archive2" --shape)"
-grep -qE 'factory-reviewer +1 +42.0k' <<<"$out" && grep -q 'message | - | - | assistant' <<<"$shape" && grep -q 'input_tokens' <<<"$shape" && ! grep -q 'body text' <<<"$shape" \
+grep -qE 'factory-reviewer +1 +[0-9.k]+ +42.0k' <<<"$out" && grep -q 'message | - | - | assistant' <<<"$shape" && grep -q 'input_tokens' <<<"$shape" && ! grep -q 'body text' <<<"$shape" \
   && t "tokens: usage inside message and provider field names are read; --shape prints keys, never text" || fail "tokens shapes" "$out"$'\n'"$shape"
+# pi-subagents 0.76's real transcripts: system, user, tool records, no assistant usage: the last request is estimated.
+mkdir -p "$work/tokens-archive3/r3"; printf '{"run":"r3","agent":"factory-reviewer","usage":{"output":2000,"turns":9}}' > "$work/tokens-archive3/r3/run.json"
+node -e 'const s="s".repeat(80000),b="b".repeat(8000),t="t".repeat(40000);console.log([
+JSON.stringify({recordType:"message",role:"system",message:{role:"system",content:s}}),
+JSON.stringify({recordType:"message",role:"user",text:b,message:{role:"user",content:[{type:"text",text:b}]}}),
+JSON.stringify({recordType:"message",role:"toolResult",toolName:"read",text:t,message:{role:"toolResult",content:[{type:"text",text:t}]}})].join("\n"))' > "$work/tokens-archive3/r3/transcript.jsonl"
+out="$(node scripts/factory/tokens.mjs "$work/tokens-archive3" --budget 30000)"
+grep -qE 'factory-reviewer +9 +22.0k +~34.0k OVER' <<<"$out" && grep -q '^~ estimated' <<<"$out" \
+  && t "tokens: without usage per turn, the last request is estimated from the fixed part, the tool results and the output" || fail "tokens estimate" "$out"
 bash scripts/factory/archive.sh export demo "$work/demo-archive.tar.gz" >/dev/null && rm -rf "$arch" \
   && bash scripts/factory/archive.sh import "$work/demo-archive.tar.gz" >/dev/null && [ -f "$arch/run.json" ] \
   && bash scripts/factory/archive.sh list demo | grep -q '^r1abc	factory-worker	gw/maker-1	01-hello' \
