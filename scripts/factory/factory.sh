@@ -7,7 +7,7 @@
 #   factory version                               the installed factory and what this project expects
 #   factory setup [--write]                       find and rehearse this project's commands (D102)
 #   factory report [--full]                       one redacted text with what a diagnosis needs (D102)
-#   factory tokens <mission> [--budget N]         request sizes per run and what fills them (P20)
+#   factory tokens <mission> [--budget N|--shape] request sizes per run and what fills them (P20)
 #   factory <script> [args]                       any scripts/factory/<script>.sh or .mjs
 #                                                 (next, status, doctor, integrate, mr, metrics …)
 #
