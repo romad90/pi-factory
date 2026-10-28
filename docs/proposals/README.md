@@ -27,6 +27,7 @@ Status: **draft** (open for discussion) · **accepted** (in the roadmap) · **re
 | P19 | [Proactive systems: work that starts before anyone sits down](P19-proactive-systems.md) | draft, later (entry criteria) | P12, P16, P14, P4 |
 | P20 | [Token budget: every agent fits a known budget, measured before it is cut](P20-token-budget.md) | proposed; step 1 built (`factory tokens`) | D97, D85 |
 | P21 | [Security layer: a scanner gate in code, then a security axis that reads what the scanner can't](P21-security-layer.md) | proposed, after mission 5 | D62, P20 |
+| P22 | [One entry, derived process: the change sets the tier, a function in code sets the steps](P22-one-entry-derived-process.md) | proposed, after mission 5 | lanes, P20, P21 |
 
 ## Why these four, in this order
 
@@ -74,3 +75,4 @@ P19 lists what to make proactive once the engine is efficient: triggers, one int
 P20 makes scarce tokens a design rule. A mission stopped because one reviewer request was over a key's 45,000-token limit: every agent turn resends its whole conversation. Step 1, `factory tokens`, shows each run's request sizes and the tool results that fill them; the next steps (capped tool output, briefs that send only what the job needs, a hard budget per request, fewer agents rereading the same diff) are each kept only if the numbers move.
 
 P21 adds the security review the factory doesn't have. A scanner (Semgrep, rules pinned, offline) gates every mission's diff with a ratchet like lint: no new findings. Dependencies the mission adds or upgrades are audited. When the diff crosses a boundary (input, auth, outside calls, files, queries), a fresh security axis on another family traces untrusted values to their sinks and checks authorization, reading only the diff and the scanner's findings. A seeded benchmark measures recall and false alarms before any of it gates.
+P22 replaces the three lanes with one entry. The person describes the work; a function in code derives the tier from the change (paths, boundaries, size, intent) twice: predicted at intake to plan the steps, actual from the diff before the MR, which can only escalate. Each mission writes its plan and why; the tier sets the steps and, through the forge, the approvals (one for low and medium, two for high). Auto-merge for low comes only after evidence, with a revert-rate circuit breaker. A shadow phase compares the function with the person's choices first.
