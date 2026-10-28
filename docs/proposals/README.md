@@ -26,6 +26,7 @@ Status: **draft** (open for discussion) · **accepted** (in the roadmap) · **re
 | P18 | [Setup by rehearsal: the factory finds its own commands and proves them as a worker would](P18-setup-by-rehearsal.md) | accepted (D102) | P11 |
 | P19 | [Proactive systems: work that starts before anyone sits down](P19-proactive-systems.md) | draft, later (entry criteria) | P12, P16, P14, P4 |
 | P20 | [Token budget: every agent fits a known budget, measured before it is cut](P20-token-budget.md) | proposed; step 1 built (`factory tokens`) | D97, D85 |
+| P21 | [Security layer: a scanner gate in code, then a security axis that reads what the scanner can't](P21-security-layer.md) | proposed, after mission 5 | D62, P20 |
 
 ## Why these four, in this order
 
@@ -71,3 +72,5 @@ P18 comes from onboarding mission 4's project: ten problems found by hand at a r
 P19 lists what to make proactive once the engine is efficient: triggers, one intake, a durable runner in a sandbox. Nine candidates are ranked by how much code, not a model, decides their outcome, starting with dependency bumps and a red main branch. Entry criteria from measured missions decide when the first one may start, and each lane leaves the loop only on its own record.
 
 P20 makes scarce tokens a design rule. A mission stopped because one reviewer request was over a key's 45,000-token limit: every agent turn resends its whole conversation. Step 1, `factory tokens`, shows each run's request sizes and the tool results that fill them; the next steps (capped tool output, briefs that send only what the job needs, a hard budget per request, fewer agents rereading the same diff) are each kept only if the numbers move.
+
+P21 adds the security review the factory doesn't have. A scanner (Semgrep, rules pinned, offline) gates every mission's diff with a ratchet like lint: no new findings. Dependencies the mission adds or upgrades are audited. When the diff crosses a boundary (input, auth, outside calls, files, queries), a fresh security axis on another family traces untrusted values to their sinks and checks authorization, reading only the diff and the scanner's findings. A seeded benchmark measures recall and false alarms before any of it gates.
