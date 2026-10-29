@@ -306,6 +306,12 @@ VAL-HELLO-002
 ## Blocked by
 01
 TK
+# P20: the brief carries the ticket and only its assertions; the spec is not to be read.
+wb="$(bash scripts/factory/brief.sh worker demo 01-hello HEAD)"; rb="$(bash scripts/factory/brief.sh reviewer demo 01-hello HEAD)"
+grep -q 'Given a user, when they say hi, then the bot says hello.' <<<"$wb" && ! grep -q 'VAL-HELLO-002' <<<"$wb" \
+  && grep -q "don't read .scratch/demo/spec.md" <<<"$wb" && grep -q '^\*\*Size:\*\* S' <<<"$wb" \
+  && grep -q 'VAL-HELLO-001: greets' <<<"$rb" && ! grep -q 'VAL-HELLO-002' <<<"$rb" && ! grep -q '{{' <<<"$wb$rb" \
+  && t "briefs carry the ticket and only its assertions, not the spec (P20)" || fail "lean briefs" "$wb"
 expect_step approve-tickets "proposed tickets wait for a human"
 bash scripts/factory/human.sh approve demo tickets >/dev/null
 grep -q $'\tapprove-tickets\t' $m/decisions.tsv && t "/factory-approve <f> tickets logs the approval" || fail "approve tickets"

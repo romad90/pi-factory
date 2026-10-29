@@ -256,6 +256,17 @@ ticket_covers() {
     }' "$1" | awk '!seen[$0]++'
 }
 
+# P20: the text of the named assertions (each "### <ID>: …" block up to the
+# next heading), so a brief carries what its agent needs instead of the spec.
+assertion_blocks() {                     # <spec> <id>...
+  local spec="$1"; shift
+  [ $# -gt 0 ] || return 0
+  awk -v ids=" $* " '
+    /^#{1,3} / { on = 0 }
+    /^### VAL-[A-Z0-9]+-[0-9][0-9][0-9]/ { id = $2; sub(/:$/, "", id); on = index(ids, " " id " ") > 0 }
+    on' "$spec"
+}
+
 # First non-empty line after "## Covers: enabler".
 ticket_enabler_reason() {
   awk '
