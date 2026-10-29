@@ -136,7 +136,7 @@ if (pkg) {
   })();
   // Name it the way the project's tests are named (spec or test), and where
   // jest's own config says tests live: a probe the runner never collects
-  // proves nothing (api-toolbox: testMatch **/test/**/*.spec.ts, no tests yet).
+  // proves nothing (a real project: testMatch **/test/**/*.spec.ts, no tests yet).
   const infix = (() => {
     const n = { spec: 0, test: 0 };
     for (const f of testFiles) { const m = f.match(/[._-](spec|test)\.[a-z]+$/); if (m) n[m[1]]++; }

@@ -66,7 +66,7 @@ measure() {
   fi
   if [ -s "$all" ]; then
     # Skipped tests count in test files only: .skip( in source code is a
-    # query builder's pagination (api-toolbox), not a skipped test.
+    # query builder's pagination, not a skipped test.
     while IFS= read -r f; do is_test_file "$f" && echo "$f"; done < "$all" > "$src"
     tr '\n' '\0' < "$all" | xargs -0 awk -v out="$details" -v tests="$src" '
       BEGIN { while ((getline l < tests) > 0) tf[l] = 1; close(tests) }

@@ -1431,7 +1431,7 @@ echo ../x > "$work/ci-mirror/.factory/package-dir"; rm -rf "$work/ci-mirror/scri
 (cd "$work/ci-mirror" && FACTORY_PACKAGE_GIT="$mirror" bash -c "$fetch" >"$work/fetch.log" 2>&1) && fail "CI must refuse a package-dir outside the repository"
 grep -q 'package-dir must be a folder inside' "$work/fetch.log" && t "CI refuses a package-dir that leaves the factory repository" || fail "package-dir check" "$(cat "$work/fetch.log")"
 
-# The probe goes where the runner looks: jest's testMatch (api-toolbox, no tests
+# The probe goes where the runner looks: jest's testMatch (a real project, no tests
 # yet), else the project's own naming (spec or test).
 pm="$work/probe-match"; mkdir -p "$pm/src" "$pm/node_modules/.bin"; cd "$pm"; git init -q
 printf '{"name":"p","private":true,"scripts":{"test":"jest --coverage"},"devDependencies":{"jest":"0.0.0","ts-jest":"0.0.0"}}\n' > package.json
