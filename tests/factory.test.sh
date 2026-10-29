@@ -962,10 +962,13 @@ case "$1 $2" in
 esac
 GLAB
 chmod +x "$work/bin/glab"
+git branch -f production "$(bash -c '. scripts/factory/lib.sh; mission_base demo')"   # the target exists: "Also in this MR" can be computed
 FACTORY_DATA_DIR="$work/data" GLAB_LOG="$work/glab.log" PATH="$work/bin:$PATH" FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo >"$work/mr.log" 2>&1 || fail "mr glab" "$(cat "$work/mr.log")"
+git branch -D production >/dev/null
 git ls-remote --heads "$work/origin.git" "$cur" | grep -q . && grep -qx 'production' "$work/glab.log" && grep -qx 'test(demo): characterize the hello tools' "$work/glab.log" \
   && grep -q '^## Summary' "$work/glab.log" && ! grep -q '^# test' "$work/glab.log" && grep -q 'merge_requests/7' $m/mr.url \
-  && t "mr.sh pushes the branch and opens the MR with glab; heading becomes the title, the rest the description (D86)" || fail "mr glab create" "$(cat "$work/mr.log" "$work/glab.log")"
+  && grep -qx -- '--squash-before-merge' "$work/glab.log" && grep -q '^## Also in this MR' "$work/glab.log" && grep -q "mission's record under" "$work/glab.log" \
+  && t "mr.sh pushes the branch and opens the MR with glab, squash on; heading becomes the title, the rest the description, plus what else rides in it (D86)" || fail "mr glab create" "$(cat "$work/mr.log" "$work/glab.log")"
 ls "$work/data"/*/demo-*.tar.gz >/dev/null 2>&1 && tar -tzf "$work/data"/*/demo-*.tar.gz | grep -q 'demo/metrics.json' \
   && t "mr.sh keeps the mission's data: metrics next to its runs, one export in the machine's data folder (D103)" || fail "mission data" "$(ls -R "$work/data" 2>&1; cat "$work/mr.log")"
 git remote remove origin; rm -f $m/pr.md $m/mr.url

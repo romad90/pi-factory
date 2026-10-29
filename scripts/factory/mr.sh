@@ -18,7 +18,10 @@
 # How the MR is created, first that works:
 #   1. glab, if installed and logged in
 #   2. the GitLab API, with the token in the variable $FACTORY_GITLAB_TOKEN_ENV
-#      names (default GITLAB_TOKEN; the name only, never the token)
+#      names (default GITLAB_TOKEN; the name only, never the token), or in
+#      ~/.pi-factory/gitlab-token (mode 600; FACTORY_GITLAB_TOKEN_FILE)
+#      The MR is set to squash, and the description ends with "Also in this MR":
+#      commits that aren't the mission's work, and how many files are its record.
 #   3. push options (title and target set); the description is printed to paste
 # Run it again after editing pr.md: an open MR for the branch gets the new body.
 set -euo pipefail
@@ -67,6 +70,27 @@ desc="$(mktemp)"; trap 'rm -f "$desc"' EXIT
 awk 'done || !/^# /{print; next} {done=1}' "$body_file" | sed '/./,$!d' > "$desc"
 [ -z "$draft" ] || title="Draft: $title"
 
+# What else rides in this MR, said up front so nobody finds it after merging
+# (mission 5: setup commits and ~150 mission-record files the reviewer wasn't told about).
+also_in_mr() {
+  local base others nscratch nfiles
+  base="$(git merge-base HEAD "origin/$target" 2>/dev/null || git merge-base HEAD "$target" 2>/dev/null || true)"
+  [ -n "$base" ] || return 0
+  others="$(git log --no-merges --format='%H%x09%s' "$base..HEAD" | while IFS=$'\t' read -r h s; do
+    git log -1 --format=%B "$h" | grep -q '^Factory-Script:' && continue
+    case "$s" in *"($feature):"*) continue ;; esac
+    printf -- '- %s %s\n' "${h:0:8}" "$s"
+  done)"
+  nfiles="$(git diff --name-only "$base" HEAD | grep -c . || true)"
+  nscratch="$(git diff --name-only "$base" HEAD -- "$(mission_dir "$feature")" | grep -c . || true)"
+  [ -n "$others" ] || [ "${nscratch:-0}" -gt 0 ] || return 0
+  printf '\n## Also in this MR\n\n'
+  [ -z "$others" ] || printf 'Commits that are not the mission'"'"'s work (setup, configuration), to review as such:\n%s\n\n' "$others"
+  [ "${nscratch:-0}" -eq 0 ] || printf '%s of the %s changed files are the mission'"'"'s record under `%s/` (spec, contract, tickets, verdicts, decisions): the audit trail, not product code.\n' "$nscratch" "$nfiles" "$(mission_dir "$feature")"
+  printf '\nMerge with **squash** (set on this MR): `develop` gets one commit; the detailed history stays here.\n'
+}
+also_in_mr >> "$desc" || true
+
 [ -z "$(git status --porcelain --untracked-files=no)" ] || warn "uncommitted changes are not in the MR"
 echo "MR: $branch → $target"
 echo "    title: $title"
@@ -104,7 +128,7 @@ if command -v glab >/dev/null 2>&1 && glab auth status >/dev/null 2>&1; then
     echo "updated MR !$existing"
   else
     out="$(glab mr create --source-branch "$branch" --target-branch "$target" --title "$title" \
-      --description "$(cat "$desc")" ${reviewer:+--reviewer "$reviewer"} --yes 2>&1)" || die "glab: $out"
+      --description "$(cat "$desc")" ${reviewer:+--reviewer "$reviewer"} --squash-before-merge --yes 2>&1)" || die "glab: $out"
     record "$(printf '%s\n' "$out" | grep -o 'https://[^ ]*merge_requests/[0-9]*' | head -1)"
   fi
   exit 0
@@ -113,6 +137,12 @@ fi
 # 2. GitLab API with a token
 token_env="$(conf FACTORY_GITLAB_TOKEN_ENV)"; token_env="${token_env:-GITLAB_TOKEN}"
 token="${!token_env:-}"
+# Or a file only this user can read (never the shell history or a dotfile in a repo).
+tf="${FACTORY_GITLAB_TOKEN_FILE:-$HOME/.pi-factory/gitlab-token}"
+if [ -z "$token" ] && [ -f "$tf" ]; then
+  if [ -n "$(find "$tf" -perm /077 2>/dev/null)" ]; then warn "$tf is readable by others: chmod 600 it; not used"
+  else token="$(tr -d '[:space:]' < "$tf")"; fi
+fi
 if [ -n "$token" ]; then
   git push -u origin "$branch"
   remote="$(git remote get-url origin)"
@@ -125,7 +155,7 @@ if (!m) { console.log("ERR cannot read the project from the remote " + e.REMOTE.
 const host = m[1] || m[2], path = m[3];
 const base = (e.API || `https://${host}/api/v4`).replace(/\/$/, "") + "/projects/" + encodeURIComponent(path) + "/merge_requests";
 const h = { "PRIVATE-TOKEN": e.TOKEN, "Content-Type": "application/json" };
-const body = { source_branch: e.SRC, target_branch: e.TGT, title: e.TITLE, description: fs.readFileSync(e.DESC_FILE, "utf8"), remove_source_branch: false };
+const body = { source_branch: e.SRC, target_branch: e.TGT, title: e.TITLE, description: fs.readFileSync(e.DESC_FILE, "utf8"), remove_source_branch: false, squash: true };
 (async () => {
   const q = `${base}?state=opened&source_branch=${encodeURIComponent(e.SRC)}&target_branch=${encodeURIComponent(e.TGT)}`;
   let r = await fetch(q, { headers: h });
@@ -136,7 +166,7 @@ const body = { source_branch: e.SRC, target_branch: e.TGT, title: e.TITLE, descr
     if (u[0]) body.reviewer_ids = [u[0].id];
   }
   r = open[0]
-    ? await fetch(`${base}/${open[0].iid}`, { method: "PUT", headers: h, body: JSON.stringify({ title: body.title, description: body.description }) })
+    ? await fetch(`${base}/${open[0].iid}`, { method: "PUT", headers: h, body: JSON.stringify({ title: body.title, description: body.description, squash: true }) })
     : await fetch(base, { method: "POST", headers: h, body: JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
   console.log(r.ok ? `OK ${open[0] ? "updated" : "created"} ${j.web_url || ""}` : `ERR GitLab ${r.status}: ${JSON.stringify(j.message || j.error || "")}`);
@@ -149,7 +179,14 @@ const body = { source_branch: e.SRC, target_branch: e.TGT, title: e.TITLE, descr
 fi
 
 # 3. push options: GitLab creates the MR; the description is pasted by hand
+desc_keep="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/mr-description-$feature.md"
+mkdir -p "$(dirname "$desc_keep")"; cp "$desc" "$desc_keep"     # outside the tree: never dirties it
 git push -u origin "$branch" -o merge_request.create -o "merge_request.target=$target" -o "merge_request.title=$title"
 echo
-echo "The push opened the MR (title and target set). Its description, to paste (without the first # line):"
-echo "    cat $body_file"
+echo "The push opened the MR (title and target set), but a push can't carry a multi-line description or squash."
+echo "Paste the description from: $desc_keep   (and tick Squash commits)"
+echo
+echo "To never do this by hand again, once per machine: a GitLab access token with the api scope"
+echo "(GitLab, Preferences, Access tokens), kept out of your shell history:"
+echo "    install -m 600 /dev/null ~/.pi-factory/gitlab-token && \$EDITOR ~/.pi-factory/gitlab-token"
+echo "then run mr.sh again: it finds an open MR for this branch and fills it (description, squash, reviewer)."
