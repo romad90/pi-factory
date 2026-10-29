@@ -1421,6 +1421,26 @@ echo "Vendored skills"
 ( cd "$root/.pi/skills/deepen-prompt" && sed -n '/^```$/,/^```$/p' SOURCE.md | grep -v '^```' | if command -v sha256sum >/dev/null; then sha256sum -c --quiet -; else shasum -a 256 -c --quiet -; fi ) >"$work/vendor.log" 2>&1 \
   && t "deepen-prompt is vendored unchanged (hashes in its SOURCE.md)" || fail "deepen-prompt changed: update SOURCE.md on purpose, or restore the files" "$(cat "$work/vendor.log")"
 
+echo "Sync a mirror (sync-mirror.sh)"
+sm="$work/sync"; mkdir -p "$sm"
+git init -q --bare "$sm/origin.git"; git -C "$root" push -q "$sm/origin.git" HEAD:refs/heads/develop   # the factory as committed (CI checks out detached)
+git -C "$sm/origin.git" symbolic-ref HEAD refs/heads/develop; git -C "$sm/origin.git" tag v9.9.9-rc.1 develop
+git clone -q "$sm/origin.git" "$sm/clone"; git -C "$sm/clone" checkout -q --detach v9.9.9-rc.1   # left detached by a tag checkout
+mkdir -p "$sm/mirror/pi-factory"; git -C "$sm/mirror" init -q; echo old > "$sm/mirror/pi-factory/gone.txt"; echo x > "$sm/mirror/README"
+git -C "$sm/mirror" add -A; git -C "$sm/mirror" commit -qm init
+out="$(bash "$sm/clone/scripts/factory/sync-mirror.sh" "$sm/mirror" 2>&1)" || true
+[ -f "$sm/mirror/pi-factory/scripts/factory/next.sh" ] && [ ! -e "$sm/mirror/pi-factory/.git" ] && [ ! -e "$sm/mirror/pi-factory/gone.txt" ] \
+  && [ "$(git -C "$sm/mirror" log -1 --format=%s)" = "chore: pi-factory v9.9.9-rc.1" ] && [ "$(git -C "$sm/clone" branch --show-current)" = develop ] \
+  && t "sync-mirror: from a detached clone, the latest tag on develop replaces the mirror's folder (no .git, deleted files gone), committed" || fail "sync-mirror" "$out"
+out="$(bash "$sm/clone/scripts/factory/sync-mirror.sh" "$sm/mirror" 2>&1)" || true
+grep -q 'already at v9.9.9-rc.1' <<<"$out" || fail "sync-mirror twice" "$out"
+echo local >> "$sm/mirror/pi-factory/README.md"
+if out="$(bash "$sm/clone/scripts/factory/sync-mirror.sh" "$sm/mirror" 2>&1)"; then fail "sync-mirror must refuse local changes" "$out"; fi
+git -C "$sm/mirror" checkout -q -- pi-factory; mkdir "$sm/mirror/pi-factory/.git"
+if out2="$(bash "$sm/clone/scripts/factory/sync-mirror.sh" "$sm/mirror" 2>&1)"; then fail "sync-mirror must refuse a nested .git" "$out2"; fi
+grep -q 'has local changes' <<<"$out" && grep -q 'holds a .git' <<<"$out2" \
+  && t "sync-mirror: idempotent; refuses local changes in the folder and a copied .git" || fail "sync-mirror refusals" "$out $out2"
+
 echo "Setup by rehearsal (D102)"
 # head missing from the image: lib.sh's stand-in covers what the scripts call.
 nohead="$work/nohead"; mkdir -p "$nohead"
