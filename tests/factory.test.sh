@@ -586,6 +586,25 @@ bash scripts/factory/collect.sh demo >/dev/null
 grep -q '^\*\*Model:\*\* gw/judge-1 (configured for factory-code-steward)' $m/verdicts/health.md && t "steward verdict recorded with the configured model" || fail "steward model"
 expect_step pr "G5 passed"
 gate_ok "gate passes the whole mission (G1-G5)"
+# The retro: built from the record, saved outside every repository; learn scrubs what it shares.
+pack="$(bash scripts/factory/retro.sh pack demo 2>&1)"
+grep -q '^# Raw record: demo' <<<"$pack" && grep -q '^## Human decisions' <<<"$pack" && grep -q 'round' <<<"$pack" \
+  && grep -q "^## Request sizes" <<<"$pack" \
+  && t "retro pack: metrics, rounds, decisions, amendments, refusals and request sizes from the record" || fail "retro pack" "$pack"
+printf '# Retro: demo\n\n| # | Finding | Evidence | Fix | P | Kind |\n|---|---|---|---|---|---|\n| 1 | A ticket whose deliverable is outside the patchable tree is relaunched forever | rounds | the ticket writer refuses it | P1 | cost |\n' > $m/retro.md
+rdata="$work/rdata"; FACTORY_DATA_DIR="$rdata" bash scripts/factory/retro.sh save demo >/dev/null
+proj="$(basename "$(git rev-parse --show-toplevel)")"
+[ -f "$rdata/$proj/retros/demo.md" ] && [ -f "$rdata/$proj/retros/demo.metrics.json" ] \
+  && t "retro save: copied with its metrics to the private data folder, outside the repository" || fail "retro save" "$(ls -R "$rdata" 2>&1)"
+mkdir -p "$rdata/billing-api/retros" "$work/lhome/.pi-factory"
+printf '| # | Finding | Evidence | Fix | P | Kind |\n|---|---|---|---|---|---|\n| 1 | A ticket whose deliverable is outside the patchable tree loops at billing-api on https://git.acme.intra/x | x | the ticket writer refuses unpatchable tickets | P1 | cost |\n' > "$rdata/billing-api/retros/invoice-fix.md"
+echo "Acme" > "$work/lhome/.pi-factory/scrub-terms"
+lout="$(HOME="$work/lhome" FACTORY_DATA_DIR="$rdata" node scripts/factory/learn.mjs 2>&1)"
+grep -q 'seen in 2 mission(s), 2 project(s): A ticket whose deliverable is outside the patchable tree' <<<"$lout" \
+  && ! grep -q -i -e billing -e acme -e 'invoice-fix' <<<"$lout" && grep -q '<project-' <<<"$lout" \
+  && t "learn: one finding recurring across two projects comes first; project, mission, host and listed terms scrubbed" || fail "learn" "$lout"
+rm -f $m/retro.md
+
 mkdir -p "$work/usage/run"; printf '{"model":"gw/maker-1","usage":{"input":120000,"output":3000,"cacheRead":90000,"cacheWrite":0,"cost":0,"turns":14},"durationMs":60000}' > "$work/usage/run/r1abc_factory-worker_meta.json"
 FACTORY_USAGE_DIRS="$work/usage" bash scripts/factory/usage.sh demo >/dev/null; FACTORY_USAGE_DIRS="$work/usage" bash scripts/factory/usage.sh demo >/dev/null
 [ "$(grep -c r1abc $m/usage.tsv)" = 1 ] && t "usage.sh records each run's tokens once (D85)" || fail "usage" "$(cat $m/usage.tsv 2>&1)"
