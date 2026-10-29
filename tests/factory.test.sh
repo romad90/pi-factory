@@ -593,7 +593,7 @@ grep -q '^# Raw record: demo' <<<"$pack" && grep -q '^## Human decisions' <<<"$p
   && t "retro pack: metrics, rounds, decisions, amendments, refusals and request sizes from the record" || fail "retro pack" "$pack"
 printf '# Retro: demo\n\n| # | Finding | Evidence | Fix | P | Kind |\n|---|---|---|---|---|---|\n| 1 | A ticket whose deliverable is outside the patchable tree is relaunched forever | rounds | the ticket writer refuses it | P1 | cost |\n' > $m/retro.md
 rdata="$work/rdata"; FACTORY_DATA_DIR="$rdata" bash scripts/factory/retro.sh save demo >/dev/null
-proj="$(basename "$(git rev-parse --show-toplevel)")"
+pfx="$(git rev-parse --show-prefix)"; pfx="${pfx%/}"; proj="$(basename "$(git rev-parse --show-toplevel)")${pfx:+-${pfx//\//-}}"
 [ -f "$rdata/$proj/retros/demo.md" ] && [ -f "$rdata/$proj/retros/demo.metrics.json" ] \
   && t "retro save: copied with its metrics to the private data folder, outside the repository" || fail "retro save" "$(ls -R "$rdata" 2>&1)"
 mkdir -p "$rdata/billing-api/retros" "$work/lhome/.pi-factory"
