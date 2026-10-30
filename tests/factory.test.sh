@@ -962,6 +962,16 @@ process.exit(m && m.step === "other-branch" && m.otherBranch === "cockpit-side" 
 git branch -q -D cockpit-side
 bash scripts/factory/cockpit.sh --once "$work/cockpit" >/dev/null && [ -s "$work/cockpit/index.html" ] && grep -q '"missions"' "$work/cockpit/state.json" \
   && [ -z "$(git status --porcelain -- .scratch)" ] && t "cockpit.sh --once writes the page and its snapshot outside the repo, read-only" || fail "cockpit once" "$(ls "$work/cockpit"; git status --porcelain)"
+# Behind an IDE's port forwarding the Host is the IDE's name: answered only when listed.
+cport=$((20000 + RANDOM % 20000))
+FACTORY_COCKPIT_PORT=$cport FACTORY_COCKPIT_HOSTS=".ide.example" timeout 10 bash scripts/factory/cockpit.sh >"$work/ck.out" 2>"$work/ck.err" &
+ck=$!; for _ in 1 2 3 4 5 6 7 8 9 10; do curl -s -o /dev/null "http://127.0.0.1:$cport/" -H "Host: 127.0.0.1:$cport" && break; sleep 0.5; done
+c_local="$(curl -s -o /dev/null -w '%{http_code}' -H "Host: 127.0.0.1:$cport" "http://127.0.0.1:$cport/")"
+c_ide="$(curl -s -o /dev/null -w '%{http_code}' -H "Host: 7357--ws.ide.example" "http://127.0.0.1:$cport/")"
+c_evil="$(curl -s -o /dev/null -w '%{http_code}' -H "Host: evil.example" "http://127.0.0.1:$cport/")"
+kill "$ck" 2>/dev/null; wait "$ck" 2>/dev/null || true
+[ "$c_local" = 200 ] && [ "$c_ide" = 200 ] && [ "$c_evil" = 403 ] && grep -q 'refused Host evil.example' "$work/ck.err" \
+  && t "cockpit: answers localhost and the hosts in FACTORY_COCKPIT_HOSTS, refuses (and names) any other Host" || fail "cockpit hosts" "local=$c_local ide=$c_ide evil=$c_evil $(cat "$work/ck.err")"
 
 # D86: one command opens the MR from /pr's body.
 out="$(FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo --dry-run 2>&1)" && fail "mr.sh must refuse without a PR body"
