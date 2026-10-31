@@ -299,8 +299,19 @@ function addsApproval(input, abs) {
 const READ_ONLY_GIT = new Set(["log", "show", "blame", "diff", "grep", "ls-files", "rev-parse", "cat-file", "describe", "shortlog"]);
 const CONTEXT_PATH = /(^|\/)\.factory\/context(\/|$)/;
 
+// What a refused agent is told to do next. In a bench run (FACTORY_BENCH=1)
+// nobody answers the supervisor: an agent told to ask waited forever.
+export function refusalHint(env = process.env) {
+  return env.FACTORY_BENCH === "1"
+    ? "Nobody answers in a bench run: don't ask the supervisor. Do the ticket without it, or stop and say in your final answer what blocked you."
+    : "If this is really needed, stop and ask the human.";
+}
+
 export function check({ tool, input = {}, cwd = process.cwd() }) {
   if (process.env.FACTORY_GUARD === "off") return null;
+  if (tool === "contact_supervisor" && process.env.FACTORY_BENCH === "1" && input.reason !== "progress_update") {
+    return { rule: "bench", reason: "no supervisor in a bench run: nobody will reply, so don't ask again. Finish the ticket with what the files settle, or stop and say in your final answer what you needed: blocked by the factory guard" };
+  }
   if (tool === "subagent") {
     if (input.action !== undefined || !projectRoot(cwd)) return null;   // status, list: harmless
     const extra = Object.keys(input).filter((k) => !SUBAGENT_ALLOWED.has(k));

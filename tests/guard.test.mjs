@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import { check } from "../scripts/factory/guard-rules.mjs";
+import { check, refusalHint } from "../scripts/factory/guard-rules.mjs";
 
 const main = mkdtempSync(join(tmpdir(), "guard-main-"));
 mkdirSync(join(main, ".git")); mkdirSync(join(main, "instrument"));
@@ -287,6 +287,19 @@ test("D101: bench agents are workers", () => {
   const prev = process.env.FACTORY_ROLE;
   process.env.FACTORY_ROLE = "worker";
   try { assert.equal(bash("wget https://x")?.rule, "network"); } finally { if (prev === undefined) delete process.env.FACTORY_ROLE; else process.env.FACTORY_ROLE = prev; }
+});
+
+test("bench: no supervisor to wait for", () => {
+  const ask = { reason: "need_decision", message: "which name?" };
+  assert.equal(check({ tool: "contact_supervisor", input: ask, cwd: main }), null, "a mission's worker may ask");
+  assert.match(refusalHint({}), /ask the human/);
+  const prev = process.env.FACTORY_BENCH;
+  process.env.FACTORY_BENCH = "1";
+  try {
+    assert.equal(check({ tool: "contact_supervisor", input: ask, cwd: main })?.rule, "bench");
+    assert.equal(check({ tool: "contact_supervisor", input: { reason: "progress_update", message: "x" }, cwd: main }), null, "progress expects no reply");
+    assert.doesNotMatch(refusalHint(), /ask the human/);
+  } finally { if (prev === undefined) delete process.env.FACTORY_BENCH; else process.env.FACTORY_BENCH = prev; }
 });
 
 test("D101: the scrub list grows, KEEP can't bring back the model keys, false positives stay out", () => {

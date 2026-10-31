@@ -16,7 +16,7 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
-import { agentDir, check, inFactoryProject, scrubCommand, secretEnvNames } from "../../scripts/factory/guard-rules.mjs";
+import { agentDir, check, inFactoryProject, refusalHint, scrubCommand, secretEnvNames } from "../../scripts/factory/guard-rules.mjs";
 import { redact } from "../../scripts/factory/redact.mjs";
 
 // FACTORY_GATEWAY_KEY_ENV: environment first, then the project's
@@ -66,7 +66,7 @@ export default function (pi: any) {
         appendFileSync(join(dir, "guard.log"),
           `${new Date().toISOString()}\t${hit.rule}\t${event.toolName}\t${logged(event.input)}\t${cwd}\n`);
       } catch { /* outside a git repo: nothing to attach to */ }
-      return { block: true, reason: `${hit.reason}. If this is really needed, stop and ask the human.` };
+      return { block: true, reason: `${hit.reason}. ${hit.rule === "bench" ? "" : refusalHint()}`.trim() };
     }
     if (event.toolName === "bash" && typeof event.input?.command === "string" && inFactoryProject(cwd)) {
       const env = { ...process.env } as Record<string, string | undefined>;

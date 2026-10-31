@@ -1182,7 +1182,7 @@ cat > "$work/bin/fakebench" <<'FB'
 # <role> <case> <work-dir> <brief> <model> <thinking> <out-dir>
 set -euo pipefail
 role="$1" wd="$3" brief="$4" model="$5" thinking="$6" out="$7"
-echo "$role $2 $model $thinking role=${FACTORY_ROLE:-}" >> "$BENCH_LOG"
+echo "$role $2 $model $thinking role=${FACTORY_ROLE:-} bench=${FACTORY_BENCH:-} wd=$wd" >> "$BENCH_LOG"
 grep -q 'brief-id:' "$brief" || { echo "no brief"; exit 1; }
 if [ "$role" = reviewer ]; then
   m="${2%%--*}" tk="${2#*--}"; mkdir -p "$wd/.scratch/$m/verdicts"
@@ -1280,7 +1280,16 @@ git worktree list | grep -q 'pi-factory/bench/wt-hang' || fail "bench: no case w
 kill -TERM -- "-$bpid" 2>/dev/null || true; wait "$bpid" 2>/dev/null || true
 for _ in $(seq 50); do git worktree list | grep -q 'pi-factory/bench/wt-' || break; sleep 0.1; done
 [ -z "$(git worktree list | grep 'pi-factory/bench/wt-')" ] && t "bench: an interrupted run removes its case worktree (trap, D101)" || fail "bench trap" "$(git worktree list; cat "$work/bench-hang.log")"
-rm -f .factory/bench/results/hang.* .factory/bench/results/noguard.*
+# No human in a bench run: a case that never ends is stopped, named, and the run goes on.
+out="$(FACTORY_BENCH_CASE_MINUTES=0.03 FACTORY_BENCH_TICK=1 bash scripts/factory/bench.sh run default --config "$work/p5.json" --label limit 2>&1)" || fail "bench limit" "$out"
+grep -qP '^runner--01-run\teasy\ttooling\tno\ttimeout\t' .factory/bench/results/limit.tsv && grep -q 'stopped after 0.03 min' <<<"$out" \
+  && grep -q 'runner--01-run 0 min, guard refusals: 0' <<<"$out" && [ -z "$(git worktree list | grep 'pi-factory/bench/wt-')" ] \
+  && t "bench: a case past FACTORY_BENCH_CASE_MINUTES fails with gate timeout, progress lines meanwhile" || fail "bench limit" "$out $(cat .factory/bench/results/limit.tsv)"
+grep -q 'role=worker bench=1 wd=' "$BENCH_LOG" && ! grep -q 'wd=.*/\.git/' "$BENCH_LOG" \
+  && t "bench: agents know there is no supervisor (FACTORY_BENCH=1), and the case worktree is outside .git (jest ignores files there)" || fail "bench env" "$(cat "$BENCH_LOG")"
+out="$(FACTORY_BENCH_WORKTREES="$PWD/.git/x" bash scripts/factory/bench.sh run default --config "$work/p1.json" --label inside 2>&1)" && fail "bench must refuse worktrees under .git" "$out"
+grep -q 'inside a .git folder' <<<"$out" && t "bench refuses FACTORY_BENCH_WORKTREES inside a .git folder" || fail "bench .git" "$out"
+rm -f .factory/bench/results/hang.* .factory/bench/results/noguard.* .factory/bench/results/limit.* .factory/bench/results/inside.*
 git add .factory/bench; git commit -qm "test: bench data"
 unset BENCH_LOG FACTORY_BENCH_RUNNER
 

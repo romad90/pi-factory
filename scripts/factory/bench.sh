@@ -42,6 +42,16 @@
 # run unguarded (a project on the installed package, D92: the package's guard). Pi loads project extensions only for a trusted project: trust
 # this repo in Pi once (pi asks the first time it starts here) before a run.
 # Case worktrees are removed on any exit, error or interrupt, unless --debug.
+# They live outside the repository and outside any .git folder
+# (FACTORY_BENCH_WORKTREES, default ~/.cache/pi-factory/bench): jest skips
+# every file under a .git folder, so a case there ran no test at all.
+#
+# No human in a bench run: agents run with FACTORY_BENCH=1, and the guard
+# answers a call to the supervisor at once ("stop and say what you needed")
+# instead of letting it wait for a reply that never comes. Each case has a
+# wall-clock limit (FACTORY_BENCH_CASE_MINUTES, default 45, 0 for none; the
+# failed gate is "timeout") and prints a progress line every
+# FACTORY_BENCH_TICK seconds (default 120): elapsed time and guard refusals.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib.sh
@@ -138,8 +148,9 @@ profile_role() {   # <profile> <role> → "model<TAB>thinking"
 }
 
 # The current case's worktree, removed on any exit or signal unless --debug (D101).
-BENCH_WT=""; BENCH_TOP=""; BENCH_KEEP=0
+BENCH_WT=""; BENCH_TOP=""; BENCH_KEEP=0; BENCH_TICK=""
 bench_cleanup() {
+  if [ -n "$BENCH_TICK" ]; then kill "$BENCH_TICK" 2>/dev/null || true; BENCH_TICK=""; fi
   [ -n "$BENCH_WT" ] || return 0
   if [ "$BENCH_KEEP" = 1 ]; then echo "bench: kept $BENCH_WT" >&2
   else git -C "$BENCH_TOP" worktree remove --force "$BENCH_WT" >/dev/null 2>&1 || rm -rf "$BENCH_WT"
@@ -149,6 +160,30 @@ bench_cleanup() {
 trap bench_cleanup EXIT
 trap 'bench_cleanup; exit 130' INT
 trap 'bench_cleanup; exit 143' TERM
+
+# with_limit <out> <command...>: the case's wall-clock limit; <out>/timed-out marks a stop.
+with_limit() {
+  local out="$1" m="${FACTORY_BENCH_CASE_MINUTES:-45}" rc=0; shift
+  if [ "$m" = 0 ] || ! command -v timeout >/dev/null; then "$@"; return; fi
+  # --foreground: Ctrl+C still reaches the agent (timeout would put it in its own process group).
+  timeout --foreground -k 30 "${m}m" "$@" || rc=$?
+  if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then echo "$m" > "$out/timed-out"; fi
+  return "$rc"
+}
+
+# bench_ticker <id> <work-dir> <start>: a progress line every FACTORY_BENCH_TICK seconds.
+bench_ticker() {
+  local id="$1" wd="$2" t0="$3" every="${FACTORY_BENCH_TICK:-120}" log n last
+  log="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/guard.log"
+  while sleep "$every"; do
+    n=0; last=""
+    if [ -f "$log" ]; then
+      n="$(awk -F'\t' -v w="$wd" 'index($5, w) == 1' "$log" | grep -c . || true)"
+      last="$(awk -F'\t' -v w="$wd" 'index($5, w) == 1 { l = $2 " on " $3 } END { print l }' "$log")"
+    fi
+    echo "bench: $id $(( ($(date +%s) - t0) / 60 )) min, guard refusals: $n${last:+ (last: $last)}" >&2
+  done
+}
 
 pi_runner() {      # same arguments as FACTORY_BENCH_RUNNER
   local role="$1" id="$2" wd="$3" brief="$4" model="$5" thinking="$6" out="$7" wf raw
@@ -165,7 +200,7 @@ pi_runner() {      # same arguments as FACTORY_BENCH_RUNNER
     s.subagents.agentOverrides["factory-"+process.argv[2]]=Object.assign(s.subagents.agentOverrides["factory-"+process.argv[2]]||{},o);
     fs.mkdirSync(require("path").dirname(f),{recursive:true});fs.writeFileSync(f,JSON.stringify(s,null,2))' "$wd/.pi/settings.json" "$role" "$model" "$thinking"
   raw="$out/pi.jsonl"
-  ( cd "$wd" && FACTORY_ROLE=worker FACTORY_DRIVE_WORKFLOW="./$wf" "${pi_cmd[@]}" -p --mode json --no-session --approve \
+  ( cd "$wd" && FACTORY_ROLE=worker FACTORY_BENCH=1 FACTORY_DRIVE_WORKFLOW="./$wf" with_limit "$out" "${pi_cmd[@]}" -p --mode json --no-session --approve \
       -e "$here/driver.mjs" --model factory-driver/script "run the workflow" </dev/null >"$raw" 2>"$raw.err" ) || true
   node -e 'const fs=require("fs");const lines=fs.readFileSync(process.argv[1],"utf8").split("\n").filter(Boolean);let end=null;
     for(const l of lines){try{const e=JSON.parse(l);if(e.type==="tool_execution_end"&&e.toolName==="subagent")end=e;}catch{}}
@@ -178,7 +213,7 @@ run_role() {       # <role> <id> <wd> <brief> <profile> <out>
   local mt model thinking
   mt="$(profile_role "$5" "$1")"; model="${mt%%$'\t'*}"; thinking="${mt#*$'\t'}"
   if [ -n "${FACTORY_BENCH_RUNNER:-}" ]; then
-    FACTORY_ROLE=worker "$FACTORY_BENCH_RUNNER" "$1" "$2" "$3" "$4" "$model" "$thinking" "$6"
+    FACTORY_ROLE=worker FACTORY_BENCH=1 with_limit "$6" "$FACTORY_BENCH_RUNNER" "$1" "$2" "$3" "$4" "$model" "$thinking" "$6"
   else
     pi_runner "$1" "$2" "$3" "$4" "$model" "$thinking" "$6"
   fi
@@ -193,8 +228,11 @@ one_case() {
   [ -n "$at" ] && base="$(git rev-parse "$at")"
   [ "$base" != "-" ] || base="$(git rev-parse HEAD)"
   top="$(git rev-parse --show-toplevel)"; prefix="$(project_prefix)"
-  local root; root="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/bench"
-  wt="$root/wt-$label-$id-$$"; out="$root/out/$label/$id"; rm -rf "$out"; mkdir -p "$out"
+  local root wts; root="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/bench"
+  wts="${FACTORY_BENCH_WORKTREES:-${XDG_CACHE_HOME:-$HOME/.cache}/pi-factory/bench}"
+  case "$wts/" in */.git/*|*/.hg/*) die "FACTORY_BENCH_WORKTREES=$wts is inside a .git folder: jest would find no test there" ;; esac
+  mkdir -p "$wts"
+  wt="$wts/wt-$label-$id-$$"; out="$root/out/$label/$id"; rm -rf "$out"; mkdir -p "$out"
   git -C "$top" worktree add -q --detach "$wt" "$base" >/dev/null 2>&1 || die "could not create a worktree at $base"
   BENCH_WT="$wt"; BENCH_TOP="$top"; BENCH_KEEP="$debug"
   wd="$wt${prefix:+/$prefix}"
@@ -219,12 +257,15 @@ one_case() {
   local briefs; briefs="$(cd "$(factory_res "$FACTORY_BRIEFS_DIR")" && pwd)"
   ( cd "$wd" && FACTORY_BRIEFS_DIR="$briefs" bash "$here/brief.sh" "$role" "$mission" "$ticket" "$base" ) > "$out/brief.md"
   start="$(date +%s)"
+  bench_ticker "$id" "$wd" "$start" & BENCH_TICK=$!
   run_role "$role" "$id" "$wd" "$out/brief.md" "$profile" "$out" > "$out/runner.log" 2>&1 || rc=$?
+  kill "$BENCH_TICK" 2>/dev/null || true; BENCH_TICK=""
   patch="$out/change.patch"
   local skip=(); mapfile -t skip < <(load_commands; hook_excludes)
   ( cd "$wd" && git add -A -- . ":(exclude)$FACTORY_DIR" "${skip[@]}" >/dev/null 2>&1 \
       && git diff --cached --relative --binary "$base" -- . ":(exclude)$FACTORY_DIR" > "$patch" ) || true
-  if [ "$rc" -ne 0 ] && [ ! -s "$patch" ]; then gate=runner
+  if [ -f "$out/timed-out" ]; then gate=timeout; echo "bench: $id stopped after $(cat "$out/timed-out") min (FACTORY_BENCH_CASE_MINUTES)" >&2
+  elif [ "$rc" -ne 0 ] && [ ! -s "$patch" ]; then gate=runner
   elif [ ! -s "$patch" ]; then gate=no-patch
   elif ! ( cd "$wd" && bash "$here/patch-guard.sh" "$patch" --mission "$mission" ) > "$out/guard.log" 2>&1; then gate=guard
   else
@@ -296,6 +337,6 @@ case "$cmd" in
     node "$here/bench-report.mjs" compare "$BENCH" "$@" ;;
   paired)
     node "$here/bench-report.mjs" paired "$BENCH" "$@" ;;
-  ""|-h|--help|help) sed -n '2,37p' "$0" | sed 's/^# \{0,1\}//' ;;
+  ""|-h|--help|help) sed -n '2,48p' "$0" | sed 's/^# \{0,1\}//' ;;
   *) die "unknown command: $cmd (bench.sh help)" ;;
 esac
