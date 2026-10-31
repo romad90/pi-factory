@@ -39,7 +39,7 @@
 # Guarded like workers (D101): agents run with FACTORY_ROLE=worker, so the
 # factory guard applies the worker rules (no network, no shared dependencies);
 # a case worktree without .pi/extensions/factory-guard.ts is refused, never
-# run unguarded. Pi loads project extensions only for a trusted project: trust
+# run unguarded (a project on the installed package, D92: the package's guard). Pi loads project extensions only for a trusted project: trust
 # this repo in Pi once (pi asks the first time it starts here) before a run.
 # Case worktrees are removed on any exit, error or interrupt, unless --debug.
 set -euo pipefail
@@ -198,8 +198,11 @@ one_case() {
   git -C "$top" worktree add -q --detach "$wt" "$base" >/dev/null 2>&1 || die "could not create a worktree at $base"
   BENCH_WT="$wt"; BENCH_TOP="$top"; BENCH_KEEP="$debug"
   wd="$wt${prefix:+/$prefix}"
-  # D101: never an unguarded agent.
+  # D101: never an unguarded agent. A project on the installed package (D92)
+  # has no guard file in its tree: Pi loads it from the package, installed
+  # for this user, so the package's guard is what runs.
   [ -f "$wd/.pi/extensions/factory-guard.ts" ] || [ -f "$wt/.pi/extensions/factory-guard.ts" ] \
+    || { [ -f "$wd/.factory/package-sha" ] && [ -f "$FACTORY_PACKAGE_ROOT/.pi/extensions/factory-guard.ts" ]; } \
     || die "case $id: no .pi/extensions/factory-guard.ts at $base: bench won't run agents without the factory guard"
   # The worktree gets what a worker's would (D21, D27, D65): instrument hidden,
   # its port, the dependencies linked.
