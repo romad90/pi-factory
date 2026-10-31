@@ -1267,6 +1267,12 @@ grep -q 'worker runner--01-run gw/maker-1 medium role=worker' "$BENCH_LOG" && t 
 out="$(bash scripts/factory/bench.sh probe default --config "$work/p2.json" --at "$(git rev-list --max-parents=0 HEAD | tail -1)" --label noguard 2>&1)" && fail "bench must refuse a case without the guard" "$out"
 grep -q "won't run agents without the factory guard" <<<"$out" && [ -z "$(git worktree list | grep 'pi-factory/bench/wt-')" ] \
   && t "bench refuses a case worktree without the guard extension, and removes it (D101)" || fail "bench no guard" "$out $(git worktree list)"
+# On the installed package the guard comes from the package, not the tree: a case at a commit with .factory/package-sha runs.
+ng="$(git rev-list --max-parents=0 HEAD | tail -1)"; pk_side="$(git branch --show-current)"
+git switch -q --detach "$ng"; mkdir -p .factory; echo "$(git rev-parse HEAD)" > .factory/package-sha; git add -f .factory/package-sha; git commit -qm "test: on the package"; pkb="$(git rev-parse HEAD)"; git switch -q "$pk_side"
+out="$(bash scripts/factory/bench.sh probe default --config "$work/p2.json" --at "$pkb" --label pkguard 2>&1)"
+! grep -q "won't run agents without the factory guard" <<<"$out" \
+  && t "bench: a project on the installed package runs with the package's guard (D92)" || fail "bench package guard" "$out"
 printf '{"agents":{"factory-worker":{"model":"gw/maker-hang","thinking":"low"}}}' > "$work/p5.json"
 setsid bash scripts/factory/bench.sh run default --config "$work/p5.json" --label hang > "$work/bench-hang.log" 2>&1 & bpid=$!
 for _ in $(seq 150); do git worktree list | grep -q 'pi-factory/bench/wt-hang' && break; sleep 0.1; done
