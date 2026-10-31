@@ -16,6 +16,11 @@
 #                follow-up cases on the code at <commit> (default HEAD): how
 #                easy the code left behind is to change
 #   bench.sh compare <label> <label>... [--default <label>] [--strict] [--name x]
+#   bench.sh paired --a <label,label…> --b <label,label…> [--json]
+#                the same cases under two arms (repeats pooled): per-case deltas,
+#                median change with a bootstrap 95% CI, McNemar on pass/fail.
+#                To compare factory versions, run one arm with an older
+#                version's briefs: FACTORY_BRIEFS_DIR=<dir> bench.sh run …
 #
 # Files (committed with the project's factory data):
 #   .factory/bench/cases.tsv               one line per case
@@ -286,6 +291,8 @@ case "$cmd" in
   compare)
     mkdir -p "$BENCH/compare"
     node "$here/bench-report.mjs" compare "$BENCH" "$@" ;;
-  ""|-h|--help|help) sed -n '2,32p' "$0" | sed 's/^# \{0,1\}//' ;;
+  paired)
+    node "$here/bench-report.mjs" paired "$BENCH" "$@" ;;
+  ""|-h|--help|help) sed -n '2,37p' "$0" | sed 's/^# \{0,1\}//' ;;
   *) die "unknown command: $cmd (bench.sh help)" ;;
 esac

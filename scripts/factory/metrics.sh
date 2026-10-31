@@ -80,7 +80,7 @@ if [ -f "$dir/decisions.tsv" ]; then      # P8: human interventions vs questions
 fi
 usage_line="-"
 if [ -s "$dir/usage.tsv" ]; then      # D85: tokens per run, from pi-subagents' metadata
-  usage_line="$(awk -F'\t' 'NR > 1 { r++; i += $5; o += $6; c += $7; t += $10; if ($4 ~ /worker/) w += $5 + $6 }
+  usage_line="$(awk -F'\t' 'NR > 1 { r++; i += $5; o += $6; c += $7; t += $10; if ($3 ~ /worker/) w += $5 + $6 }
     END { printf "%d runs · %.1fM in (%.0f%% cached), %.1fk out · %d turns · workers %.1fM", r, i / 1e6, (i ? 100 * c / i : 0), o / 1e3, t, w / 1e6 }' "$dir/usage.tsv")"
 fi
 models_list=""
@@ -121,7 +121,8 @@ fi
 if [ "$json" = --json ]; then
   hours=null; [ -n "$first" ] && [ -n "$last" ] && hours=$(( (last - first) / 3600 ))
   FEATURE="$feature" INTENT="$intent" TICKETS="$tickets" REVIEWED="$reviewed" FIRST="$first_pass" ROUNDS="$rounds" DET="$det_fail" \
-  DECISIONS="$decisions" AUTO="$auto" HAND="$hand" HOURS="$hours" GUARD="$guard" \
+  DECISIONS="$decisions" AUTO="$auto" HAND="$hand" HOURS="$hours" GUARD="$guard" MODELS="$models_list" \
+  FACTORY_VERSION="$(node -p 'require(process.argv[1]).version' "$FACTORY_PACKAGE_ROOT/package.json" 2>/dev/null || cat .factory/VERSION 2>/dev/null || true)" \
   USAGE="$dir/usage.tsv" SCORES="$dir/scores.tsv" MRURL="$dir/mr.url" node -e '
     const fs = require("fs"), e = process.env, num = (v) => (/^\d+$/.test(v || "") ? Number(v) : null);
     const rd = (f) => { try { return fs.readFileSync(f, "utf8"); } catch { return ""; } };
@@ -133,7 +134,9 @@ if [ "$json" = --json ]; then
       runs: u.length, tokensIn: u.reduce((a, c) => a + Number(c[4] || 0), 0), tokensOut: u.reduce((a, c) => a + Number(c[5] || 0), 0),
       cost: Math.round(u.reduce((a, c) => a + Number(c[8] || 0), 0) * 100) / 100,
       scored: sc.length, scoreFails: sc.filter((c) => c[6] === "fail").length,
-      mr: rd(e.MRURL).trim() || null }));'
+      mr: rd(e.MRURL).trim() || null,
+      // What the mission ran with, so a comparison can say what differed.
+      factory: e.FACTORY_VERSION || null, models: e.MODELS || null }));'
   exit 0
 fi
 

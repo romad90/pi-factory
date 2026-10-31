@@ -732,7 +732,10 @@ cp $m/spec.md "$work/spec.keep"; printf '\n## Frozen path\n- src/\n' >> $m/spec.
 out="$(bash scripts/factory/next.sh demo)"; cp "$work/spec.keep" $m/spec.md
 echo "$out" | grep -q '^STEP: blocked' && echo "$out" | grep -q 'must be exactly "## Frozen paths"' \
   && t "next.sh blocks a misspelled '## Frozen paths' heading (D88)" || fail "frozen heading" "$out"
-grep -q 'Tokens (usage.tsv, D85) | 1 runs' "$work/metrics.md" && t "metrics: tokens from usage.tsv" || fail "metrics tokens" "$(grep -i token "$work/metrics.md")"
+grep -q 'Tokens (usage.tsv, D85) | 1 runs' "$work/metrics.md" && grep -q 'workers 0.1M' "$work/metrics.md" && t "metrics: tokens from usage.tsv, workers summed by agent" || fail "metrics tokens" "$(grep -i token "$work/metrics.md")"
+mj="$(bash scripts/factory/metrics.sh demo --json)"
+node -e 'const j=JSON.parse(process.argv[1]);process.exit(/^\d+\.\d+\.\d+/.test(j.factory||"")&&"models" in j?0:1)' "$mj" \
+  && t "metrics --json records the factory version and models the mission ran with" || fail "metrics version" "$mj"
 
 echo "Health ratchet"
 mkdir -p src/lib
@@ -1231,6 +1234,17 @@ head -1 <<<"$out" | grep -q '^3 configurations on suite default, 1 cases each, a
   && grep -q '⚠ m3 differs from m1 by 2 variables (worker model, worker thinking)' <<<"$out" \
   && node -e 'const c=require(process.argv[1]),p=(l)=>c.points.find(x=>x.label===l);process.exit(c.points.length===3&&p("m2").pareto&&!p("m1").pareto&&!p("m3").pareto&&p("m3").below_floor&&Math.abs(c.floor-0.9)<1e-9&&c.axes.includes("cost_per_trial")?0:1)' "$PWD/.factory/bench/compare/trio.json" \
   && t "bench compare: the answer first, cost recommendations only above the quality floor, a warning when two variables changed, the cockpit's points" || fail "bench compare" "$out"
+# Paired: same cases, two arms, repeats pooled; the interval says whether the change is real.
+pb="$work/paired"; mkdir -p "$pb/results"
+mk() { printf 'case\tdifficulty\tarea\tpass\tfailed_gate\tturns\ttokens\tcost\tseconds\trounds\n' > "$pb/results/$1.tsv"; shift
+  while [ $# -gt 0 ]; do printf '%s\tmedium\tx\t%s\t-\t%s\t%s\t0\t1\t1\n' "$1" "$2" "$3" "$4" >> "$pb/results/$LBL.tsv"; shift 4; done; }
+for i in 1 2; do LBL="old$i"; mk "$LBL" c1 yes 30 900000 c2 yes 40 1200000 c3 no 45 1500000 c4 yes 28 800000 c5 yes 33 1000000 c6 no 50 1700000
+  LBL="new$i"; mk "$LBL" c1 yes 18 500000 c2 yes 22 700000 c3 yes 25 800000 c4 yes 16 450000 c5 yes 20 600000 c6 yes 30 900000; done
+out="$(node scripts/factory/bench-report.mjs paired "$pb" --a old1,old2 --b new1,new2)"
+js="$(node scripts/factory/bench-report.mjs paired "$pb" --a old1,old2 --b new1,new2 --json)"
+node -e 'const j=JSON.parse(process.argv[1]);process.exit(j.cases===6&&j.tokens.median_delta<0&&j.tokens.excludes_zero&&j.pass.only_b===2&&j.pass.only_a===0&&j.pass.mcnemar_p===0.5?0:1)' "$js" \
+  && grep -q 'paired median change' <<<"$out" && [ "$js" = "$(node scripts/factory/bench-report.mjs paired "$pb" --a old1,old2 --b new1,new2 --json)" ] \
+  && t "bench paired: per-case deltas, a seeded bootstrap CI on the median change, McNemar on pass/fail (P20)" || fail "bench paired" "$out"
 bash scripts/factory/bench.sh run default --config "$work/p3.json" --label m3b >/dev/null 2>&1 || fail "bench run m3b"
 out="$(bash scripts/factory/bench.sh compare m3 m3b --min-pass 50 --name floorless 2>&1)" || fail "bench compare floor" "$out"
 grep -q '^most efficient   none: no configuration reaches the quality floor (50%)' <<<"$out" && grep -q '^lowest cost      none: no configuration reaches' <<<"$out" \
