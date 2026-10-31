@@ -174,7 +174,60 @@ function compare([dir, ...rest]) {
   console.log(""); console.log(`compare: ${file}`);
 }
 
+// --- paired: the same cases under two arms, repeats pooled (P20: is a change real?) ---
+// node bench-report.mjs paired <bench dir> --a <label,label…> --b <label,label…> [--seed N] [--iters N]
+// Per case: mean tokens and turns per arm over its repeats, pass by majority.
+// Paired deltas (b − a), their median with a percentile bootstrap 95% CI
+// (seeded: the same inputs give the same interval), and McNemar's exact test
+// on the cases whose majority pass differs. A total over different tickets
+// says nothing; this compares like with like.
+function paired(argv) {
+  const [dir] = argv, opt = (n) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : null; };
+  const A = (opt("--a") || "").split(",").filter(Boolean), B = (opt("--b") || "").split(",").filter(Boolean);
+  if (!dir || !A.length || !B.length) { console.error("usage: paired <bench dir> --a l1,l2 --b l1,l2 [--seed N] [--iters N]"); process.exit(2); }
+  let seed = Number(opt("--seed") || 7) >>> 0; const iters = Number(opt("--iters") || 2000);
+  const rnd = () => { seed = (seed + 0x6D2B79F5) >>> 0; let t = seed; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const arm = (labels) => {
+    const by = {};
+    for (const l of labels) for (const r of tsv(join(dir, "results", `${l}.tsv`))) {
+      const c = (by[r.case] ||= { tokens: [], turns: [], pass: [] });
+      c.tokens.push(Number(r.tokens) || 0); c.turns.push(Number(r.turns) || 0); c.pass.push(r.pass === "yes");
+    }
+    return by;
+  };
+  const a = arm(A), b = arm(B), mean = (x) => x.reduce((s, v) => s + v, 0) / (x.length || 1);
+  const cases = Object.keys(a).filter((k) => b[k]).sort();
+  if (!cases.length) { console.error("paired: no case ran in both arms"); process.exit(1); }
+  const rows = cases.map((k) => ({ case: k, runs: [a[k].pass.length, b[k].pass.length],
+    tokens: [mean(a[k].tokens), mean(b[k].tokens)], turns: [mean(a[k].turns), mean(b[k].turns)],
+    pass: [mean(a[k].pass.map(Number)) > 0.5, mean(b[k].pass.map(Number)) > 0.5] }));
+  const ci = (d) => {
+    const meds = [];
+    for (let i = 0; i < iters; i++) meds.push(median(d.map(() => d[Math.floor(rnd() * d.length)])));
+    meds.sort((x, y) => x - y);
+    return [meds[Math.floor(0.025 * iters)], meds[Math.min(iters - 1, Math.floor(0.975 * iters))]];
+  };
+  const stat = (key) => { const d = rows.map((r) => r[key][1] - r[key][0]); const [lo, hi] = ci(d);
+    return { median_a: median(rows.map((r) => r[key][0])), median_b: median(rows.map((r) => r[key][1])), median_delta: median(d), ci95: [lo, hi], excludes_zero: lo > 0 || hi < 0 }; };
+  // McNemar exact (two-sided binomial on discordant pairs).
+  const bOnly = rows.filter((r) => !r.pass[0] && r.pass[1]).length, aOnly = rows.filter((r) => r.pass[0] && !r.pass[1]).length, n = aOnly + bOnly;
+  const choose = (n, k) => { let c = 1; for (let i = 1; i <= k; i++) c = (c * (n - k + i)) / i; return c; };
+  let p = 1; if (n) { const k = Math.min(aOnly, bOnly); let tail = 0; for (let i = 0; i <= k; i++) tail += choose(n, i); p = Math.min(1, 2 * tail / 2 ** n); }
+  const out = { a: A, b: B, cases: rows.length, tokens: stat("tokens"), turns: stat("turns"),
+    pass: { a: rows.filter((r) => r.pass[0]).length, b: rows.filter((r) => r.pass[1]).length, only_a: aOnly, only_b: bOnly, mcnemar_p: Number(p.toFixed(4)) },
+    rows, note: rows.length < 5 ? "fewer than 5 paired cases: read the rows, not the interval" : null };
+  if (argv.includes("--json")) { process.stdout.write(JSON.stringify(out, null, 2) + "\n"); return; }
+  const k = (v) => (Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(Math.round(v)));
+  console.log(`paired: ${rows.length} cases, a = ${A.join("+")}, b = ${B.join("+")}`);
+  for (const key of ["tokens", "turns"]) { const t = out[key];
+    console.log(`  ${key}: median ${k(t.median_a)} → ${k(t.median_b)}, paired median change ${k(t.median_delta)} (95% CI ${k(t.ci95[0])} to ${k(t.ci95[1])})${t.excludes_zero ? "" : ": the interval includes no change"}`); }
+  console.log(`  pass: a ${out.pass.a}/${rows.length}, b ${out.pass.b}/${rows.length}; only a ${aOnly}, only b ${bOnly}; McNemar p = ${out.pass.mcnemar_p}`);
+  if (out.note) console.log(`  note: ${out.note}`);
+  for (const r of rows) console.log(`  ${r.case.padEnd(28)} tokens ${k(r.tokens[0])} → ${k(r.tokens[1])}  turns ${r.turns[0].toFixed(1)} → ${r.turns[1].toFixed(1)}  pass ${r.pass[0] ? "yes" : "no"} → ${r.pass[1] ? "yes" : "no"}  (${r.runs[0]}+${r.runs[1]} runs)`);
+}
+
 if (cmd === "summary") summary(args);
+else if (cmd === "paired") paired(args);
 else if (cmd === "print") print(args);
 else if (cmd === "compare") compare(args);
 else { console.error("usage: bench-report.mjs summary|print|compare ..."); process.exit(2); }
