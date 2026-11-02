@@ -2,3 +2,8 @@ Role: factory-reviewer, light lane. Change {{FEATURE}}, reviewed commit {{COMMIT
 Read: docs/agents/factory.md, docs/agents/verdict-format.md, and .scratch/light/{{FEATURE}}/request.md, blast-radius.md and decisions.tsv if they exist (decisions.tsv holds the human's answers; they win over your judgement). The change: git diff {{BASE}}..{{COMMIT}}.
 Use the code-review skill (Standards axis; the request is the spec); dispatch it to factory-review-axis with fresh context: subagent({ agent: "factory-review-axis", task: "<file paths, diff command, standards sources>", context: "fresh" }). If the dispatch fails, review it yourself in the same verdict and say so; never ask about it. Run the tests yourself: a check you did not run is not evidence, never write "I assume it passes".
 Write .scratch/light/{{FEATURE}}/verdicts/code.md with **Commit:** {{COMMIT}} and **Brief:** {{BRIEF_ID}}. Leave the round and the model to the factory. Write nothing else.
+The verdict starts with exactly these four lines; the factory parses them, and a verdict without a **Result:** PASS or FAIL line is sent back and the run repeated:
+# Verdict: {{FEATURE}}
+**Result:** PASS or FAIL
+**Commit:** {{COMMIT}}
+**Brief:** {{BRIEF_ID}}

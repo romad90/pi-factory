@@ -467,6 +467,17 @@ out="$(bash scripts/factory/next.sh demo 2>&1 || true)"
 [ "$(head -1 <<<"$out")" = "STEP: blocked" ] && grep -q "is on branch '$orig'" <<<"$out" \
   && t "a checkout switched to another branch is refused, with the mission's branch" || fail "wrong branch" "$out"
 git switch -q "$orig"; git branch -q -D elsewhere
+# A validator that ran `git checkout <sha>` left the checkout detached (two missions): reattached, never a forked history.
+git checkout -q --detach HEAD
+bash scripts/factory/checkpoint.sh demo > "$work/ck.log" 2>&1
+[ "$(git branch --show-current)" = "$orig" ] && grep -q "switched back to $orig" "$work/ck.log" \
+  && t "a detached HEAD on the mission's tip is switched back to its branch before a checkpoint" || fail "reattach" "$(cat "$work/ck.log")"
+git checkout -q --detach HEAD^
+out="$(bash scripts/factory/checkpoint.sh demo 2>&1)" && fail "checkpoint must refuse a detached HEAD off the branch" "$out"
+grep -q "detached HEAD" <<<"$out" && grep -q "git switch" <<<"$out" && t "a detached HEAD elsewhere stops the checkpoint with the command to run" || fail "detached refused" "$out"
+out="$(bash scripts/factory/next.sh demo 2>&1 || true)"
+[ "$(head -1 <<<"$out")" = "STEP: blocked" ] && grep -q "detached HEAD" <<<"$out" && t "next.sh blocks on a detached HEAD" || fail "next detached" "$out"
+git switch -q "$orig"
 
 # Ticket 02 asks a decision.
 bash scripts/factory/human.sh ask demo 02-count --stdin >/dev/null <<'Q'
@@ -553,6 +564,12 @@ expect_step validate "all tickets pass"
 
 echo "Mission: behavior"
 head="$(git rev-parse HEAD)"
+# A behavior verdict without its Result line is a format slip: sent back, the step is validate again, not fixes.
+printf '# Verdict: behavior\n**Commit:** %s\n\n## Assertions\n- VAL-HELLO-001: PASS\n' "$head" > $m/verdicts/behavior.md
+bash scripts/factory/collect.sh demo > "$work/collect-b.log" 2>&1
+grep -q 'behavior.md .*sent back' "$work/collect-b.log" && [ ! -f $m/verdicts/behavior.md ] && [ -f $m/state/behavior.invalid-verdict.md ] \
+  && t "a behavior verdict without a Result line is sent back, not read as FAIL" || fail "behavior sent back" "$(cat "$work/collect-b.log"; ls $m/verdicts $m/state)"
+expect_step validate "after a malformed behavior verdict the step is validate again"
 cat > $m/verdicts/behavior.md <<V
 # Verdict: behavior
 **Result:** PASS
@@ -565,6 +582,9 @@ cat > $m/verdicts/behavior.md <<V
 V
 bash scripts/factory/collect.sh demo >/dev/null
 expect_step unverified "PASS without evidence is unverified"
+[ ! -f $m/state/behavior.sent-back ] && t "a valid behavior verdict clears the send-back" || fail "behavior send-back cleared"
+for b in validator code-steward reviewer light-reviewer; do grep -q '^\*\*Result:\*\* PASS or FAIL$' .factory/briefs/$b.md || fail "verdict skeleton in $b brief"; done
+t "verdict-writing briefs carry the four-line verdict skeleton"
 gate_fail "gate blocks unverified behavior" "unverified, not accepted: VAL-HELLO-001"
 bash scripts/factory/human.sh accept-unverified demo VAL-HELLO-001 "no harness yet" >/dev/null
 expect_step health "accepted by a human, code health next (G5)"

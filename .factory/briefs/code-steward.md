@@ -4,3 +4,8 @@ The change under judgement: git diff {{BASE}}..{{COMMIT}} -- . ':(exclude).scrat
 The repo's own rules in AGENTS.md are part of the bar: a changed file that breaks one is a finding citing `AGENTS: <section>`, judged like a QB item.
 Use the code-steward skill. Run the tests yourself.
 Write .scratch/{{FEATURE}}/verdicts/health.md in the verdict format with **Commit:** {{COMMIT}} and **Brief:** {{BRIEF_ID}}, and the sections ## Bar, ## Explanations (one ### per changed source file) and ## Findings. Leave the round and the model to the factory. Write nothing else.
+The verdict starts with exactly these four lines; the factory parses them, and a verdict without a **Result:** PASS or FAIL line is sent back and the run repeated:
+# Verdict: health
+**Result:** PASS or FAIL
+**Commit:** {{COMMIT}}
+**Brief:** {{BRIEF_ID}}
