@@ -2,6 +2,18 @@
 
 Status: proposed, after mission 6. Depends on D98 (bench), D97 (archive), P14; section 7 on P2.
 
+## North star: delegate, don't supervise
+
+Chatting with agents is micromanagement: many tools, many conversations, every mistake corrected by hand, the human still in the loop. The factory aims at delegation instead: **one task, one owner; assign it and walk away; check the verifiable result at the end.**
+
+Delegation needs three things, and the factory has only the second today:
+
+1. **A complete assignment.** A spec that settles every decision. Mission 6 shows it works: a spec that left nothing open, and the factory asked the human no question.
+2. **An owner.** The scripted loop and its agents carry the task to the end.
+3. **A check that doesn't need the human.** Mission 6 also shows what is missing: every gate green, and the one escaped defect found only because the human ran a check by hand. "Walk away" is safe only when "verifiable" means a command.
+
+Every item below is judged by one question: does it let the human assign once and come back to a result they can trust without watching the work?
+
 ## Problem
 
 Mission 6 was the cleanest run so far: four tickets, all first-pass, no fix round, no question to the human, every gate green. One defect still got through every gate. A refactoring wrapped two public methods in a helper that returns `undefined` on error; TypeScript inferred `Promise<void | undefined>` instead of `Promise<void>`, so the package's published types changed. The contract had the right assertion ("the public surface is unchanged"). An agent judged it, compared export names, and passed it. The human's API Extractor run, a ten-second mechanical diff of the regenerated declarations, caught it after validation.
