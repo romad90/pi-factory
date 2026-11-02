@@ -98,6 +98,20 @@ The user's look at Warp Factories (October 2026) shows a second audience for the
 
 For us, v2 of the cockpit adds, next to leads → mission → ticket: an Inbox across repos, Agents (from `effective-models.mjs`), Scorers and Benchmarks (from P14's files), Self-improvement (from P15's `patterns.md`) and the factory definition with its version. Still read-only; the Run and approve buttons wait for P12 or P6.
 
+### 6. Actions: copy now, buttons later (after mission 6)
+
+The cockpit stays read-only (D90). What it adds now removes the manual labor without executing anything:
+
+- **The exact next command, with a copy button**, at every human `STEP`. Mission 6's errors came from retyping commands seen on a screen (a misspelled method name, `2>1` for `2>&1`, misspelled config keys), not from deciding.
+- **The new measurements** (P23): `prepare` and `verify` results, escaped defects, human wait per gate, the gate × fault-class recall table, each release's canary verdict.
+
+Buttons that run something come later, and only when all four hold:
+
+1. **Verified identity.** Today the page's only protection is a Host header check, and it is reached through an IDE's port forwarding without authentication: an approve button would let anyone who reaches the port approve a gate. Identity comes from the forge (P16).
+2. **An audit trail** of who ran what, in the mission's record.
+3. **Stable commands:** a command unchanged for two missions. A button over a moving command is rebuilt every release.
+4. **Reversible actions only:** rerun the bench, run `verify`, refresh a snapshot. Approving, amending and merging stay deliberate acts in the session or the forge: their friction is the review.
+
 ## Trade-offs
 
 | For | Against |
@@ -118,5 +132,5 @@ For us, v2 of the cockpit adds, next to leads → mission → ticket: an Inbox a
 ## Open questions
 
 - SQLite (Atelier, SSSF) or JSONL? Proposed: JSONL in the mission folder, committed with the rest; SQLite only if the page gets slow.
-- Should the page ever write? Proposed: no in this proposal. Decisions stay in `/factory-decide`; P6 adds buttons that call the same scripts.
+- Should the page ever write? Proposed: no in this proposal. Decisions stay in `/factory-decide`; P6 adds buttons that call the same scripts, under the four conditions of section 6.
 - One page per mission or per repo? Proposed: per repo, missions as tabs, since a repo rarely runs more than one.
