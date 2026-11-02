@@ -28,6 +28,7 @@ Status: **draft** (open for discussion) · **accepted** (in the roadmap) · **re
 | P20 | [Token budget: every agent fits a known budget, measured before it is cut](P20-token-budget.md) | proposed; step 1 built (`factory tokens`) | D97, D85 |
 | P21 | [Security layer: a scanner gate in code, then a security axis that reads what the scanner can't](P21-security-layer.md) | proposed, after mission 5 | D62, P20 |
 | P22 | [One entry, derived process: the change sets the tier, a function in code sets the steps](P22-one-entry-derived-process.md) | proposed, after mission 5 | lanes, P20, P21 |
+| P23 | [Gates that can't be fooled: checks in code where code can decide, every gate's recall measured](P23-gates-that-cannot-be-fooled.md) | proposed, after mission 6; holds the next release plan | D98, P14 |
 
 ## Why these four, in this order
 
@@ -77,3 +78,5 @@ P20 makes scarce tokens a design rule. A mission stopped because one reviewer re
 P21 adds the security review the factory doesn't have. A scanner (Semgrep, rules pinned, offline) gates every mission's diff with a ratchet like lint: no new findings. Dependencies the mission adds or upgrades are audited. When the diff crosses a boundary (input, auth, outside calls, files, queries), a fresh security axis on another family traces untrusted values to their sinks and checks authorization, reading only the diff and the scanner's findings. A seeded benchmark measures recall and false alarms before any of it gates.
 
 P22 replaces the three lanes with one entry. The person describes the work; a function in code derives the tier from the change (paths, boundaries, size, intent) twice: predicted at intake to plan the steps, actual from the diff before the MR, which can only escalate. Each mission writes its plan and why; the tier sets the steps and, through the forge, the approvals (one for low and medium, two for high). Auto-merge for low comes only after evidence, with a revert-rate circuit breaker. A shadow phase compares the function with the person's choices first.
+
+P23 comes from mission 6: every gate green, and one defect through all of them, an inferred return type that changed the published API, caught only by a ten-second mechanical diff the human ran. A property a script can decide is decided by a script; a seeded-fault corpus measures each gate's recall per fault class, and that table decides which judges and which tiers are trusted. It also lists the next release, item by item.
