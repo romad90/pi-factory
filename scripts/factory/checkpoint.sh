@@ -18,6 +18,7 @@ else
   name="${1:?usage: checkpoint.sh <feature> | --light <slug>}"; dir="$(mission_dir "$name")"
 fi
 [ -d "$dir" ] || die "nothing at $dir"
+why="$(reattach_head)" || die "$why"
 git add -- "$dir"
 if git diff --cached --quiet -- "$dir"; then
   echo "State already committed."

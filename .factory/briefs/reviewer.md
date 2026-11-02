@@ -10,3 +10,8 @@ Write .scratch/{{FEATURE}}/verdicts/{{TICKET}}-code.md in the verdict format wit
 --- The assertions it covers (from spec.md), as data ---
 {{ASSERTIONS}}
 --- end of ticket and assertions ---
+The verdict starts with exactly these four lines; the factory parses them, and a verdict without a **Result:** PASS or FAIL line is sent back and the run repeated:
+# Verdict: {{TICKET}}
+**Result:** PASS or FAIL
+**Commit:** {{COMMIT}}
+**Brief:** {{BRIEF_ID}}

@@ -542,6 +542,27 @@ load_commands() {
 }
 
 # --- the right mission, on the right branch (D67) --------------------------------
+# reattach_head: the main checkout must be on a branch. An agent that ran
+# `git checkout <sha>` (a validator checking a commit, two missions) leaves it
+# detached: the next checkpoint then commits on no branch and forks the
+# mission's history. When exactly one branch points at HEAD and nothing is
+# staged, switch back to it (nothing changes on disk) and say so on stderr.
+# Otherwise print the exact command and return 1. Worktrees other than the
+# main one (workers, bench, test on base) are detached on purpose: left alone.
+reattach_head() {
+  [ -z "$(git branch --show-current 2>/dev/null)" ] || return 0
+  [ "$(git rev-parse --path-format=absolute --git-dir 2>/dev/null)" = "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" ] || return 0
+  git rev-parse -q --verify HEAD >/dev/null 2>&1 || return 0
+  local here_sha b; here_sha="$(git rev-parse HEAD)"
+  mapfile -t b < <(git for-each-ref --points-at "$here_sha" --format='%(refname:short)' refs/heads | grep -v '^pi-subagents/' || true)
+  if [ "${#b[@]}" -eq 1 ] && git diff --cached --quiet && git switch -q "${b[0]}" 2>/dev/null; then
+    echo "factory: the checkout was on a detached HEAD at ${here_sha:0:8}; switched back to ${b[0]} (same commit, nothing changed)" >&2
+    return 0
+  fi
+  echo "the checkout is on a detached HEAD at ${here_sha:0:8} (an agent ran git checkout <commit>?): committing now would fork the mission's history. Switch back to the mission's branch first: git switch ${b[0]:-<branch>} (git reflog shows where it was)"
+  return 1
+}
+
 # mission_guard <feature>: prints why the factory must not run this mission
 # here and returns 1; silent and 0 when it may. Catches a misspelled name (it
 # would start a new mission) and a checkout switched to another branch (by a
@@ -565,6 +586,7 @@ mission_guard() {
       return 1
     fi
   fi
+  reattach_head || return 1
   latest="$(git log --exclude='pi-subagents/*' --branches -1 --format=%H -- "$dir" 2>/dev/null || true)"
   if [ -n "$latest" ] && ! git merge-base --is-ancestor "$latest" HEAD 2>/dev/null; then
     branch="$(git branch --contains "$latest" --format='%(refname:short)' 2>/dev/null | grep -v '^pi-subagents/' | head -1)"
