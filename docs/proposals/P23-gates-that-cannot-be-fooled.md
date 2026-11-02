@@ -127,7 +127,7 @@ From missions 4–6 and their retros, in order. Each line is one PR, merged by t
 
 **Tooling and cockpit**
 14. `mr.sh`: the title from the spec when `pr.md` has none; `--help`.
-15. Cockpit: QUIET only for running agents; MR count from `mr.url`; workers labelled by ticket.
+15. Cockpit: QUIET only for running agents; MR count from `mr.url`; workers labelled by ticket. Read-only additions (P10 section 6): the next command with a copy button at every human step, and the new measurements; no button that runs anything yet.
 16. `doctor`: warn on `NODE_TLS_REJECT_UNAUTHORIZED=0`; warn when user-level skills shadow the factory's (`~/.agents/skills`) and differ.
 17. Guard: block reads of `~/.netrc`, `~/.git-credentials`, `~/.npmrc`.
 18. Tools that copy the project tree (mutation testers) skip the factory's links: an ignore hint written by `factory link`.
