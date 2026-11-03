@@ -9,6 +9,7 @@
 #   scripts/factory/archive.sh export <feature> [file] pack a mission's archive (tar.gz)
 #   scripts/factory/archive.sh import <file>           unpack an export into this checkout's archive
 #   scripts/factory/archive.sh tokens <feature> [--budget N]  request sizes per run, and the tool results that fill them (P20)
+#   scripts/factory/archive.sh frictions <feature> [--json]   failed, repeated and refused tool calls, by cause (P23)
 #
 # Where: <git-common-dir>/pi-factory/archive/<feature>/<run>/, next to the
 # draft patches (D73) and run logs (D91): never committed, never in an MR,
@@ -35,7 +36,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib.sh
 . "$here/lib.sh"
 
-usage="usage: archive.sh collect|list|export|tokens <feature> [file|--budget N] | import <file>"
+usage="usage: archive.sh collect|list|export|tokens|frictions <feature> [file|--budget N] | import <file>"
 cmd="${1:?$usage}"; shift
 
 archive_root() {                       # <git-common-dir>/pi-factory/archive
@@ -65,6 +66,12 @@ case "$cmd" in
     feature="${1:?$usage}"; shift
     bash "$here/archive.sh" collect "$feature" >/dev/null 2>&1 || true
     node "$here/tokens.mjs" "$(archive_root)/$feature" "$@"
+    ;;
+  frictions)
+    # P23: where agents fought their setup, from the transcripts. Collects first.
+    feature="${1:?$usage}"; shift
+    bash "$here/archive.sh" collect "$feature" >/dev/null 2>&1 || true
+    node "$here/frictions.mjs" "$(archive_root)/$feature" "$@"
     ;;
   export)
     feature="${1:?$usage}"; src="$(archive_root)/$feature"
