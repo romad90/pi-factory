@@ -1395,7 +1395,7 @@ grep -qE '\| shape \| API server, library; talks to MongoDB, HTTP services \(fro
   && grep -qE '\| risk: TLS certificate checks can be off \| src/tools/call.js:2' $ms \
   && grep -qE '\| risk: outgoing calls without a timeout \| 1 of 1 file\(s\) .*src/tools/call.js' $ms \
   && t "measure: the project's shape from its manifests, its packs, and risks an SRE looks for first (TLS off, calls without timeouts)" || fail "shape and risks" "$(cat $ms)"
-tlsid="$(sed -n 's/^| \(M-[0-9]*\) | risk: TLS.*/\1/p' $ms)"; toid="$(sed -n 's/^| \(M-[0-9]*\) | risk: outgoing.*/\1/p' $ms)"; shid="$(sed -n 's/^| \(M-[0-9]*\) | shape .*/\1/p' $ms)"
+tlsid="$(sed -n 's/^| \(M-[0-9]*\) | risk: TLS.*/\1/p' $ms)"; toid="$(sed -n 's/^| \(M-[0-9]*\) | risk: outgoing.*/\1/p' $ms)"
 rm -rf reports
 [ "$(astep tidy-tools)" = "STEP: architect" ] || fail "job architect step"
 bash scripts/factory/workflow.sh architect tidy-tools > "$work/wf.log"; wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"

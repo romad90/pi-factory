@@ -72,7 +72,7 @@ title="$(sed -n 's/^# \{1,\}//p' "$body_file" | head -1)"
 if [ -z "$title" ] && [ -f "$dir/spec.md" ]; then
   h="$(sed -n 's/^# \{1,\}//p' "$dir/spec.md" | head -1 | sed -E 's/^([Ss]pec|[Mm]ission)[[:space:]]*(:|—|–|-)[[:space:]]*//')"
   case "$(verdict_field "$dir/spec.md" Intent)" in
-    feature) ty=feat ;; bugfix) ty=fix ;; refactor) ty=refactor ;; maintenance) ty=test ;; *) ty=chore ;;
+    feature) ty=feat ;; bugfix) ty=fix ;; refactor) ty=refactor ;; maintenance) ty="test" ;; *) ty=chore ;;
   esac
   [ -z "$h" ] || title="$ty($feature): $h"
 fi
