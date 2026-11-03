@@ -3,7 +3,7 @@
 # The first output line is machine-readable for the lead (/factory):
 #   STEP: <code>
 # Codes (human steps marked *, they notify you):
-#   measure architect approve-strategy* mission job-done*   (a job, P22)
+#   measure architect strategy-critic approve-strategy* mission job-done*   (a job, P22)
 #   paused* grill* context-sync investigate approve-conclusion* handoff* report*
 #   contract approve* design approve-design* decide* tickets approve-tickets* coverage*
 #   setup* build review escalate* blocked* validate behavior-fix
@@ -71,10 +71,25 @@ if [ ! -f "$spec" ] && [ -f "$dir/job.md" ]; then
     [ ${#rejected[@]} -lt 2 ] || step blocked "the architect's strategy failed its check three times: read $st and the problems above; fix job.md (a clearer job) or write the strategy yourself"
     step architect "scripts/factory/workflow.sh architect $feature (the strategy goes back to the architect with these problems)"
   fi
+  # Doubt before a person reads it (D107): a critic of another family attacks
+  # the plan; a [blocking] finding sends it back to the architect.
+  sh12="$(sha256 "$st" | cut -c1-12)"; crit="$dir/strategy-critique.md"
+  if ! approved_by_human "$st" Strategy approve-strategy; then
+    if [ ! -f "$crit" ] || ! grep -q "^\*\*Strategy:\*\* $sh12" "$crit"; then
+      step strategy-critic "scripts/factory/workflow.sh strategy-critic $feature (another family, fresh: attacks the plan before you read it)"
+    fi
+    if grep -q '^\[blocking\]\|^- \[blocking\]' "$crit"; then
+      STATUS="The critic's blocking findings:"$'\n'"$(grep -E '^(- )?\[blocking\]' "$crit")"$'\n'
+      rejected=("$dir"/state/strategy.rejected-*.md)
+      [ ${#rejected[@]} -lt 2 ] || step blocked "the critic blocked the strategy after two rewrites: read $st and $crit, then decide (fix job.md, edit the strategy, or approve it as it is with /factory-approve $feature strategy)"
+      step architect "scripts/factory/workflow.sh architect $feature (the strategy goes back to the architect with the critic's findings)"
+    fi
+  fi
   if ! approved_by_human "$st" Strategy approve-strategy; then
     hint=""; approval_unrecorded "$st" Strategy approve-strategy && hint=" $UNRECORDED"
     STATUS="$(sed -n '/^## Choice/,/^## Missions/p' "$st" | sed '$d')"$'\n'
-    step approve-strategy "human, once: read $st (options, choice, missions, decisions for the team), then /factory-approve $feature strategy. To change it: edit it, or delete it and run /factory $feature (the architect writes it again).$hint"
+    nb="$(grep -cE '^(- )?\[non-blocking\]' "$crit" 2>/dev/null || true)"; [ "${nb:-0}" -eq 0 ] || STATUS+="The critic left $nb non-blocking finding(s) in $crit."$'\n'
+    step approve-strategy "human, once: read $st (options, choice, missions, decisions for the team) and $crit, then /factory-approve $feature strategy. To change it: edit it, or delete it and run /factory $feature (the architect writes it again).$hint"
   fi
   STATUS="Missions of job $feature:"$'\n'
   next_m=""

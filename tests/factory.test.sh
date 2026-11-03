@@ -67,7 +67,7 @@ t "an unknown pack is refused"
 # Fake models: author/worker one family, critic/judges another.
 for a in .pi/agents/factory/*.md; do
   case "$(basename "$a")" in
-    factory-contract-critic.md|factory-reviewer.md|factory-review-axis.md|factory-validator.md|factory-code-steward.md) m=gw/judge-1 ;;
+    factory-contract-critic.md|factory-strategy-critic.md|factory-reviewer.md|factory-review-axis.md|factory-validator.md|factory-code-steward.md) m=gw/judge-1 ;;
     *) m=gw/maker-1 ;;
   esac
   sed -i.bak "s|^model: .*|model: $m|" "$a" && rm -f "$a.bak"
@@ -1432,7 +1432,7 @@ cat > .scratch/tidy-tools/strategy.md <<ST
 ST
 git add .scratch/tidy-tools; git commit -qm "test: a bad strategy"
 out="$(bash scripts/factory/next.sh tidy-tools 2>&1 || true)"
-[ "$(head -1 <<<"$out")" = "STEP: architect" ] && grep -q '\[M-99\] is cited but measures.md has no such row' <<<"$out" && grep -q 'option A: no \*\*Leaves out:\*\* line' <<<"$out" \
+[ "$(head -1 <<<"$out")" = "STEP: architect" ] && grep -q '\[M-99\] is cited but measures.md has no such row' <<<"$out" && grep -q 'option A: no \*\*Non-goals:\*\* line' <<<"$out" \
   && grep -q '\*\*Chosen:\*\* C is not one of the options' <<<"$out" && grep -q 'lowercase words and dashes' <<<"$out" && grep -q 'Done when:\*\* needs a command' <<<"$out" \
   && grep -q 'Decisions for the team' <<<"$out" && t "strategy check: uncited numbers, missing fields, an unknown choice, a mission without a command refused, back to the architect" || fail "strategy check" "$out"
 out="$(bash scripts/factory/human.sh approve tidy-tools strategy 2>&1)" && fail "a refused strategy can't be approved" "$out"
@@ -1453,6 +1453,7 @@ cat > .scratch/tidy-tools/strategy.md <<ST
 ### A. Refactor now
 **Value:** faster [$fid]
 **Cost:** one mission
+**Strength:** speculative
 **Leaves out:** pinning
 
 ### B. Leave it
@@ -1475,6 +1476,15 @@ Speed [$fid].
 
 Flatten a.js.
 
+### 2. fix-calls
+**Intent:** bugfix
+**After:** refactor-tools
+**Max tickets:** 2
+**Scope:** src/tools/call.js
+**Done when:** \`npm test\`
+
+Add a timeout.
+
 ## Decisions for the team
 - none
 ST
@@ -1482,6 +1492,10 @@ out="$(node scripts/factory/strategy.mjs check .scratch/tidy-tools .scratch tidy
 grep -q 'refactor-tools: refactors src/tools/a.js (mutation 33.3% \['"$fid"'\]) without an earlier mission pinning it to 70%' <<<"$out" \
   && grep -q 'Lenses names fewer than two lenses' <<<"$out" && grep -q "\[$tlsid\] (risk: TLS certificate checks can be off) is a decision for the team" <<<"$out" \
   && t "casebook: a blind refactor, a plan without lenses, a TLS risk not left to the team are refused" || fail "casebook" "$out"
+grep -q '\*\*Chosen:\*\* A is speculative' <<<"$out" && grep -q 'option B: \*\*Strength:\*\* must be' <<<"$out" && grep -q 'option A: no \*\*Trade-off:\*\* line' <<<"$out" \
+  && grep -q 'refactor-tools: refactors a library \[.*\] without checking its public surface' <<<"$out" \
+  && grep -q 'fix-calls: a bugfix names its \*\*Reproduction:\*\*' <<<"$out" \
+  && t "casebook: a speculative choice, options without strength or trade-off, a library refactor that doesn't check its surface (Hyrum), a fix without a reproduction are refused" || fail "casebook 2" "$out"
 cat > .scratch/tidy-tools/strategy.md <<ST
 # Strategy: tidy-tools
 
@@ -1499,12 +1513,18 @@ cat > .scratch/tidy-tools/strategy.md <<ST
 ### A. Pin, then refactor
 **Value:** a.js becomes safe to change [$fid]
 **Cost:** two missions, about 6 tickets
-**Leaves out:** new features
+**Strength:** strong
+**Risks:** none known beyond the time spent; the surface is checked
+**Trade-off:** buys safety, pays with time
+**Non-goals:** new features
 
 ### B. Refactor now
 **Value:** faster [$fid]
 **Cost:** one mission, but blind
-**Leaves out:** safety
+**Strength:** speculative
+**Risks:** a silent behavior change
+**Trade-off:** buys speed, pays with safety
+**Non-goals:** safety
 
 ## Choice
 **Chosen:** A
@@ -1526,7 +1546,7 @@ Pin what a.js does today: one assertion per surviving mutant. No change under sr
 **After:** pin-tools
 **Max tickets:** 3
 **Scope:** src/tools/a.js
-**Done when:** \`npm test\` green, frozen tests unchanged
+**Done when:** \`npm test\` green, frozen tests unchanged, \`git diff --exit-code -- etc/t.api.md\`
 **Frozen tests:** tests/
 
 Flatten a.js with named refactorings.
@@ -1534,7 +1554,26 @@ Flatten a.js with named refactorings.
 ## Decisions for the team
 - certificate checks can be turned off [$tlsid]: the team decides the default
 ST
-[ "$(astep tidy-tools)" = "STEP: approve-strategy" ] || fail "approve-strategy step" "$(bash scripts/factory/next.sh tidy-tools 2>&1)"
+cp .scratch/tidy-tools/strategy.md "$work/strategy-good.md"
+# Doubt before a person reads it (D107): the critic attacks; a blocking finding sends the plan back.
+[ "$(astep tidy-tools)" = "STEP: strategy-critic" ] || fail "strategy-critic step" "$(bash scripts/factory/next.sh tidy-tools 2>&1)"
+bash scripts/factory/workflow.sh strategy-critic tidy-tools > "$work/wf.log"; wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
+sh12="$(bash -c '. scripts/factory/lib.sh; sha256 .scratch/tidy-tools/strategy.md | cut -c1-12')"
+grep -q '"agent": "factory-strategy-critic"' "$wf" && grep -q "strategy $sh12" "$wf" && grep -q 'strategy-critique.md' "$wf" \
+  && t "strategy critic: another family, fresh, reads the job, the measurements and the plan it attacks" || fail "critic wave" "$(cat "$wf")"
+printf '# Critique: tidy-tools\n**Strategy:** %s\n- [blocking] pin-tools never runs mutation testing: its done condition cannot fail on weak tests [%s]\n' "$sh12" "$fid" > .scratch/tidy-tools/strategy-critique.md
+out="$(bash scripts/factory/next.sh tidy-tools 2>&1 || true)"
+[ "$(head -1 <<<"$out")" = "STEP: architect" ] && grep -q 'never runs mutation testing' <<<"$out" || fail "critic blocks" "$out"
+bash scripts/factory/workflow.sh architect tidy-tools > /dev/null
+grep -q 'never runs mutation testing' .scratch/tidy-tools/state/strategy-check.md && [ -f .scratch/tidy-tools/state/strategy.rejected-2.md ] \
+  && t "a blocking finding sends the plan back to the architect, with the finding, before anyone reads it" || fail "critic rejected" "$(ls .scratch/tidy-tools/state)"
+sed 's/^Its score \[/Its score, still the measured one [/' "$work/strategy-good.md" > .scratch/tidy-tools/strategy.md
+sh12="$(bash -c '. scripts/factory/lib.sh; sha256 .scratch/tidy-tools/strategy.md | cut -c1-12')"
+[ "$(astep tidy-tools)" = "STEP: strategy-critic" ] || fail "a new strategy is criticized again"
+printf '# Critique: tidy-tools\n**Strategy:** %s\n- [non-blocking] option B is shown fairly\n' "$sh12" > .scratch/tidy-tools/strategy-critique.md
+out="$(bash scripts/factory/next.sh tidy-tools 2>&1 || true)"
+[ "$(head -1 <<<"$out")" = "STEP: approve-strategy" ] && grep -q '1 non-blocking finding' <<<"$out" \
+  && t "no blocking finding: the person reads the plan and the critique, once" || fail "approve-strategy step" "$out"
 out="$(bash scripts/factory/human.sh approve tidy-tools strategy 2>&1)" || fail "approve strategy" "$out"
 out2="$(bash scripts/factory/human.sh approve tidy-tools strategy 2>&1)"
 grep -q 'already approved' <<<"$out2" && [ "$(grep -c approve-strategy .scratch/tidy-tools/decisions.tsv)" = 1 ] \

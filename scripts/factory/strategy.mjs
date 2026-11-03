@@ -26,7 +26,7 @@ function missions() {
     const head = b.split("\n")[0].trim(), name = head.replace(/^\d+\.\s*/, "");
     const text = b.split("\n").slice(1).filter((l) => !/^\*\*[A-Z][\w ]*:\*\*/.test(l)).join("\n").trim();
     return { name, intent: field(b, "Intent"), after: field(b, "After") || "-", max: field(b, "Max tickets"), scope: field(b, "Scope"),
-      done: field(b, "Done when"), frozenPaths: list(field(b, "Frozen paths")), frozenTests: list(field(b, "Frozen tests")), text };
+      done: field(b, "Done when"), repro: field(b, "Reproduction"), frozenPaths: list(field(b, "Frozen paths")), frozenTests: list(field(b, "Frozen tests")), text };
   });
 }
 
@@ -41,11 +41,16 @@ function check() {
     if (!field(o.body, "Value")) p.push(`option ${o.letter}: no **Value:** line`);
     else if (!cites(field(o.body, "Value")).length) p.push(`option ${o.letter}: its value cites no measurement`);
     if (!field(o.body, "Cost")) p.push(`option ${o.letter}: no **Cost:** line`);
-    if (!field(o.body, "Leaves out")) p.push(`option ${o.letter}: no **Leaves out:** line`);
+    if (!field(o.body, "Non-goals") && !field(o.body, "Leaves out")) p.push(`option ${o.letter}: no **Non-goals:** line`);
+    const st = field(o.body, "Strength").toLowerCase();
+    if (!["strong", "worth exploring", "speculative"].includes(st)) p.push(`option ${o.letter}: **Strength:** must be strong, worth exploring or speculative`);
+    if (!field(o.body, "Trade-off")) p.push(`option ${o.letter}: no **Trade-off:** line (the quality it buys, and the one it pays with)`);
   }
   const chosen = field(section(s, "Choice"), "Chosen").replace(/[^A-Z].*$/, "");
   if (!chosen) p.push("## Choice has no **Chosen:** line");
   else if (!opts.some((o) => o.letter === chosen)) p.push(`**Chosen:** ${chosen} is not one of the options`);
+  else if (field(opts.find((o) => o.letter === chosen).body, "Strength").toLowerCase() === "speculative")
+    p.push(`**Chosen:** ${chosen} is speculative: show it, don't choose it; if the best path needs a number you don't have, the first mission measures it`);
   if (!cites(section(s, "Choice")).length) p.push("## Choice cites no measurement: say why from the numbers");
   if (!cites(section(s, "What the measurements say")).length) p.push("## What the measurements say cites no measurement");
   const ms = missions();
@@ -63,6 +68,7 @@ function check() {
     if (m.after !== "-" && !seen.includes(m.after)) p.push(`${at}: **After:** ${m.after} is not an earlier mission`);
     if (m.intent === "refactor" && !m.frozenTests.length) p.push(`${at}: a refactor names its **Frozen tests:**`);
     if (!m.text) p.push(`${at}: no mission text under its fields`);
+    if (m.intent === "bugfix" && !m.repro) p.push(`${at}: a bugfix names its **Reproduction:**, the test that fails before the fix`);
     seen.push(m.name);
   }
   if (!/^## Decisions for the team/m.test(s)) p.push("no ## Decisions for the team section (write \"- none\" if there is none)");
@@ -88,6 +94,11 @@ function check() {
       if (!pinned) p.push(`mission ${m.name}: refactors ${f.path} (${f.score === null ? "test strength not measured" : `mutation ${f.score}%`} [${f.id}]) without an earlier mission pinning it to ${threshold}%`);
     }
   });
+  // Hyrum's law: a library's observable behavior, its types included, is its callers' contract.
+  const shape = (rows.find((r) => r.what === "shape") || {}).value || "";
+  if (/\blibrary\b/.test(shape)) for (const m of ms.filter((m) => m.intent === "refactor"))
+    if (!(m.done.match(/`[^`]+`/g) || []).some((c) => /api-extractor|\.api\.md|declaration/i.test(c)))
+      p.push(`mission ${m.name}: refactors a library [${(rows.find((r) => r.what === "shape") || {}).id}] without checking its public surface: its done condition needs a command that fails when the API report changes (Hyrum's law)`);
   const decisions = section(s, "Decisions for the team");
   for (const r of rows.filter((r) => /^risk: TLS/.test(r.what))) {
     if (!cites(decisions).includes(r.id)) p.push(`[${r.id}] (${r.what}) is a decision for the team: name it under ## Decisions for the team`);
@@ -109,6 +120,7 @@ if (cmd === "check") {
     if (existsSync(f)) { console.log(`  ${m.name}: spec exists, kept`); continue; }
     const L = [`# ${m.name}`, "", `**Intent:** ${m.intent}`, `**Job:** ${job} (${approved})`, `**After:** ${m.after}`, `**Max tickets:** ${m.max}`, "",
       "## Problem", "", m.text, "", "## Scope", "", m.scope || "-", "", "## Done when", "", m.done, ""];
+    if (m.repro) L.push("## Reproduction", "", m.repro, "");
     if (m.frozenPaths.length) L.push("## Frozen paths", "", ...m.frozenPaths.map((x) => `- ${x}`), "");
     if (m.frozenTests.length) L.push("## Frozen tests", "", ...m.frozenTests.map((x) => `- ${x}`), "");
     L.push(`Written from .scratch/${job}/strategy.md, approved by a person. It settles the scope: no grilling; what it leaves open goes to the contract critic.`);

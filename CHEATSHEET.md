@@ -87,7 +87,7 @@ After any model change, probe the gateway once: `doctor.sh` (full) runs `models-
 
 | File | Set |
 |---|---|
-| `.pi/agents/factory/*.md` | `model:` and `thinking:` per agent (13 agents; a profile without `factory-architect` gives it the designer's model) |
+| `.pi/agents/factory/*.md` | `model:` and `thinking:` per agent (14 agents; a profile without `factory-architect` or `factory-strategy-critic` gives them the designer's or the contract critic's model) |
 | `.pi/settings.json` | `subagents.modelScope.allow: ["<your-provider>/*"]` |
 | `.factory/model-families.json` | a `{ "match": "*name*", "family": "x" }` line per model you use |
 
@@ -169,7 +169,7 @@ It writes `.factory/commands.env`, `behavior-paths`, `model-families.json`, `VER
 /factory-job tidy-api "make the api modules easy to change"
 ```
 
-The factory measures the code (`measure.sh`: what kind of software it is from its manifests, the practice packs installed, tests, history, per-file nesting, churn, importers, mutation score from the last report in `reports/mutation/mutation.json`, the public API report, and risks found by pattern: certificate checks off, calls without timeouts, empty catch blocks). Then a fresh architect writes `.scratch/<job>/strategy.md`: what the numbers say, the lenses it used and why, two or three options with value and cost, the choice, up to four missions in order, and the decisions that belong to your team (no mission takes them). A script checks it first: every number cited is measured, every mission has a command for "done", at least two lenses with evidence, no refactor of a file under 70% mutation score (`FACTORY_PIN_THRESHOLD`) without a pinning mission first, and a TLS risk always left to your team. Read it, then:
+The factory measures the code (`measure.sh`: what kind of software it is from its manifests, the practice packs installed, tests, history, per-file nesting, churn, importers, mutation score from the last report in `reports/mutation/mutation.json`, the public API report, and risks found by pattern: certificate checks off, calls without timeouts, empty catch blocks). Then a fresh architect writes `.scratch/<job>/strategy.md`: what the numbers say, the lenses it used and why, two or three options with value and cost, the choice, up to four missions in order, and the decisions that belong to your team (no mission takes them). A script checks it first: every number cited is measured, every mission has a command for "done", at least two lenses with evidence, no refactor of a file under 70% mutation score (`FACTORY_PIN_THRESHOLD`) without a pinning mission first, a library refactor whose done condition checks the public API report (Hyrum's law), a fix that names its reproduction, options with a strength (a speculative one is never chosen) and a trade-off, and a TLS risk always left to your team. Then a strategy critic from another model family attacks it; a blocking finding sends it back to the architect before you see it. Read it and the critique, then:
 
 ```text
 /factory-approve tidy-api strategy
@@ -203,7 +203,8 @@ Keep specs to roughly 12 stories or fewer; split anything bigger into two missio
 | `paused` | lead | a pause note exists | lead resumes and continues |
 | `measure` | lead | a job without measurements, or the job changed | `measure.sh <job>` (no model, D105) |
 | `architect` | lead | a job without a strategy, or the strategy failed its check | runs the architect (its problems go into the brief) |
-| `approve-strategy` | you | the strategy passed its check | read `strategy.md`, `/factory-approve <job> strategy` |
+| `strategy-critic` | lead | the strategy passed its check, no critique of this version yet | runs the strategy critic (another family); a blocking finding sends it back to the architect |
+| `approve-strategy` | you | the strategy passed its check and its critic | read `strategy.md` and `strategy-critique.md`, `/factory-approve <job> strategy` |
 | `mission` | lead | the strategy is approved | continues with the job's next mission |
 | `job-done` | you | every mission of the job has its MR | merge them in order; `retro.sh close` after each |
 | `grill` | you | no spec (and no job) | `/grill-with-docs`, `/to-spec`, or `/factory-job` |

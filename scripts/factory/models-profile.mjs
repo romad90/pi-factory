@@ -30,7 +30,7 @@ const profile = arg || process.env.PI_FACTORY_MODELS || join(homedir(), ".pi-fac
 const placeholder = (v) => /[<>]/.test(String(v ?? ""));
 // An agent newer than the profile takes the model of the agent its role is
 // closest to, and says so, so an upgrade never leaves an agent without a model.
-const STAND_IN = { "factory-architect": "factory-designer" };
+const STAND_IN = { "factory-architect": "factory-designer", "factory-strategy-critic": "factory-contract-critic" };
 function withStandIns(p) {
   p.agents = p.agents ?? {};
   for (const [name, from] of Object.entries(STAND_IN)) {

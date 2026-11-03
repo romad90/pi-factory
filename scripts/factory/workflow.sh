@@ -8,6 +8,7 @@
 #
 # Usage:
 #   scripts/factory/workflow.sh architect   <job>       (P22: plan a job from its measurements)
+#   scripts/factory/workflow.sh strategy-critic <job>   (D107: attack the plan before a person reads it)
 #   scripts/factory/workflow.sh investigate <feature>
 #   scripts/factory/workflow.sh contract    <feature>
 #   scripts/factory/workflow.sh tickets     <feature> <all|fix-behavior|fix-health>
@@ -21,7 +22,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib.sh
 . "$here/lib.sh"
 
-mode="${1:?usage: workflow.sh <architect|investigate|contract|design|tickets|build-wave|review-wave|validate|steward|light> <feature> ...}"
+mode="${1:?usage: workflow.sh <architect|strategy-critic|investigate|contract|design|tickets|build-wave|review-wave|validate|steward|light> <feature> ...}"
 feature="${2:?usage: workflow.sh <mode> <feature> ...}"
 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
@@ -105,7 +106,11 @@ return out;'
     mkdir -p "$d/state"
     if [ -f "$d/strategy.md" ]; then
       if problems="$(node "$here/strategy.mjs" check "$d" "$FACTORY_DIR" "$feature" 2>&1)"; then
-        die "$d/strategy.md passes its check: approve it (/factory-approve $feature strategy), or delete it to plan again"
+        # It passes its check: it goes back only on the critic's blocking findings for this version.
+        sh12="$(sha256 "$d/strategy.md" | cut -c1-12)"
+        grep -q "^\*\*Strategy:\*\* $sh12" "$d/strategy-critique.md" 2>/dev/null && grep -qE '^(- )?\[blocking\]' "$d/strategy-critique.md" \
+          || die "$d/strategy.md passes its check: approve it (/factory-approve $feature strategy), or delete it to plan again"
+        problems="The strategy critic's blocking findings (.scratch/$feature/strategy-critique.md):"$'\n'"$(grep -E '^(- )?\[blocking\]' "$d/strategy-critique.md")"
       fi
       n=1; while [ -e "$d/state/strategy.rejected-$n.md" ]; do n=$((n + 1)); done
       mv "$d/strategy.md" "$d/state/strategy.rejected-$n.md"
@@ -113,6 +118,17 @@ return out;'
       bash "$here/checkpoint.sh" "$feature" >/dev/null
     fi
     add architect factory-architect false architect "$feature"
+    body='const it = ITEMS[0];
+const r = await runs.run(it.key, { agent: it.agent, task: it.task });
+return { output: r.output };'
+    ;;
+
+  strategy-critic)
+    # D107: doubt before a person reads the plan. Another family, fresh context.
+    d="$(mission_dir "$feature")"
+    [ -f "$d/strategy.md" ] || die "no strategy to criticize at $d/strategy.md"
+    node "$here/strategy.mjs" check "$d" "$FACTORY_DIR" "$feature" >/dev/null 2>&1 || die "the strategy fails its check: the architect fixes it first"
+    add strategy-critic factory-strategy-critic false strategy-critic "$feature" "$(sha256 "$d/strategy.md" | cut -c1-12)"
     body='const it = ITEMS[0];
 const r = await runs.run(it.key, { agent: it.agent, task: it.task });
 return { output: r.output };'

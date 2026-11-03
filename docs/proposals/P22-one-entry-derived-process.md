@@ -68,7 +68,9 @@ The tier decides how much process one change gets. Before that, a job has to bec
 - **Risks measured as leads.** Certificate checks turned off, outgoing calls whose file never sets a timeout, empty catch blocks, a library that exits the process: found by pattern, each with where.
 - **Expectations held by code, not by repetition.** The check refuses a refactor of a file under the pin threshold without an earlier pinning mission, a plan without lenses, and a TLS risk not left to the team. Each rule is a case in the test suite's casebook; a new expectation becomes a new case, not a new instruction to remember.
 
-Next, once the data supports it: the critic attacks the strategy as it attacks a contract, and the strategy's approval stands in for the missions' own approvals when the checks (P23) carry the missions' done conditions.
+**Borrowed, held by checks (D107).** Strength and trade-off per option (ATAM, improve-codebase-architecture), done conditions as fitness functions, Hyrum's law for libraries, a reproduction for every fix, the codebase-design vocabulary, a table of the excuses our missions showed, and a strategy critic of another family that attacks the plan before the person reads it (doubt-driven review).
+
+Next, once the data supports it: the strategy's approval stands in for the missions' own approvals when the checks (P23) carry the missions' done conditions.
 
 ## Migration
 
