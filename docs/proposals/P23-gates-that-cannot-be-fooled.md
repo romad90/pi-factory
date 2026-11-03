@@ -77,7 +77,7 @@ What it decides:
 - Mission cost includes the lead: mission 6 spent 7.2M input tokens in the lead's own session against 2.1M in all subagents, and the cockpit counted only the subagents.
 - Decisions carry a kind (gate, amendment, question); the target applies to questions only. A second approval of an approved gate is refused.
 - `factory learn` groups findings by a fixed `Area` column the retro skill fills (`verdict-format`, `git-state`, `gate-coverage`, `cost`, `measurement`, `setup`, `cockpit`), not by word overlap, which missed every paraphrase.
-- **Pinned models.** The lead ran on a `latest` alias the gateway can repoint at any time, so two missions or two bench arms may not have run the same model. The profile names exact versions; each run records the model the gateway actually resolved; `doctor` refuses a `latest` alias for any role.
+- **Pinned models.** The lead ran on a `latest` alias the gateway can repoint at any time, so two missions or two bench arms may not have run the same model. The pre-flight already warns about floating aliases (D102); it becomes a refusal for any role, the profile names exact versions, and each run records the model the gateway actually resolved.
 - **Human wait, measured.** The time from a human `STEP` to the decision is recorded per gate. Mission 6's 15-hour cycle was mostly waiting; machine time and human time are reported apart, which is the honest number for anyone deciding whether to adopt the factory.
 
 ### 4. The human's checks become commands
@@ -93,9 +93,30 @@ Once the script checks of section 1 exist, `verify` runs inside the loop; until 
 
 rc.39 to rc.42 went straight into a real project after the factory's own tests. A release candidate now runs the bench's cases (and `bench.sh recall` once the corpus exists) before `sync-mirror.sh` may install it in a project; a drop in pass rate or recall beyond the run-to-run noise blocks it. The same rule applies to Pi and pi-subagents upgrades.
 
-### 6. The retro closes after the merge
+### 6. The retro closes after the merge (built)
 
-The lead writes the retro before the MR, so it never sees what came after: the human's checks (mission 6's escape is missing from its retro), the team's review comments, a defect found in use. `retro.sh close <mission>` runs after the merge: it pulls the MR's review comments, asks for escaped defects, and adds them to the saved retro. Each escaped defect becomes a seeded fault in the corpus, so the corpus grows from real misses.
+The lead writes the retro before the MR, so it never sees what came after: the human's checks (mission 6's escape is missing from its retro), the team's review comments, a defect found in use. `retro.sh close <mission>`, run after the merge, adds a section to the private retro:
+
+- **The team's review comments, as candidate recall misses.** A comment a person had to leave is something the factory's reviewers did not say (the recall failure of an AI reviewer, as Faire measures it). It is a candidate, not a miss: a comment can be a preference or a question. The human labels each one `[miss]` or `[ok]`; labels survive a re-run. `factory learn` counts the labelled misses per mission. System notes, bots and the MR's author are left out.
+- **Reverts** of the merged change: a guardrail metric. Throughput can rise while quality falls; a revert says so.
+- **Escaped defects**, one line each, written by the person. Each one becomes a seeded fault in the corpus (section 2), so the corpus grows from real misses.
+
+Precision (an agent's comment nobody acted on) does not apply yet: the factory's reviewers write verdicts, not MR comments. It does when P16 brings review into the forge.
+
+### 6b. Friction from the transcripts (built)
+
+An agent fighting its setup (a port in use, a tool missing, a guard refusal it retries around) spends tokens and reports success anyway. Uber lets agents report these "paper cuts" themselves; the factory reads them from the evidence instead: `factory frictions <mission>` lists, from the archived transcripts, the tool calls that failed, the calls repeated three times or more in a run, and the guard's refusals, grouped by cause across runs (digits folded, so port 3001 and port 3002 are one cause). The retro pack includes it. A cause seen in several runs is fixed in a brief, a setup step or a skill, and the next mission's frictions show whether the fix held.
+
+### 6c. Old specs are dated intent (built)
+
+Every mission leaves its spec in `.scratch/<mission>/spec.md`. Six months later it describes what was wanted then, not what the code does. The rule every role shares (`docs/agents/factory.md`): another mission's spec is intent as of its date; for current behavior, the code and its tests are the truth.
+
+### 6d. No judge is trusted before it is calibrated (rule)
+
+Scoring runs with an LLM judge (Warp's rubrics: redundant tests, verbosity, efficiency) assume the judge is right. Mission 6 had four judges agree on something false. Two rules before any judge's score drives a decision:
+
+1. **Count before judging.** What a script can count is counted: efficiency is failed calls, repeated calls and tokens (`frictions`, `tokens`), not a rubric.
+2. **Calibrate.** A judge is run on labelled cases first (the seeded-fault corpus, the labelled review misses) and its agreement with the labels is reported. A judge below the bar set in advance informs, never gates. Entry condition: a corpus of at least 20 labelled cases per dimension.
 
 ### 7. The lead's memory, bounded (P2 revisited)
 
@@ -106,6 +127,7 @@ All mission state is on disk; `next.sh` rebuilds it every step. The lead's long 
 - Mission 6's escape replayed on the bench: today's gates miss it; with `surface` typed as a script check, it fails at validation.
 - `bench.sh recall` on the corpus before and after: the table is the evidence for each gate change.
 - The next mission's retro: escaped defects (found after the MR by any check or person) is the headline metric, target zero.
+- Labelled review misses per mission (`learn`), and frictions per run, before and after each fix aimed at them.
 - Preparation time and typing errors before and after `factory prepare`: mission 6 took about three hours.
 - Lead tokens per mission before and after a fresh session per step.
 
@@ -123,34 +145,37 @@ From missions 4–6 and their retros, in order. Each line is one PR, merged by t
 **Reliability**
 1. ✅ Verdict sent back on a format slip; skeleton in every verdict-writing brief (#97).
 2. ✅ No checkpoint on a detached HEAD; reattached when safe (#97).
-3. Bench: no hang (no supervisor in a bench run), case worktrees outside `.git` (jest ignored them and the tests gate passed on zero tests), a time limit and progress lines per case. On branch `fix/bench-no-hang`, to finish.
+3. ✅ Bench: no hang (no supervisor in a bench run), case worktrees outside `.git` (jest ignored them and the tests gate passed on zero tests), a time limit and progress lines per case (#100).
 4. `factory prepare` and `factory verify`: the human's checks as two commands (section 4).
 5. Canary release: an rc replays the bench before it can reach a project (section 5).
 6. Typed assertions and the five script checks (section 1).
 7. Seeded-fault corpus, `bench.sh recall`; mission 6's escape is case 1 (section 2).
-8. `retro.sh close` after the merge; escaped defects become seeded faults (section 6).
+8. ✅ `retro.sh close` after the merge: review comments as candidate misses, reverts, escaped defects (section 6).
+9. ✅ `factory frictions`: failed, repeated and refused calls from the transcripts, in the retro pack (section 6b).
+10. ✅ Other missions' specs are dated intent (section 6c).
+11. Judge calibration on labelled cases before any score gates (section 6d), once the corpus has 20 cases per dimension.
 
 **Measurement**
-9. Pinned model versions, the resolved model recorded per run, no `latest` alias.
-10. Health baseline carries its factory version; the duplicate counter skips generated declarations (`types/`, `*.d.ts`), which made every duplicate in one project a false positive.
-11. Mutation rule: no new surviving mutant.
-12. Lead tokens in the mission cost; decisions by kind; idempotent approvals; human wait per gate.
-13. Retros saved under the repository's name, not the worktree folder's; `Area` column; `learn` groups by it; old-format retros read or flagged.
+12. Pinned model versions, the resolved model recorded per run; a floating alias refused, not only warned about (D102 warns).
+13. Health baseline carries its factory version; the duplicate counter skips generated declarations (`types/`, `*.d.ts`), which made every duplicate in one project a false positive.
+14. Mutation rule: no new surviving mutant.
+15. Lead tokens in the mission cost; decisions by kind; idempotent approvals; human wait per gate.
+16. Retros saved under the repository's name, not the worktree folder's; `Area` column; `learn` groups by it; old-format retros read or flagged.
 
 **Tooling and cockpit**
-14. `mr.sh`: the title from the spec when `pr.md` has none; `--help`.
-15. Cockpit: QUIET only for running agents; MR count from `mr.url`; workers labelled by ticket. Read-only additions (P10 section 6): the next command with a copy button at every human step, and the new measurements; no button that runs anything yet.
-16. `doctor`: warn on `NODE_TLS_REJECT_UNAUTHORIZED=0`; warn when user-level skills shadow the factory's (`~/.agents/skills`) and differ.
-17. Guard: block reads of `~/.netrc`, `~/.git-credentials`, `~/.npmrc`.
-18. Tools that copy the project tree (mutation testers) skip the factory's links: an ignore hint written by `factory link`.
-19. A complete mission text skips the grilling and goes to the spec; the grilling asks only what is missing.
+17. `mr.sh`: the title from the spec when `pr.md` has none; `--help`.
+18. Cockpit: QUIET only for running agents; MR count from `mr.url`; workers labelled by ticket. Read-only additions (P10 section 6): the next command with a copy button at every human step, and the new measurements; no button that runs anything yet.
+19. `doctor`: warn when user-level skills shadow the factory's (`~/.agents/skills`) and differ. (TLS checks turned off are already reported, D102.)
+20. Guard: block reads of `~/.netrc`, `~/.git-credentials`, `~/.npmrc`.
+21. Tools that copy the project tree (mutation testers) skip the factory's links: an ignore hint written by `factory link`.
+22. A complete mission text skips the grilling and goes to the spec; the grilling asks only what is missing.
 
 **Cost (P20; P2 for the lead)**
-20. A fresh lead session per step (section 7), measured on lead tokens per mission.
-21. Prompt caching for the fixed prefix, if the gateway supports it (0% cached in every mission so far).
-22. Reviewers stop browsing the factory's own scripts: `scripts/factory` hidden from agents like the instrument.
-23. A mechanical loop guard: the same tool call three times in a row, or a supervisor call with no reply, ends the run with a status.
-24. Tools per role: list what each agent used in the archive, drop the rest, measure the fixed tokens before and after.
+23. A fresh lead session per step (section 7), measured on lead tokens per mission.
+24. Prompt caching for the fixed prefix, if the gateway supports it (0% cached in every mission so far).
+25. Reviewers stop browsing the factory's own scripts: `scripts/factory` hidden from agents like the instrument.
+26. A mechanical loop guard: the same tool call three times in a row, or a supervisor call with no reply, ends the run with a status.
+27. Tools per role: list what each agent used in the archive, drop the rest, measure the fixed tokens before and after.
 
 **Ideas, not yet scheduled**
 - A judge from another model family, admitted only through `bench.sh recall`.

@@ -38,7 +38,12 @@ for (const p of projects) {
   for (const f of readdirSync(rd).filter((x) => x.endsWith(".md")).sort()) {
     const mission = f.replace(/\.md$/, ""), text = read(join(rd, f));
     let m = {}; try { m = JSON.parse(read(join(rd, `${mission}.metrics.json`)) || "{}"); } catch {}
-    missions.push({ project: p, mission, metrics: m });
+    // P23: what the team found after the merge (retro.sh close), labelled by a person.
+    const after = (text.split(/^## After the merge\b/m)[1] || "");
+    const esc = (after.split(/^### Escaped defects[^\n]*$/m)[1] || "").split("\n").filter((l) => /^- /.test(l) && !/^- none recorded/.test(l)).length;
+    const closed = after ? { misses: (after.match(/^- \[miss\]/gm) || []).length, ok: (after.match(/^- \[ok\]/gm) || []).length,
+      unlabelled: (after.match(/^- \[ \]/gm) || []).length, escaped: esc } : null;
+    missions.push({ project: p, mission, metrics: m, closed });
     let header = null;
     for (const line of text.split("\n")) {
       if (!/^\s*\|/.test(line)) { header = header && line.trim() === "" ? header : header; continue; }
@@ -72,9 +77,9 @@ groups.sort((a, b) => { const [pa, ma, xa] = rank(a), [pb, mb, xb] = rank(b); re
 const L = [];
 const k = (n) => (n == null ? "-" : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(0)}k` : String(n));
 L.push(`# What the missions taught (${missions.length} missions, ${new Set(missions.map((m) => m.project)).size} projects)`, "");
-L.push("## Missions", "", "| Project | Mission | Tickets | Rounds | First pass | Decisions (target 5) | Runs | Tokens in | Cycle h |", "|---|---|---|---|---|---|---|---|---|");
-for (const { project, mission, metrics: m } of missions)
-  L.push(`| ${project} | ${mission} | ${m.tickets ?? "-"} | ${m.rounds ?? "-"} | ${m.firstPass ?? "-"}/${m.reviewed ?? "-"} | ${m.decisions ?? "-"} | ${m.runs ?? "-"} | ${k(m.tokensIn)} | ${m.cycleHours ?? "-"} |`);
+L.push("## Missions", "", "| Project | Mission | Tickets | Rounds | First pass | Decisions (target 5) | Runs | Tokens in | Cycle h | Review misses | Escaped |", "|---|---|---|---|---|---|---|---|---|---|---|");
+for (const { project, mission, metrics: m, closed: c } of missions)
+  L.push(`| ${project} | ${mission} | ${m.tickets ?? "-"} | ${m.rounds ?? "-"} | ${m.firstPass ?? "-"}/${m.reviewed ?? "-"} | ${m.decisions ?? "-"} | ${m.runs ?? "-"} | ${k(m.tokensIn)} | ${m.cycleHours ?? "-"} | ${c ? `${c.misses}/${c.misses + c.ok}${c.unlabelled ? ` (+${c.unlabelled} to label)` : ""}` : "not closed"} | ${c ? c.escaped : "-"} |`);
 L.push("", "## Findings, recurring first", "");
 for (const g of groups) {
   const [np, nm] = rank(g), top = g.items.find((i) => i.p === "P1") || g.items[0];

@@ -91,6 +91,13 @@ node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1]));process
   && grep -q 'kept from the profile: model scope; families; agents factory-extra' <<<"$cap" && [ -f "$PI_FACTORY_MODELS.bak" ] \
   && t "capture keeps the profile's model scope, families and agents it can't see; a .bak first" || fail "capture merge" "$cap"$'\n'"$(cat "$PI_FACTORY_MODELS")"
 cp "$work/profile.keep" "$PI_FACTORY_MODELS"
+# The README names only what exists: every relative link and every path in backticks.
+missing="$(cd "$root" && node -e '
+const fs = require("fs"), s = fs.readFileSync("README.md", "utf8"), bad = [];
+for (const m of s.matchAll(/\]\(([^)#\s]+)(?:#[^)]*)?\)/g)) if (!/^https?:/.test(m[1]) && !fs.existsSync(m[1])) bad.push(m[1]);
+for (const m of s.matchAll(/`((?:scripts|docs|\.pi|\.factory|packs|templates|tests|instrument)\/[^`\s<*]*)`/g)) if (!fs.existsSync(m[1].replace(/\/$/, ""))) bad.push(m[1]);
+console.log(bad.join(" "))')"
+[ -z "$missing" ] && t "README: every linked file and named path exists" || fail "README paths" "$missing"
 rc=0; out="$(cd "$root" && node scripts/factory/models-lint.mjs 2>&1)" || rc=$?
 [ "$rc" = 2 ] && grep -q "the factory's own folder, not a project" <<<"$out" \
   && t "models-lint in the factory's own folder says so instead of false failures" || fail "lint in factory folder" "rc=$rc $out"
@@ -615,7 +622,7 @@ gate_ok "gate passes the whole mission (G1-G5)"
 # The retro: built from the record, saved outside every repository; learn scrubs what it shares.
 pack="$(bash scripts/factory/retro.sh pack demo 2>&1)"
 grep -q '^# Raw record: demo' <<<"$pack" && grep -q '^## Human decisions' <<<"$pack" && grep -q 'round' <<<"$pack" \
-  && grep -q "^## Request sizes" <<<"$pack" \
+  && grep -q "^## Request sizes" <<<"$pack" && grep -q "^## Frictions" <<<"$pack" \
   && t "retro pack: metrics, rounds, decisions, amendments, refusals and request sizes from the record" || fail "retro pack" "$pack"
 printf '# Retro: demo\n\n| # | Finding | Evidence | Fix | P | Kind |\n|---|---|---|---|---|---|\n| 1 | A ticket whose deliverable is outside the patchable tree is relaunched forever | rounds | the ticket writer refuses it | P1 | cost |\n' > $m/retro.md
 rdata="$work/rdata"; FACTORY_DATA_DIR="$rdata" bash scripts/factory/retro.sh save demo >/dev/null
@@ -629,7 +636,48 @@ lout="$(HOME="$work/lhome" FACTORY_DATA_DIR="$rdata" node scripts/factory/learn.
 grep -q 'seen in 2 mission(s), 2 project(s): A ticket whose deliverable is outside the patchable tree' <<<"$lout" \
   && ! grep -q -i -e billing -e acme -e 'invoice-fix' <<<"$lout" && grep -q '<project-' <<<"$lout" \
   && t "learn: one finding recurring across two projects comes first; project, mission, host and listed terms scrubbed" || fail "learn" "$lout"
+# After the merge (P23): the team's review comments as candidate misses, reverts, escaped defects; labels survive a re-run.
+mkdir -p "$work/glab2"; mrsha="$(git rev-parse HEAD)"
+cat > "$work/glab2/glab" <<GL
+#!/usr/bin/env bash
+case "\$1" in
+  auth) exit 0 ;;
+  api) case "\$2" in
+    *merge_requests/9) printf '{"web_url":"https://gitlab.example/g/p/-/merge_requests/9","state":"merged","merged_at":"2026-11-02T10:00:00Z","author":{"username":"me"},"merged_by":{"username":"lead"},"merge_commit_sha":"$mrsha"}' ;;
+    *notes*) printf '[{"id":1,"system":true,"body":"approved","author":{"username":"lead"}},{"id":2,"body":"LGTM","author":{"username":"ci-bot","bot":true}},{"id":3,"body":"thanks","author":{"username":"me"}},{"id":4,"body":"This widens the return type of setFailed","author":{"username":"lead"},"position":{"new_path":"src/op.ts","new_line":145}}]' ;;
+  esac ;;
+esac
+GL
+chmod +x "$work/glab2/glab"
+git switch -q -c revert-probe; git commit -q --allow-empty -m "Revert the change" -m "This reverts commit $mrsha."; git switch -q -
+out="$(PATH="$work/glab2:$PATH" FACTORY_DATA_DIR="$rdata" FACTORY_MR_URL=https://gitlab.example/g/p/-/merge_requests/9 bash scripts/factory/retro.sh close demo 2>&1)" || fail "retro close" "$out"
+saved="$rdata/$proj/retros/demo.md"
+grep -q '^## After the merge' "$saved" && grep -q '^- \[ \] @lead src/op.ts:145: This widens the return type of setFailed (note 4)' "$saved" \
+  && ! grep -q -e 'LGTM' -e 'thanks' -e '(note 1)' "$saved" && grep -q 'Reverts of the merged change: [0-9a-f]\{8\} "Revert the change"' "$saved" \
+  && grep -q 'merged on 2026-11-02 by lead' "$saved" && grep -q '1 review comment(s) to label' <<<"$out" \
+  && t "retro close: human review comments as candidate misses (no system, bot or author notes), reverts found, appended to the private retro" || fail "retro close" "$out"$'\n'"$(cat "$saved")"
+sed -i 's/^- \[ \] @lead/- [miss] @lead/; s/^- none recorded/- types: inferred return type widened, caught by the API report after validation/' "$saved"
+PATH="$work/glab2:$PATH" FACTORY_DATA_DIR="$rdata" FACTORY_MR_URL=https://gitlab.example/g/p/-/merge_requests/9 bash scripts/factory/retro.sh close demo >/dev/null 2>&1
+lout="$(HOME="$work/lhome" FACTORY_DATA_DIR="$rdata" node scripts/factory/learn.mjs --raw 2>&1)"
+[ "$(grep -c '^## After the merge' "$saved")" = 1 ] && grep -q '^- \[miss\] @lead' "$saved" && grep -q '^- types: inferred' "$saved" \
+  && grep -qE '\| demo \|.*\| 1/1 \| 1 \|' <<<"$lout" \
+  && t "retro close again: one section, labels and escaped defects kept; learn counts review misses and escaped defects" || fail "retro close rerun" "$(cat "$saved")"$'\n'"$lout"
+git branch -q -D revert-probe
 rm -f $m/retro.md
+
+# Frictions (P23): failed, repeated and refused tool calls from the transcripts, grouped by cause across runs.
+for r in f1 f2; do fa="$work/fr-archive/$r"; mkdir -p "$fa"
+  printf '{"run":"%s","agent":"factory-worker","ticket":"01-a","guard":[{"rule":"network","input":"curl https://x"}]}' "$r" > "$fa/run.json"
+  node -e 'const w=(o)=>JSON.stringify(o),p=process.argv[1];const L=[];
+    for (let i=0;i<3;i++){L.push(w({recordType:"tool_start",toolCallId:"c"+i,toolName:"bash",argsPreview:"npm run start -- --port "+(3000+i)}));
+      L.push(w({recordType:"message",role:"toolResult",toolCallId:"c"+i,toolName:"bash",text:"Error: listen EADDRINUSE :::"+(3000+i)}));}
+    L.push(w({recordType:"tool_start",toolCallId:"ok",toolName:"read",argsPreview:"src/a.ts"}),w({recordType:"message",role:"toolResult",toolCallId:"ok",toolName:"read",text:"export const a = 1"}));
+    console.log(L.join("\n"))' "$r" > "$fa/transcript.jsonl"
+done
+out="$(node scripts/factory/frictions.mjs "$work/fr-archive")"
+grep -q '2 runs, 8 tool calls: 6 failed, 2 refused by the guard' <<<"$out" && grep -qE 'failed +2 run\(s\) +6×  bash npm run start -- --port #' <<<"$out" \
+  && grep -qE 'repeated +2 run\(s\)' <<<"$out" && grep -qE 'refused +2 run\(s\) +2×  network curl' <<<"$out" && ! grep -q 'src/a.ts' <<<"$out" \
+  && t "frictions: failed, repeated and refused calls grouped by cause across runs, from the transcripts (P23)" || fail "frictions" "$out"
 
 mkdir -p "$work/usage/run"; printf '{"model":"gw/maker-1","usage":{"input":120000,"output":3000,"cacheRead":90000,"cacheWrite":0,"cost":0,"turns":14},"durationMs":60000}' > "$work/usage/run/r1abc_factory-worker_meta.json"
 FACTORY_USAGE_DIRS="$work/usage" bash scripts/factory/usage.sh demo >/dev/null; FACTORY_USAGE_DIRS="$work/usage" bash scripts/factory/usage.sh demo >/dev/null
