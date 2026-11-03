@@ -7,6 +7,7 @@
 # mission's files, so the lead relays orchestration instead of improvising it.
 #
 # Usage:
+#   scripts/factory/workflow.sh architect   <job>       (P22: plan a job from its measurements)
 #   scripts/factory/workflow.sh investigate <feature>
 #   scripts/factory/workflow.sh contract    <feature>
 #   scripts/factory/workflow.sh tickets     <feature> <all|fix-behavior|fix-health>
@@ -20,7 +21,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib.sh
 . "$here/lib.sh"
 
-mode="${1:?usage: workflow.sh <investigate|contract|design|tickets|build-wave|review-wave|validate|steward|light> <feature> ...}"
+mode="${1:?usage: workflow.sh <architect|investigate|contract|design|tickets|build-wave|review-wave|validate|steward|light> <feature> ...}"
 feature="${2:?usage: workflow.sh <mode> <feature> ...}"
 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
@@ -93,6 +94,28 @@ for (const it of ITEMS) {            // sequential: the critic reads the author'
   out.push({ key: it.key, output: r.output });
 }
 return out;'
+    ;;
+
+  architect)
+    # P22: the architect plans a job from the measurements; a refused strategy
+    # is kept aside and its problems go into the next brief.
+    d="$(mission_dir "$feature")"
+    [ -f "$d/job.md" ] || die "no job at $d/job.md"
+    [ -f "$d/measures.md" ] || die "measure first: scripts/factory/measure.sh $feature"
+    mkdir -p "$d/state"
+    if [ -f "$d/strategy.md" ]; then
+      if problems="$(node "$here/strategy.mjs" check "$d" "$FACTORY_DIR" "$feature" 2>&1)"; then
+        die "$d/strategy.md passes its check: approve it (/factory-approve $feature strategy), or delete it to plan again"
+      fi
+      n=1; while [ -e "$d/state/strategy.rejected-$n.md" ]; do n=$((n + 1)); done
+      mv "$d/strategy.md" "$d/state/strategy.rejected-$n.md"
+      printf '# Your previous strategy was refused\n\nKept in state/strategy.rejected-%s.md. Fix each problem:\n\n%s\n' "$n" "$problems" > "$d/state/strategy-check.md"
+      bash "$here/checkpoint.sh" "$feature" >/dev/null
+    fi
+    add architect factory-architect false architect "$feature"
+    body='const it = ITEMS[0];
+const r = await runs.run(it.key, { agent: it.agent, task: it.task });
+return { output: r.output };'
     ;;
 
   design)

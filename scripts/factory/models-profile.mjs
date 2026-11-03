@@ -28,6 +28,20 @@ const userMode = argv.includes("--user");
 const [cmd, arg] = argv.filter((a) => a !== "--user");
 const profile = arg || process.env.PI_FACTORY_MODELS || join(homedir(), ".pi-factory", "models.json");
 const placeholder = (v) => /[<>]/.test(String(v ?? ""));
+// An agent newer than the profile takes the model of the agent its role is
+// closest to, and says so, so an upgrade never leaves an agent without a model.
+const STAND_IN = { "factory-architect": "factory-designer" };
+function withStandIns(p) {
+  p.agents = p.agents ?? {};
+  for (const [name, from] of Object.entries(STAND_IN)) {
+    const a = p.agents[name], src = p.agents[from];
+    if ((!a?.model || placeholder(a.model)) && src?.model && !placeholder(src.model)) {
+      p.agents[name] = { ...src };
+      console.log(`${name}: not in the profile, using ${from}'s model (${src.model}); add "${name}" to the profile to choose another`);
+    }
+  }
+  return p;
+}
 const readJson = (f) => JSON.parse(readFileSync(f, "utf8"));
 
 function agentFiles() {
@@ -65,7 +79,7 @@ if (cmd === "capture") {
   console.log(`captured ${Object.keys(agents).length} agents → ${profile}${kept.length ? ` (kept from the profile: ${kept.join("; ")})` : ""}`);
 } else if (cmd === "apply" && userMode) {
   if (!existsSync(profile)) { console.error(`no profile at ${profile} (create it with: capture, from a configured repo)`); process.exit(1); }
-  const p = readJson(profile), file = userSettingsFile();
+  const p = withStandIns(readJson(profile)), file = userSettingsFile();
   const s = existsSync(file) ? readJson(file) : {};
   const sub = (s.subagents = s.subagents ?? {});
   const ov = (sub.agentOverrides = sub.agentOverrides ?? {});
@@ -83,7 +97,7 @@ if (cmd === "capture") {
   if (Array.isArray(p.families) && p.families.length) console.log("families: run apply (without --user) in each project to add the profile's rules to .factory/model-families.json");
 } else if (cmd === "apply") {
   if (!existsSync(profile)) { console.error(`no profile at ${profile} (create it with: capture, from a configured repo)`); process.exit(1); }
-  const p = readJson(profile);
+  const p = withStandIns(readJson(profile));
   let set = 0;
   if (!existsSync(AGENTS_DIR)) console.log("agents: on the installed package here; their models come from apply --user");
   for (const f of existsSync(AGENTS_DIR) ? agentFiles() : []) {

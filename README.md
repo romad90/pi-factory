@@ -8,7 +8,7 @@
 
 Delegation needs three things:
 
-1. **A complete assignment.** A spec and a validation contract that settle every decision before any code exists. When they do, the agents have nothing to ask: one mission ran with zero questions to the human.
+1. **A complete assignment.** A spec and a validation contract that settle every decision before any code exists. When they do, the agents have nothing to ask: one mission ran with zero questions to the human. And the person needn't write that spec: given a job in one line, the factory measures the code, an architect chooses the strategy and splits it into missions, and the person approves the plan once.
 2. **An owner.** A scripted loop carries the task to the end: fresh agents build, review and validate; scripts, not a model, decide what happens next and keep the record.
 3. **A check that doesn't need the human.** Every claim is backed by evidence, by judges from another model family, and, wherever a script can decide, by a script. This is the part still being built: in one mission every gate was green and a changed public type got through; only a ten-second mechanical check found it. [P23](docs/proposals/P23-gates-that-cannot-be-fooled.md) is the plan to make that check a command.
 
@@ -16,7 +16,7 @@ Delegation needs three things:
 
 ## How it works, in one paragraph
 
-You write the spec and approve the definition of done. A contract of numbered assertions is written, attacked by a critic, and approved by you before any ticket exists. Fresh-context agents build tickets in parallel worktrees; each patch passes a guard, lint and tests before a reviewer from another model family sees it; a validator checks behavior against cases the workers never see; a ratchet and a code steward hold code health. Scripts decide every next step and keep the record in files. CI enforces the gates on every merge request. You come back at a handful of human steps: approve the contract, the design, the tickets, the merge.
+You give a job in one line, or write the spec yourself. For a job, scripts measure the code (tests, nesting, churn, importers, mutation scores, the public surface) and an architect proposes two or three strategies with their value and cost, picks one, and splits it into missions whose done conditions are commands; you approve that plan once. Each mission then starts at its contract. A contract of numbered assertions is written, attacked by a critic, and approved by you before any ticket exists. Fresh-context agents build tickets in parallel worktrees; each patch passes a guard, lint and tests before a reviewer from another model family sees it; a validator checks behavior against cases the workers never see; a ratchet and a code steward hold code health. Scripts decide every next step and keep the record in files. CI enforces the gates on every merge request. You come back at a handful of human steps: approve the contract, the design, the tickets, the merge.
 
 The principles, borrowed from Factory's *Missions* and hardened over six missions:
 
@@ -103,7 +103,11 @@ mindmap
 
 ```mermaid
 flowchart TD
-    A[Human: /grill-with-docs, /to-spec] --> B[contract wave: author, then critic]
+    J[Human: /factory-job, one line] --> M[measure.sh: the code's numbers, no model]
+    M --> AR[architect: options, choice, missions]
+    AR --> AS{Human, once: /factory-approve job strategy}
+    AS --> B
+    A[Or by hand: /grill-with-docs, /to-spec] --> B[contract wave: author, then critic]
     B --> G1{G1: /factory-approve}
     G1 -- amend --> B
     G1 --> DS[designer: program design for feature and refactor]
@@ -140,6 +144,7 @@ You type `/factory <mission>` once. The lead loops on `scripts/factory/next.sh`,
 
 | Agent | Does | Model guidance | Context |
 |---|---|---|---|
+| `factory-architect` | Turns a one-line job into a strategy: options, choice and missions, from the measurements (D105) | Frontier, family A | fresh |
 | `factory-contract-author` | Writes or amends the validation contract from the spec | Frontier, family A | fresh |
 | `factory-contract-critic` | Attacks the contract before you approve it | Frontier, **family ≠ author** | fresh |
 | `factory-designer` | Writes the program design (call stacks, files, signatures, slices) after G1, for feature and refactor missions | Frontier, family A | fresh |
@@ -182,13 +187,14 @@ factory doctor
 #    then commit, open an MR, and in GitLab: Settings → Merge requests → "Pipelines must succeed"
 ```
 
-In Pi, from the project: trust it once (that loads the command guard), then `/subagents-models` shows the 12 `factory-*` agents, each on its own model. **Upgrading** a mirror and every project in one command: `scripts/factory/sync-mirror.sh <mirror> --projects`. Copying the factory into a repo instead (`install-into.sh`) still works; see the [cheat sheet](CHEATSHEET.md).
+In Pi, from the project: trust it once (that loads the command guard), then `/subagents-models` shows the 13 `factory-*` agents, each on its own model. **Upgrading** a mirror and every project in one command: `scripts/factory/sync-mirror.sh <mirror> --projects`. Copying the factory into a repo instead (`install-into.sh`) still works; see the [cheat sheet](CHEATSHEET.md).
 
 ## Daily use
 
 | You want to | Type |
 |---|---|
-| Start or continue a mission | `/factory <mission>` |
+| Give the factory a job in one line | `/factory-job <name> "<what you want>"`, then `/factory-approve <name> strategy` once |
+| Start or continue a mission (or a job) | `/factory <mission>` |
 | Approve the contract (G1) | `/factory-approve <mission>` |
 | Approve the proposed tickets | `/factory-approve <mission> tickets` |
 | Change the contract | `/factory-amend <mission> "<change>"` |
@@ -245,9 +251,9 @@ A pack is a shape (how the software runs and fails), not a label: a batch bot is
 ## Repository layout
 
 ```
-.pi/agents/factory/        12 factory agents (model + thinking in frontmatter; your models override them per machine)
+.pi/agents/factory/        13 factory agents (model + thinking in frontmatter; your models override them per machine)
 .pi/extensions/            factory-guard.ts: the command guard
-.pi/prompts/               /factory, /factory-approve|decide|amend|accept-unverified|pause|fix|light
+.pi/prompts/               /factory, /factory-job, /factory-approve|decide|amend|accept-unverified|pause|fix|light
 .pi/skills/                mattpocock/skills v1.3.1 (pinned) + contract, contract-critic, verify-behavior, ticket-writer, code-steward, mission-retro, deep-prompt
 .pi/settings.json          builtins off, model scope, retry for shared quotas
 .factory/                  briefs, skills pin, model families, commands.env, behavior-paths, VERSION

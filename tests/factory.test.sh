@@ -1361,6 +1361,129 @@ rm -f .factory/bench/results/hang.* .factory/bench/results/noguard.* .factory/be
 git add .factory/bench; git commit -qm "test: bench data"
 unset BENCH_LOG FACTORY_BENCH_RUNNER
 
+# P22, the architect step: one line in, measures by scripts, a strategy checked and approved once, missions out.
+echo "A job and its architect (P22)"
+astep() { head -1 <<<"$(bash scripts/factory/next.sh "$1" 2>&1 || true)"; }
+out="$(bash scripts/factory/human.sh job Bad-Name "x" 2>&1)" && fail "a job name must be lowercase" "$out"
+bash scripts/factory/human.sh job tidy-tools "make the tools easy to change" >/dev/null || fail "human.sh job"
+[ "$(astep tidy-tools)" = "STEP: measure" ] && t "a job starts by measuring, no model" || fail "job measure step" "$(bash scripts/factory/next.sh tidy-tools 2>&1)"
+mkdir -p reports/mutation
+printf '{"files":{"src/tools/a.js":{"mutants":[{"status":"Killed"},{"status":"Survived"},{"status":"NoCoverage"},{"status":"CompileError"}]}}}' > reports/mutation/mutation.json
+out="$(bash scripts/factory/measure.sh tidy-tools 2>&1)" || fail "measure" "$out"
+ms=.scratch/tidy-tools/measures.md
+grep -qE '^\| M-1 \| tests \| `.*` exit 0' $ms && grep -q 'mutation report reports/mutation/mutation.json' $ms \
+  && grep -qE '\| file src/tools/a.js \| .*change\(s\) in a year, [0-9]+ importer\(s\), mutation 33.3% \(1 survived, 1 not covered\)' $ms \
+  && grep -q '| public surface | no committed API report' $ms && grep -qE '\| mission demo \| intent ' $ms \
+  && t "measure: tests, history, per-file churn, importers and mutation score, the public surface, earlier missions, each with an id" || fail "measures" "$(cat $ms)"
+rm -rf reports
+[ "$(astep tidy-tools)" = "STEP: architect" ] || fail "job architect step"
+bash scripts/factory/workflow.sh architect tidy-tools > "$work/wf.log"; wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
+grep -q '"agent": "factory-architect"' "$wf" && grep -q 'strategy-format.md' "$wf" && grep -q 'measures.md' "$wf" \
+  && t "architect wave: a fresh architect reads the job, the measurements and the format" || fail "architect wave" "$(cat "$wf")"
+fid="$(sed -n 's/^| \(M-[0-9]*\) | file src\/tools\/a.js .*/\1/p' $ms)"
+cat > .scratch/tidy-tools/strategy.md <<ST
+# Strategy: tidy-tools
+
+**Job:** make the tools easy to change
+
+## What the measurements say
+- a.js is weakly pinned [$fid]
+
+## Options
+### A. Pin, then refactor
+**Value:** a.js becomes safe to change [$fid]
+**Cost:** two missions
+
+### B. Leave it
+**Value:** nothing to spend [M-99]
+**Cost:** none
+**Leaves out:** everything
+
+## Choice
+**Chosen:** C
+
+## Missions
+### 1. Pin Tools
+**Intent:** pin
+**After:** later
+**Max tickets:** many
+**Done when:** the code is cleaner
+ST
+git add .scratch/tidy-tools; git commit -qm "test: a bad strategy"
+out="$(bash scripts/factory/next.sh tidy-tools 2>&1 || true)"
+[ "$(head -1 <<<"$out")" = "STEP: architect" ] && grep -q '\[M-99\] is cited but measures.md has no such row' <<<"$out" && grep -q 'option A: no \*\*Leaves out:\*\* line' <<<"$out" \
+  && grep -q '\*\*Chosen:\*\* C is not one of the options' <<<"$out" && grep -q 'lowercase words and dashes' <<<"$out" && grep -q 'Done when:\*\* needs a command' <<<"$out" \
+  && grep -q 'Decisions for the team' <<<"$out" && t "strategy check: uncited numbers, missing fields, an unknown choice, a mission without a command refused, back to the architect" || fail "strategy check" "$out"
+out="$(bash scripts/factory/human.sh approve tidy-tools strategy 2>&1)" && fail "a refused strategy can't be approved" "$out"
+bash scripts/factory/workflow.sh architect tidy-tools > /dev/null
+[ -f .scratch/tidy-tools/state/strategy.rejected-1.md ] && grep -q 'M-99' .scratch/tidy-tools/state/strategy-check.md && [ ! -f .scratch/tidy-tools/strategy.md ] \
+  && t "a refused strategy is kept aside, its problems go into the architect's next brief" || fail "strategy rejected" "$(ls .scratch/tidy-tools .scratch/tidy-tools/state)"
+cat > .scratch/tidy-tools/strategy.md <<ST
+# Strategy: tidy-tools
+
+**Job:** make the tools easy to change
+
+## What the measurements say
+- a.js is weakly pinned [$fid]
+
+## Options
+### A. Pin, then refactor
+**Value:** a.js becomes safe to change [$fid]
+**Cost:** two missions, about 6 tickets
+**Leaves out:** new features
+
+### B. Refactor now
+**Value:** faster [$fid]
+**Cost:** one mission, but blind
+**Leaves out:** safety
+
+## Choice
+**Chosen:** A
+Its score [$fid] is too low to refactor blind.
+
+## Missions
+### 1. pin-tools
+**Intent:** maintenance
+**After:** -
+**Max tickets:** 4
+**Scope:** src/tools/
+**Done when:** \`npm test\` green and the mutation score of src/tools/a.js at 70% or more
+**Frozen paths:** src/
+
+Pin what a.js does today: one assertion per surviving mutant. No change under src/.
+
+### 2. refactor-tools
+**Intent:** refactor
+**After:** pin-tools
+**Max tickets:** 3
+**Scope:** src/tools/a.js
+**Done when:** \`npm test\` green, frozen tests unchanged
+**Frozen tests:** tests/
+
+Flatten a.js with named refactorings.
+
+## Decisions for the team
+- none
+ST
+[ "$(astep tidy-tools)" = "STEP: approve-strategy" ] || fail "approve-strategy step" "$(bash scripts/factory/next.sh tidy-tools 2>&1)"
+out="$(bash scripts/factory/human.sh approve tidy-tools strategy 2>&1)" || fail "approve strategy" "$out"
+grep -q '^\*\*Strategy approved:\*\*' .scratch/tidy-tools/strategy.md && grep -q 'approve-strategy' .scratch/tidy-tools/decisions.tsv \
+  && grep -q '^\*\*Intent:\*\* maintenance' .scratch/pin-tools/spec.md && grep -q '^\*\*Job:\*\* tidy-tools' .scratch/pin-tools/spec.md \
+  && grep -q '^## Frozen paths' .scratch/pin-tools/spec.md && grep -q 'one assertion per surviving mutant' .scratch/pin-tools/spec.md \
+  && grep -q '^## Frozen tests' .scratch/refactor-tools/spec.md && grep -q '^\*\*After:\*\* pin-tools' .scratch/refactor-tools/spec.md \
+  && [ -z "$(git status --porcelain .scratch)" ] \
+  && t "approving the strategy once writes each mission's spec from it, committed" || fail "strategy approve" "$out $(cat .scratch/pin-tools/spec.md 2>&1)"
+out="$(bash scripts/factory/next.sh tidy-tools 2>&1 || true)"
+[ "$(head -1 <<<"$out")" = "STEP: mission" ] && grep -q 'continue with mission pin-tools' <<<"$out" && grep -q 'refactor-tools (refactor, after pin-tools): not started' <<<"$out" \
+  && t "the job hands the lead its next mission, with every mission's state" || fail "job mission step" "$out"
+[ "$(astep pin-tools)" = "STEP: contract" ] && t "a mission from a strategy starts at its contract: no grilling" || fail "mission contract" "$(bash scripts/factory/next.sh pin-tools 2>&1)"
+out="$(bash scripts/factory/next.sh refactor-tools 2>&1 || true)"
+[ "$(head -1 <<<"$out")" = "STEP: blocked" ] && grep -q 'builds on pin-tools' <<<"$out" && t "a mission waits for the one it builds on" || fail "mission after" "$out"
+printf 'https://gitlab.example/g/p/-/merge_requests/1\n' > .scratch/pin-tools/mr.url; printf 'https://gitlab.example/g/p/-/merge_requests/2\n' > .scratch/refactor-tools/mr.url
+[ "$(astep tidy-tools)" = "STEP: job-done" ] && t "every mission has its MR: the job is done" || fail "job done" "$(bash scripts/factory/next.sh tidy-tools 2>&1)"
+rm -f .scratch/pin-tools/mr.url .scratch/refactor-tools/mr.url
+git rm -rq .scratch/tidy-tools .scratch/pin-tools .scratch/refactor-tools; git commit -qm "test: job done"
+
 # D92: install once per machine (P11). Models per machine, then a project on the package.
 echo "Context repos and investigation (D99)"
 ctx="$work/ctx src"; git init -q "$ctx"; (cd "$ctx" && echo 'export const poll = () => 1;' > poll.js && git add -A && git commit -qm init)
@@ -1499,6 +1622,11 @@ bash "$root/scripts/factory/factory.sh" models apply --user "$work/profile.json"
 node -e 'const s=require(process.argv[1]).subagents;process.exit(s.agentOverrides["factory-worker"].model==="gw/maker-1"&&s.modelScope.allow[0]==="gw/*"?0:1)' "$PI_CODING_AGENT_DIR/settings.json" \
   && [ "$(node scripts/factory/effective-models.mjs | awk -F'\t' '$1 == "factory-reviewer" { print $2 }')" = gw/judge-1 ] \
   && t "factory models apply --user: this machine's models, for every project" || fail "apply --user" "$(cat "$PI_CODING_AGENT_DIR/settings.json")"
+printf '{"agents":{"factory-designer":{"model":"gw/maker-2","thinking":"high"}}}' > "$work/profile-old.json"
+out="$(bash "$root/scripts/factory/factory.sh" models apply --user "$work/profile-old.json")"
+grep -q "factory-architect: not in the profile, using factory-designer's model (gw/maker-2)" <<<"$out" \
+  && node -e 'process.exit(require(process.argv[1]).subagents.agentOverrides["factory-architect"].model==="gw/maker-2"?0:1)' "$PI_CODING_AGENT_DIR/settings.json" \
+  && t "a profile older than the architect gives it the designer's model, and says so" || fail "stand-in" "$out"
 rm -f "$PI_CODING_AGENT_DIR/settings.json"
 bash "$root/scripts/factory/factory.sh" version | grep -q "project expects: $(cat "$root/.factory/VERSION")" && t "factory version: installed and expected" || fail "factory version"
 echo 99.0.0 > .factory/VERSION
