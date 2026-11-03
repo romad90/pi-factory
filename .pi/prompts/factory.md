@@ -11,7 +11,7 @@ Loop:
 2. Act:
    - `paused`: run `scripts/factory/pause.sh resume $1`, show its output, go to 1.
    - `measure`: run `scripts/factory/measure.sh $1`, go to 1.
-   - `architect`: `scripts/factory/workflow.sh architect $1`, pass its `WORKFLOW_FILE` path as below, go to 1.
+   - `architect`, `strategy-critic`: `scripts/factory/workflow.sh architect|strategy-critic $1`, pass its `WORKFLOW_FILE` path as below, go to 1.
    - `mission`: the job's next mission is named on the NEXT line. From now on, run this loop for that mission instead of `$1` (start at its `next.sh`). When that mission stops at a human step, say which job it belongs to.
    - `approve-strategy`, `job-done`, `verify-failed`, `grill`, `approve`, `decide`, `approve-tickets`, `coverage`, `setup`, `escalate`, `blocked`, `unverified`, `approve-conclusion`, `handoff`, `report`: stop. Show the human the status and the NEXT line. These are human steps.
    - `context-sync`: run `scripts/factory/context.sh sync $1`, go to 1.

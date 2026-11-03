@@ -70,6 +70,14 @@
         "factory-worker",
         "factory-worker-heavy"
       ]
+    ],
+    [
+      [
+        "factory-strategy-critic"
+      ],
+      [
+        "factory-architect"
+      ]
     ]
   ]
 }

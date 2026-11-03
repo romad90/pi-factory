@@ -16,7 +16,7 @@ Delegation needs three things:
 
 ## How it works, in one paragraph
 
-You give a job in one line, or write the spec yourself. For a job, scripts measure the code: what kind of software it is (an API, a bot, a batch job, a library) and what it talks to, tests, nesting, churn, importers, mutation scores, the public surface, and the risks an SRE looks for first. An architect then works the way a distinguished engineer would: it picks the lenses the problem needs (software engineering, reliability, computer science, security, product) and shows the evidence behind each, compares two or three strategies by value and cost, and splits the chosen one into missions whose done conditions are commands. A script holds it to the expectations you'd otherwise repeat (no refactor of weakly tested code before it is pinned; security defaults left to your team). You approve the plan once. Each mission then starts at its contract and ends when its done condition passes, run by a script. A contract of numbered assertions is written, attacked by a critic, and approved by you before any ticket exists. Fresh-context agents build tickets in parallel worktrees; each patch passes a guard, lint and tests before a reviewer from another model family sees it; a validator checks behavior against cases the workers never see; a ratchet and a code steward hold code health. Scripts decide every next step and keep the record in files. CI enforces the gates on every merge request. You come back at a handful of human steps: approve the contract, the design, the tickets, the merge.
+You give a job in one line, or write the spec yourself. For a job, scripts measure the code: what kind of software it is (an API, a bot, a batch job, a library) and what it talks to, tests, nesting, churn, importers, mutation scores, the public surface, and the risks an SRE looks for first. An architect then works the way a distinguished engineer would: it picks the lenses the problem needs (software engineering, reliability, computer science, security, product) and shows the evidence behind each, compares two or three strategies by value and cost, and splits the chosen one into missions whose done conditions are commands. A script holds it to the expectations you'd otherwise repeat (no refactor of weakly tested code before it is pinned; a library's public surface checked by a command; a fix that starts from a reproduction; security defaults left to your team), and a critic from another model family attacks the plan before you see it. You approve the plan once. Each mission then starts at its contract and ends when its done condition passes, run by a script. A contract of numbered assertions is written, attacked by a critic, and approved by you before any ticket exists. Fresh-context agents build tickets in parallel worktrees; each patch passes a guard, lint and tests before a reviewer from another model family sees it; a validator checks behavior against cases the workers never see; a ratchet and a code steward hold code health. Scripts decide every next step and keep the record in files. CI enforces the gates on every merge request. You come back at a handful of human steps: approve the contract, the design, the tickets, the merge.
 
 The principles, borrowed from Factory's *Missions* and hardened over six missions:
 
@@ -24,7 +24,7 @@ The principles, borrowed from Factory's *Missions* and hardened over six mission
 - **The contract before the code.** Assertion IDs, written, attacked, approved; a wrong assertion becomes an amendment, never a quiet edit.
 - **Validators report and never fix.** A finding becomes a ticket.
 - **State in files.** Missions live in `.scratch/<mission>/`, committed, so any session can pick up.
-- **Judges from another model family.** Critic ≠ author; reviewers, validator and steward ≠ workers, linted in CI.
+- **Judges from another model family.** Critic ≠ author, strategy critic ≠ architect; reviewers, validator and steward ≠ workers, linted in CI.
 - **Scripts decide what code can decide.** Rounds, models, staleness, guards and gates are computed, never self-reported. A model judges only what is left.
 - **The intent sets the reference.** Feature and bugfix: the contract; refactor: frozen tests that don't change by a line; maintenance: today's code.
 - **Agents can't do harm.** A command guard blocks dangerous tool calls live and scrubs secrets from their environment; a patch guard rejects unsafe changes deterministically.
@@ -106,8 +106,10 @@ mindmap
 ```mermaid
 flowchart TD
     J[Human: /factory-job, one line] --> M[measure.sh: the code's numbers, no model]
-    M --> AR[architect: options, choice, missions]
-    AR --> AS{Human, once: /factory-approve job strategy}
+    M --> AR[architect: lenses, options, choice, missions]
+    AR --> SC[check by script, then critic of another family]
+    SC -- blocking --> AR
+    SC --> AS{Human, once: /factory-approve job strategy}
     AS --> B
     A[Or by hand: /grill-with-docs, /to-spec] --> B[contract wave: author, then critic]
     B --> G1{G1: /factory-approve}
@@ -146,7 +148,8 @@ You type `/factory <mission>` once. The lead loops on `scripts/factory/next.sh`,
 
 | Agent | Does | Model guidance | Context |
 |---|---|---|---|
-| `factory-architect` | Turns a one-line job into a strategy: the project's shape, the lenses it needs, options, choice and missions, all from measurements (D105, D106) | Frontier, family A | fresh |
+| `factory-architect` | Turns a one-line job into a strategy: the project's shape, the lenses it needs, options with strength and trade-off, choice and missions, all from measurements (D105–D107) | Frontier, family A | fresh |
+| `factory-strategy-critic` | Attacks the strategy before you read it; a blocking finding sends it back (D107) | Frontier, **family ≠ architect** | fresh |
 | `factory-contract-author` | Writes or amends the validation contract from the spec | Frontier, family A | fresh |
 | `factory-contract-critic` | Attacks the contract before you approve it | Frontier, **family ≠ author** | fresh |
 | `factory-designer` | Writes the program design (call stacks, files, signatures, slices) after G1, for feature and refactor missions | Frontier, family A | fresh |
@@ -189,7 +192,7 @@ factory doctor
 #    then commit, open an MR, and in GitLab: Settings → Merge requests → "Pipelines must succeed"
 ```
 
-In Pi, from the project: trust it once (that loads the command guard), then `/subagents-models` shows the 13 `factory-*` agents, each on its own model. **Upgrading** a mirror and every project in one command: `scripts/factory/sync-mirror.sh <mirror> --projects`. Copying the factory into a repo instead (`install-into.sh`) still works; see the [cheat sheet](CHEATSHEET.md).
+In Pi, from the project: trust it once (that loads the command guard), then `/subagents-models` shows the 14 `factory-*` agents, each on its own model. **Upgrading** a mirror and every project in one command: `scripts/factory/sync-mirror.sh <mirror> --projects`. Copying the factory into a repo instead (`install-into.sh`) still works; see the [cheat sheet](CHEATSHEET.md).
 
 ## Daily use
 
@@ -254,7 +257,7 @@ A pack is a shape (how the software runs and fails), not a label: a batch bot is
 ## Repository layout
 
 ```
-.pi/agents/factory/        13 factory agents (model + thinking in frontmatter; your models override them per machine)
+.pi/agents/factory/        14 factory agents (model + thinking in frontmatter; your models override them per machine)
 .pi/extensions/            factory-guard.ts: the command guard
 .pi/prompts/               /factory, /factory-job, /factory-approve|decide|amend|accept-unverified|pause|fix|light
 .pi/skills/                mattpocock/skills v1.3.1 (pinned) + contract, contract-critic, verify-behavior, ticket-writer, code-steward, mission-retro, deep-prompt

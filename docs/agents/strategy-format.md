@@ -18,8 +18,11 @@ Written by `factory-architect` to `.scratch/<job>/strategy.md` from `job.md` (th
 ## Options
 ### A. <short name>
 **Value:** <what the codebase or the team gains, concretely> [M-…]
-**Cost:** <missions, about how many tickets, the risk>
-**Leaves out:** <what this option does not do>
+**Cost:** <missions, about how many tickets>
+**Strength:** strong | worth exploring | speculative
+**Risks:** <what could go wrong, and what is known not to be a risk>
+**Trade-off:** <the quality it buys, and the one it pays with>
+**Non-goals:** <what this option does not do>
 
 ### B. <short name>
 … (two or three options; one may be "do less" or "do nothing yet")
@@ -37,6 +40,7 @@ Written by `factory-architect` to `.scratch/<job>/strategy.md` from `job.md` (th
 **Done when:** `<a command that exits 0 only when the mission is done>` (verify.sh runs it, no model)
 **Frozen paths:** <comma-separated, or ->
 **Frozen tests:** <comma-separated, or -; required for a refactor>
+**Reproduction:** <for a bugfix: the test that fails before the fix>
 
 <The mission text: what to do and what not to do, in a few lines. It becomes the spec's problem statement, so it settles every decision a worker would otherwise ask about.>
 
@@ -50,10 +54,15 @@ Written by `factory-architect` to `.scratch/<job>/strategy.md` from `job.md` (th
 
 Rules the check enforces (what a reviewer of this plan would hold it to, written as code so nobody has to repeat it):
 
-- At least two options; `**Chosen:**` names one of them.
+- At least two options; `**Chosen:**` names one of them, and not a speculative one.
+- Each option has a value, a cost, a strength (strong, worth exploring, speculative), a trade-off and its non-goals (`Leaves out` is still read).
 - Every `[M-n]` cited exists in `measures.md`; the findings, each option's value and the choice cite at least one.
 - Each mission: a name in lowercase words and dashes, not used by an existing mission; a known intent; a `**Done when:**` with a command in backticks; a number for `**Max tickets:**`; `**After:**` naming an earlier mission or `-`; a refactor names its frozen tests.
 - At most 4 missions. A job that needs more is two jobs.
 - `## Lenses` names at least two lenses; an applied lens cites a measurement.
 - A refactor doesn't touch a measured file whose mutation score is under the threshold (`FACTORY_PIN_THRESHOLD`, default 70), or isn't measured, unless an earlier maintenance or bugfix mission covers it.
 - A measured risk of certificate checks turned off is named, by its id, under `## Decisions for the team`.
+- A refactor of a library (shape) protects its public surface: its done condition holds a command that checks the API report (Hyrum's law).
+- A bugfix names its `**Reproduction:**`, the test that fails before the fix.
+
+Then a strategy critic (another model family, fresh context) attacks the plan; a `[blocking]` finding sends it back to the architect with the finding, before any person reads it.
