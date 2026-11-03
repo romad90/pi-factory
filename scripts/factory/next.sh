@@ -7,7 +7,7 @@
 #   paused* grill* context-sync investigate approve-conclusion* handoff* report*
 #   contract approve* design approve-design* decide* tickets approve-tickets* coverage*
 #   setup* build review escalate* blocked* validate behavior-fix
-#   behavior-stale health health-fix steward unverified* pr*
+#   behavior-stale health health-fix steward unverified* verify verify-failed* pr*
 #
 # Usage: scripts/factory/next.sh <feature>
 set -euo pipefail
@@ -24,7 +24,7 @@ UNRECORDED="The approval line has no /factory-approve record in decisions.tsv (w
 STATUS=""
 shopt -s nullglob
 
-HUMAN_STEPS=" paused grill approve-strategy job-done approve-conclusion handoff report approve approve-design decide approve-tickets coverage setup escalate blocked unverified pr "
+HUMAN_STEPS=" paused grill approve-strategy job-done verify-failed approve-conclusion handoff report approve approve-design decide approve-tickets coverage setup escalate blocked unverified pr "
 
 step() {                                  # <code> <human explanation>
   local code="$1"; shift
@@ -270,5 +270,17 @@ if [ "$(verdict_field "$h" Result)" != "PASS" ]; then
   step health-fix "scripts/factory/workflow.sh tickets $feature fix-health (one fix ticket per finding in $h; you approve them)"
 fi
 unverified_step "$h" "code steward"
+
+# P23: the done condition, as commands a script runs; no model judges it.
+if [ -n "$(done_commands "$spec")" ]; then
+  vf="$dir/verify.md"
+  if [ ! -f "$vf" ] || ! code_verdict_is_fresh "$(verdict_field "$vf" Commit)"; then
+    step verify "scripts/factory/verify.sh $feature (runs each command under \"## Done when\"; a non-zero exit is expected when it fails: continue the loop)"
+  fi
+  if [ "$(verdict_field "$vf" Result)" != PASS ]; then
+    STATUS="$(sed -n '/^- `/,$p' "$vf")"$'\n'
+    step verify-failed "human: the done condition fails (above, and $vf). Either the work isn't done (fix tickets: scripts/factory/workflow.sh tickets $feature fix-health after adding the failure to verdicts/health.md as a finding), or the condition is wrong (/factory-amend $feature \"<new done condition>\"). Then next.sh again"
+  fi
+fi
 
 step pr "scripts/factory/metrics.sh $feature → /pr (Evidence, written to $dir/pr.md) → scripts/factory/mr.sh $feature opens the MR → /skill:mission-retro (private: retro.sh save)"

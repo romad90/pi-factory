@@ -78,6 +78,47 @@ for (const f of candidates) {
 }
 for (const [f, v] of fileRows) add(`file ${f}`, v);
 
+// Shape: what kind of software this is, from its manifests, never from a label.
+// The architect picks its lenses and the practice packs from it.
+const manifests = ["package.json", "pyproject.toml", "requirements.txt", "go.mod", "pom.xml", "build.gradle", "Gemfile", "Cargo.toml"].filter((f) => tracked.includes(f));
+let deps = "";
+for (const f of manifests) {
+  const t = read(f);
+  if (f === "package.json") { try { const j = JSON.parse(t); deps += " " + Object.keys({ ...(j.dependencies || {}), ...(j.peerDependencies || {}) }).join(" ") + (j.bin ? " __bin__" : "") + (j.main || j.types || j.exports ? " __lib__" : ""); } catch {} }
+  else deps += " " + t;
+}
+const SHAPES = [
+  ["API server", /\b(express|fastify|@nestjs\/core|koa|@hapi\/hapi|restify|flask|fastapi|django|gin-gonic|labstack\/echo|spring-boot)\b/i],
+  ["bot", /\b(botbuilder|@slack\/bolt|@slack\/web-api|discord\.js|telegraf|@microsoft\/teams[\w.-]*|botframework[\w-]*|rasa)\b/i],
+  ["batch or scheduled job", /\b(node-cron|cron|bull|bullmq|agenda|apscheduler|celery|airflow)\b/i],
+  ["front end", /\b(react|vue|@angular\/core|svelte|next|nuxt)\b/i],
+  ["command-line tool", /__bin__|\b(commander|yargs|click|cobra)\b/i],
+  ["library", /__lib__/],
+];
+const shapes = SHAPES.filter(([, re]) => re.test(deps)).map(([n]) => n);
+const cronJobs = tracked.filter((f) => /\.(ya?ml)$/.test(f) && /^\s*kind:\s*CronJob\b/m.test(read(f)));
+if (cronJobs.length && !shapes.includes("batch or scheduled job")) shapes.push("batch or scheduled job");
+const talks = [["MongoDB", /\b(mongodb|mongoose|pymongo)\b/i], ["PostgreSQL", /\b(pg|postgres|psycopg2?|typeorm|prisma)\b/i], ["MySQL", /\b(mysql2?|pymysql)\b/i], ["Redis", /\b(redis|ioredis)\b/i],
+  ["HTTP services", /\b(axios|node-fetch|got|undici|superagent|request|requests|httpx)\b/i], ["message queues", /\b(kafkajs|amqplib|@azure\/service-bus|pika|nats)\b/i]]
+  .filter(([, re]) => re.test(deps)).map(([n]) => n);
+add("shape", manifests.length ? `${shapes.length ? shapes.join(", ") : "no known framework"}${talks.length ? `; talks to ${talks.join(", ")}` : ""} (from ${manifests.join(", ")}${cronJobs.length ? `, CronJob in ${cronJobs.join(", ")}` : ""})` : "no manifest found: shape unknown");
+const installedPacks = tracked.filter((f) => /^docs\/agents\/quality-bar-[\w-]+\.md$/.test(f)).map((f) => f.replace(/^.*quality-bar-|\.md$/g, ""));
+add("practice packs", installedPacks.length ? `installed: ${installedPacks.join(", ")}` : "none installed (packs: api, batch)");
+
+// Risky operations: what an SRE and a security reviewer look for first, found
+// by pattern, each with where. A pattern is a lead, not a verdict.
+const prod = code.filter((f) => !isTest(f) && !f.startsWith("scripts/factory/"));
+const where = (re) => prod.flatMap((f) => (texts.get(f) || "").split("\n").map((l, i) => (re.test(l) ? `${f}:${i + 1}` : "")).filter(Boolean));
+const tlsOff = where(/rejectUnauthorized\s*:\s*(false|[^,}]*\|\|\s*false)|NODE_TLS_REJECT_UNAUTHORIZED|verify\s*=\s*False|InsecureSkipVerify\s*:\s*true/);
+if (tlsOff.length) add("risk: TLS certificate checks can be off", tlsOff.slice(0, 6).join(", "));
+const callers = prod.filter((f) => /\b(axios|fetch\(|got\(|https?\.request|request\(|requests\.(get|post)|httpx\.)/.test(texts.get(f) || ""));
+const noTimeout = callers.filter((f) => !/timeout/i.test(texts.get(f) || ""));
+if (callers.length) add("risk: outgoing calls without a timeout", noTimeout.length ? `${noTimeout.length} of ${callers.length} file(s) making outgoing calls never mention a timeout: ${noTimeout.slice(0, 6).join(", ")}` : `none: the ${callers.length} file(s) making outgoing calls all mention a timeout`);
+const swallowed = where(/catch\s*(\([^)]*\))?\s*\{\s*\}/);
+if (swallowed.length) add("risk: errors swallowed (empty catch)", swallowed.slice(0, 6).join(", "));
+const exits = where(/\bprocess\.exit\(/).filter((w) => !/(bin|cli|main)\b/.test(w));
+if (exits.length && shapes.includes("library")) add("risk: a library that exits the process", exits.slice(0, 6).join(", "));
+
 const api = tracked.filter((f) => /^etc\/.*\.api\.md$/.test(f) || /\.api\.md$/.test(f));
 add("public surface", api.length ? `committed API report: ${api.join(", ")} (a change shows as a diff)` : "no committed API report: a change to the public surface would not be seen by a script");
 

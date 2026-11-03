@@ -25,10 +25,22 @@ here="$(cd "$(dirname "$0")" && pwd)"
 MAX_LINES="${FACTORY_MAX_FILE_LINES:-400}"
 MAX_NESTING="${FACTORY_MAX_NESTING:-4}"
 
+# Generated code is not the team's code: declarations a compiler writes
+# (*.d.ts, types/), build output and minified files. Counted, every duplicate in
+# one project's committed declarations was a false positive (mission 6).
+# FACTORY_GENERATED_RE adds a project's own (an extended regex on the path).
+is_generated_file() {
+  case "$1" in *.d.ts|*.d.mts|*.d.cts|*.min.js|*.min.css|*.generated.*|*_pb2.py|*.pb.go) return 0 ;; esac
+  [[ "/$1" =~ /(types|dist|build|out|generated|__generated__|coverage)/ ]] && return 0
+  [ -n "${FACTORY_GENERATED_RE:-}" ] && [[ "$1" =~ $FACTORY_GENERATED_RE ]] && return 0
+  return 1
+}
+
 source_files() {                       # tracked source files; $1 = with-tests|no-tests
   local f
   while IFS= read -r f; do
     is_code_file "$f" || continue
+    is_generated_file "$f" && continue
     [ "$1" = no-tests ] && is_test_file "$f" && continue
     [ -f "$f" ] && echo "$f"
   done < <(git ls-files)

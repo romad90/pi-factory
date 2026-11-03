@@ -289,6 +289,22 @@ ticket_blockers() {
     }' "$1" | sort -u
 }
 
+# The repository's name, the same from every worktree of it: the folder that
+# holds the shared git folder. A worktree's own folder name (api-next, say)
+# would file a mission's data apart from the repository's other missions.
+repo_name() {
+  local common; common="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || { basename "$PWD"; return; }
+  if [ "$(basename "$common")" = .git ]; then basename "$(dirname "$common")"; else basename "$common" .git; fi
+}
+
+# The mission's done condition (P23): the commands in backticks under
+# "## Done when" in spec.md, one per line. verify.sh runs them.
+done_commands() {                      # <spec>
+  [ -f "$1" ] || return 0
+  awk '/^## Done when/ { on = 1; next } on && /^## / { exit } on' "$1" \
+    | grep -o '`[^`]*`' | sed 's/^`//; s/`$//' | awk 'NF' || true
+}
+
 # --- verdicts ----------------------------------------------------------------
 
 # verdict_field <file> <Field>  → value of "**Field:** value" (first word)

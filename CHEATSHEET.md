@@ -169,13 +169,13 @@ It writes `.factory/commands.env`, `behavior-paths`, `model-families.json`, `VER
 /factory-job tidy-api "make the api modules easy to change"
 ```
 
-The factory measures the code (`measure.sh`: tests, history, per-file nesting, churn, importers, mutation score from the last report in `reports/mutation/mutation.json`, the public API report), then a fresh architect writes `.scratch/<job>/strategy.md`: what the numbers say, two or three options with value and cost, the choice, up to four missions in order, and the decisions that belong to your team (no mission takes them). A script checks it first (every number cited is measured, every mission has a command for "done"). Read it, then:
+The factory measures the code (`measure.sh`: what kind of software it is from its manifests, the practice packs installed, tests, history, per-file nesting, churn, importers, mutation score from the last report in `reports/mutation/mutation.json`, the public API report, and risks found by pattern: certificate checks off, calls without timeouts, empty catch blocks). Then a fresh architect writes `.scratch/<job>/strategy.md`: what the numbers say, the lenses it used and why, two or three options with value and cost, the choice, up to four missions in order, and the decisions that belong to your team (no mission takes them). A script checks it first: every number cited is measured, every mission has a command for "done", at least two lenses with evidence, no refactor of a file under 70% mutation score (`FACTORY_PIN_THRESHOLD`) without a pinning mission first, and a TLS risk always left to your team. Read it, then:
 
 ```text
 /factory-approve tidy-api strategy
 ```
 
-Each mission's `spec.md` is written from it; `/factory tidy-api` runs them in order, each from its contract (no grilling). Mutation scores need a report: run Stryker once before the job if you want them used (the architect says when they're missing).
+Each mission's `spec.md` is written from it; `/factory tidy-api` runs them in order, each from its contract (no grilling). Before the MR, `verify.sh <mission>` runs the commands under its `## Done when` (any spec can have that section); the MR gate requires them passing on the current code. Mutation scores need a report: run Stryker once before the job if you want them used (the architect says when they're missing).
 
 ## 6. A mission
 
@@ -201,7 +201,12 @@ Keep specs to roughly 12 stories or fewer; split anything bigger into two missio
 | STEP | Who | Means | Do |
 |---|---|---|---|
 | `paused` | lead | a pause note exists | lead resumes and continues |
-| `grill` | you | no spec | `/grill-with-docs`, `/to-spec` |
+| `measure` | lead | a job without measurements, or the job changed | `measure.sh <job>` (no model, D105) |
+| `architect` | lead | a job without a strategy, or the strategy failed its check | runs the architect (its problems go into the brief) |
+| `approve-strategy` | you | the strategy passed its check | read `strategy.md`, `/factory-approve <job> strategy` |
+| `mission` | lead | the strategy is approved | continues with the job's next mission |
+| `job-done` | you | every mission of the job has its MR | merge them in order; `retro.sh close` after each |
+| `grill` | you | no spec (and no job) | `/grill-with-docs`, `/to-spec`, or `/factory-job` |
 | `context-sync` | lead | context repos not cloned, or changed in the spec | `context.sh sync <f>` (read-only clones, D99) |
 | `investigate` | lead | briefs, answers, a conclusion or a reproduction ticket missing | runs the investigate wave (explorers, then the investigator) |
 | `approve-conclusion` | you | the investigation concluded | `/factory-approve <f> conclusion` |
@@ -226,6 +231,8 @@ Keep specs to roughly 12 stories or fewer; split anything bigger into two missio
 | `health` | lead | no health report for the current code | `health.sh check` (no model) |
 | `health-fix` | lead | ratchet or steward failed | ticket writer drafts fix tickets |
 | `steward` | lead | no steward verdict for the current code | code steward → `collect.sh` |
+| `verify` | lead | the spec has a `## Done when` with commands, not run on the current code | `verify.sh <f>` (no model, D106) |
+| `verify-failed` | you | a done command fails | fix tickets for the failure, or amend the done condition |
 | `pr` | you | all gates green | `/pr`, `mr.sh`, `/skill:mission-retro` |
 
 ## 8. The quality bar (G5)
@@ -296,6 +303,8 @@ If the merge left your branch's dependency versions, take the target's `package.
 | `factory report [--full]` | something is wrong and you need help: one redacted text with what a diagnosis needs (D102) |
 | `factory tokens <f> [--budget N]` | a provider refused a request on tokens, or a mission costs too much: each run's request sizes and the tool results that fill them (P20) |
 | `factory frictions <f>` | agents spin their wheels: failed, repeated (3+ times in a run) and guard-refused tool calls, grouped by cause across runs, read from the transcripts (P23) |
+| `factory verify <f>` | the mission's done condition: runs each command in backticks under `## Done when` in its spec, records `verify.md` (D106) |
+| `factory measure <job>` | a job's measurements, no model: shape, tests, churn, importers, mutation scores, risks (D105) |
 | `scripts/factory/retro.sh close <f>` | after the MR is merged: the team's review comments as candidate misses for you to label, reverts of the mission's commits, escaped defects; appended to the private retro (P23) |
 | `factory learn [--raw]` | across all your projects: every saved retro and its metrics, recurring findings first, scrubbed of names (projects, missions, hosts, paths, your terms in `~/.pi-factory/scrub-terms`) so you can share it; `--raw` for your eyes only |
 | `factory bench paired --a <labels> --b <labels>` | did a factory change help? The same bench cases under two arms (repeats pooled): per-case deltas, median change with a bootstrap 95% CI, McNemar on pass/fail. For factory versions, run one arm with the older briefs: `FACTORY_BRIEFS_DIR=<dir> factory bench run …` |

@@ -146,7 +146,7 @@ From missions 4–6 and their retros, in order. Each line is one PR, merged by t
 1. ✅ Verdict sent back on a format slip; skeleton in every verdict-writing brief (#97).
 2. ✅ No checkpoint on a detached HEAD; reattached when safe (#97).
 3. ✅ Bench: no hang (no supervisor in a bench run), case worktrees outside `.git` (jest ignored them and the tests gate passed on zero tests), a time limit and progress lines per case (#100).
-4. `factory prepare` and `factory verify`: the human's checks as two commands (section 4).
+4. ✅ `verify.sh`: a mission's done condition as commands a script runs, gated (D106). `factory prepare` is now the architect's measurements (D105, D106).
 5. Canary release: an rc replays the bench before it can reach a project (section 5).
 6. Typed assertions and the five script checks (section 1).
 7. Seeded-fault corpus, `bench.sh recall`; mission 6's escape is case 1 (section 2).
@@ -157,14 +157,14 @@ From missions 4–6 and their retros, in order. Each line is one PR, merged by t
 
 **Measurement**
 12. Pinned model versions, the resolved model recorded per run; a floating alias refused, not only warned about (D102 warns).
-13. Health baseline carries its factory version; the duplicate counter skips generated declarations (`types/`, `*.d.ts`), which made every duplicate in one project a false positive.
+13. Health baseline carries its factory version. ✅ The duplicate counter skips generated declarations (D106).
 14. Mutation rule: no new surviving mutant.
-15. Lead tokens in the mission cost; decisions by kind; idempotent approvals; human wait per gate.
-16. Retros saved under the repository's name, not the worktree folder's; `Area` column; `learn` groups by it; old-format retros read or flagged.
+15. Lead tokens in the mission cost; decisions by kind; human wait per gate. ✅ Idempotent approvals (D106).
+16. ✅ Retros saved under the repository's name (D106). `Area` column; `learn` groups by it; old-format retros read or flagged.
 
 **Tooling and cockpit**
-17. `mr.sh`: the title from the spec when `pr.md` has none; `--help`.
-18. Cockpit: QUIET only for running agents; MR count from `mr.url`; workers labelled by ticket. Read-only additions (P10 section 6): the next command with a copy button at every human step, and the new measurements; no button that runs anything yet.
+17. ✅ `mr.sh`: the title from the spec when `pr.md` has none; `--help` (D106).
+18. Cockpit: ✅ QUIET only for runs not yet collected (D106); MR count from `mr.url`; workers labelled by ticket. Read-only additions (P10 section 6): the next command with a copy button at every human step, and the new measurements; no button that runs anything yet.
 19. `doctor`: warn when user-level skills shadow the factory's (`~/.agents/skills`) and differ. (TLS checks turned off are already reported, D102.)
 20. Guard: block reads of `~/.netrc`, `~/.git-credentials`, `~/.npmrc`.
 21. Tools that copy the project tree (mutation testers) skip the factory's links: an ignore hint written by `factory link`.

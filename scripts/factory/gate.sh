@@ -144,6 +144,13 @@ check_mission() {                       # <feature>
   check_evidence "$b" "G4 behavior" "$spec"
   check_fresh    "$b" "G4 behavior" behavior
   [ "${FACTORY_G5:-on}" = off ] || check_health "$feature"
+  # P23: a mission with a done condition passes it, as run by verify.sh on today's code.
+  if [ -n "$(done_commands "$spec")" ]; then
+    local vf; vf="$(mission_dir "$feature")/verify.md"
+    if [ ! -f "$vf" ]; then bad "done condition: never run (scripts/factory/verify.sh $feature)"
+    elif [ "$(verdict_field "$vf" Result)" != PASS ]; then bad "done condition: fails ($vf)"
+    else ok "done condition: its commands pass"; check_fresh "$vf" "done condition" code; fi
+  fi
 }
 
 # G5 (D49): the steward explained every changed source file. A file it
