@@ -3,6 +3,7 @@
 # The first output line is machine-readable for the lead (/factory):
 #   STEP: <code>
 # Codes (human steps marked *, they notify you):
+#   measure architect approve-strategy* mission job-done*   (a job, P22)
 #   paused* grill* context-sync investigate approve-conclusion* handoff* report*
 #   contract approve* design approve-design* decide* tickets approve-tickets* coverage*
 #   setup* build review escalate* blocked* validate behavior-fix
@@ -23,7 +24,7 @@ UNRECORDED="The approval line has no /factory-approve record in decisions.tsv (w
 STATUS=""
 shopt -s nullglob
 
-HUMAN_STEPS=" paused grill approve-conclusion handoff report approve approve-design decide approve-tickets coverage setup escalate blocked unverified pr "
+HUMAN_STEPS=" paused grill approve-strategy job-done approve-conclusion handoff report approve approve-design decide approve-tickets coverage setup escalate blocked unverified pr "
 
 step() {                                  # <code> <human explanation>
   local code="$1"; shift
@@ -56,7 +57,44 @@ if [ -f "$dir/state/open-question.md" ]; then
   STATUS="$(cat "$dir/state/open-question.md")"$'\n'
   step decide "human: answer with /factory-decide $feature <your answer, and why>. Irreversible choices never default (D47)."
 fi
-[ -f "$spec" ] || step grill "human, main session: /grill-with-docs, then /to-spec → $spec"
+# P22, the architect step: a job (one line from a person) is measured by
+# scripts, planned by the architect, approved once, then run mission by mission.
+if [ ! -f "$spec" ] && [ -f "$dir/job.md" ]; then
+  st="$dir/strategy.md"
+  if [ ! -f "$dir/measures.md" ] || [ "$dir/job.md" -nt "$dir/measures.md" ]; then
+    step measure "scripts/factory/measure.sh $feature (tests, history, nesting, churn, importers, mutation scores from the last report; no model)"
+  fi
+  [ -f "$st" ] || step architect "scripts/factory/workflow.sh architect $feature (architect, fresh: options, choice and missions from the measurements, per docs/agents/strategy-format.md)"
+  if ! problems="$(node "$here/strategy.mjs" check "$dir" "$FACTORY_DIR" "$feature" 2>&1)"; then
+    STATUS="Strategy refused by its check:"$'\n'"$problems"$'\n'
+    rejected=("$dir"/state/strategy.rejected-*.md)
+    [ ${#rejected[@]} -lt 2 ] || step blocked "the architect's strategy failed its check three times: read $st and the problems above; fix job.md (a clearer job) or write the strategy yourself"
+    step architect "scripts/factory/workflow.sh architect $feature (the strategy goes back to the architect with these problems)"
+  fi
+  if ! approved_by_human "$st" Strategy approve-strategy; then
+    hint=""; approval_unrecorded "$st" Strategy approve-strategy && hint=" $UNRECORDED"
+    STATUS="$(sed -n '/^## Choice/,/^## Missions/p' "$st" | sed '$d')"$'\n'
+    step approve-strategy "human, once: read $st (options, choice, missions, decisions for the team), then /factory-approve $feature strategy. To change it: edit it, or delete it and run /factory $feature (the architect writes it again).$hint"
+  fi
+  STATUS="Missions of job $feature:"$'\n'
+  next_m=""
+  while IFS=$'\t' read -r m intent after; do
+    b="$(mission_dir "$m")/verdicts/behavior.md"; mr="$(mission_dir "$m")/mr.url"
+    state="not started"; [ -f "$(mission_dir "$m")/spec.md" ] && [ -n "$(git log -1 --format=%h -- "$(mission_dir "$m")/issues" 2>/dev/null)" ] && state="in progress"
+    [ "$(verdict_field "$b" Result)" = PASS ] && state="validated"
+    [ -s "$mr" ] && state="MR opened"
+    STATUS+="  $m ($intent${after:+, after $after}): $state"$'\n'
+    if [ -z "$next_m" ] && [ "$state" != "MR opened" ]; then next_m="$m"; fi
+  done < <(node "$here/strategy.mjs" list "$dir")
+  [ -n "$next_m" ] || step job-done "every mission of $feature has its MR: merge them in order, then scripts/factory/retro.sh close <mission> after each merge"
+  step mission "continue with mission $next_m: run the loop for $next_m (next.sh $next_m) in this session"
+fi
+# A mission written from a strategy starts after the one it builds on (P22).
+after="$(verdict_field "$spec" After)"
+if [ -n "$after" ] && [ "$after" != "-" ] && [ "$(verdict_field "$(mission_dir "$after")/verdicts/behavior.md" Result)" != PASS ]; then
+  step blocked "$feature builds on $after, which isn't validated yet: finish $after first (/factory $after), then /factory $feature on a branch that has its work"
+fi
+[ -f "$spec" ] || step grill "human, main session: /grill-with-docs, then /to-spec → $spec. Or give the factory a job instead: /factory-job <name> \"<what you want>\" (the architect plans it)"
 
 # D99: a bug between services is investigated before any contract. Context
 # repos are cloned read-only; explorers map one repo each, fresh; the

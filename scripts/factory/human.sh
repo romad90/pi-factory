@@ -8,6 +8,8 @@
 #   human.sh approve           <feature> tickets       the tickets the ticket writer proposed
 #   human.sh approve           <feature> design [note] G1b: the program design (D94)
 #   human.sh approve           <feature> conclusion    an investigation's conclusion (D99)
+#   human.sh job               <name> <what you want>  a job for the architect (P22)
+#   human.sh approve           <job> strategy          the architect's plan: writes each mission's spec
 #   human.sh ask               <feature> <ticket|-> <question>      (lead, when relaying)
 #   human.sh ask               <feature> <ticket|-> --stdin < question
 #   human.sh decide            <feature> <answer> [why...]
@@ -21,7 +23,8 @@ here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib.sh
 . "$here/lib.sh"
 
-cmd="${1:?usage: human.sh <approve|ask|decide|amend|accept-unverified> <feature> ...}"
+cmd="${1:?usage: human.sh <job|approve|ask|decide|amend|accept-unverified> <feature> ...}"
+text_arg_early() { if [ "${1:-}" = --stdin ]; then tr '\n' ' ' | sed 's/  */ /g; s/^ //; s/ $//'; else printf '%s' "$*"; fi; }
 feature="${2:?usage: human.sh $cmd <feature> ...}"
 shift 2
 # D75: a fix-lane reviewer may ask too. A fix has no spec, only a request
@@ -32,6 +35,37 @@ if [ ! -f "$(mission_dir "$feature")/spec.md" ] && [ -f "$(mission_dir "light/${
   case "$cmd" in ask|decide) ;; *) die "$cmd needs a mission; $light is a fix (fix lane: ask and decide only)" ;; esac
 fi
 dir="$(mission_dir "$feature")"; spec="$dir/spec.md"
+# P22, the architect step: a job is one line from a person; the factory
+# measures, the architect plans, the person approves the plan once.
+if [ "$cmd" = job ]; then
+  text="$(text_arg_early "$@")"
+  [ -n "$text" ] || die "usage: human.sh job <name> <what you want, in one line> (or --stdin)"
+  [[ "$feature" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]] || die "a job's name is lowercase words and dashes: $feature"
+  [ ! -e "$dir/job.md" ] && [ ! -e "$spec" ] || die "$dir already holds a job or a mission: pick another name"
+  mkdir -p "$dir"
+  printf '# Job: %s\n\n**Asked:** %s%s\n\n%s\n' "$feature" "$(date +%F)" "$(w="$(git config user.name 2>/dev/null || true)"; [ -n "$w" ] && printf ' by %s' "$w")" "$text" > "$dir/job.md"
+  bash "$here/checkpoint.sh" "$feature" >/dev/null
+  echo "Job $feature recorded. The factory measures the code, then the architect proposes a strategy: /factory $feature"
+  exit 0
+fi
+if [ "$cmd" = approve ] && [ "${1:-}" = strategy ] && [ -f "$dir/job.md" ]; then
+  shift
+  st="$dir/strategy.md"
+  [ -f "$st" ] || die "no strategy at $st yet: run /factory $feature"
+  out="$(node "$here/strategy.mjs" check "$dir" "$FACTORY_DIR" "$feature" 2>&1)" || die "the strategy doesn't pass its check:"$'\n'"$out"
+  who="$(approver)"; line="$(date +%F)${who:+ — by $who}${1:+ — $*}"
+  tmp="$(mktemp)"
+  awk -v line="**Strategy approved:** $line" 'index($0, "**Strategy approved:**") == 1 { next }
+    { print } /^# / && !done { print ""; print line; done = 1 }' "$st" > "$tmp"
+  mv "$tmp" "$st"
+  decision_log "$feature" - approve-strategy "Approve the architect's strategy" "approved${who:+ by $who}" strategy
+  echo "Strategy approved. Missions:"
+  node "$here/strategy.mjs" create "$dir" "$FACTORY_DIR" "$feature" "strategy approved $line"
+  while IFS=$'\t' read -r m _ _; do bash "$here/checkpoint.sh" "$m" >/dev/null; done < <(node "$here/strategy.mjs" list "$dir")
+  bash "$here/checkpoint.sh" "$feature" >/dev/null
+  echo "Each mission starts at its contract: /factory $feature continues with the first."
+  exit 0
+fi
 [ -n "$light" ] || [ -f "$spec" ] || die "no spec at $spec"
 checkpoint() { if [ -n "$light" ]; then bash "$here/checkpoint.sh" --light "$light"; else bash "$here/checkpoint.sh" "$feature"; fi; }
 q="$dir/state/open-question.md"

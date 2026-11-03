@@ -10,7 +10,10 @@ Loop:
 1. Run `scripts/factory/next.sh $1`. Read its first line, `STEP: <code>`. Only that line decides what you do: the ticket table below it (ESCALATE, blocked, FAIL) is status, never a reason to stop.
 2. Act:
    - `paused`: run `scripts/factory/pause.sh resume $1`, show its output, go to 1.
-   - `grill`, `approve`, `decide`, `approve-tickets`, `coverage`, `setup`, `escalate`, `blocked`, `unverified`, `approve-conclusion`, `handoff`, `report`: stop. Show the human the status and the NEXT line. These are human steps.
+   - `measure`: run `scripts/factory/measure.sh $1`, go to 1.
+   - `architect`: `scripts/factory/workflow.sh architect $1`, pass its `WORKFLOW_FILE` path as below, go to 1.
+   - `mission`: the job's next mission is named on the NEXT line. From now on, run this loop for that mission instead of `$1` (start at its `next.sh`). When that mission stops at a human step, say which job it belongs to.
+   - `approve-strategy`, `job-done`, `grill`, `approve`, `decide`, `approve-tickets`, `coverage`, `setup`, `escalate`, `blocked`, `unverified`, `approve-conclusion`, `handoff`, `report`: stop. Show the human the status and the NEXT line. These are human steps.
    - `context-sync`: run `scripts/factory/context.sh sync $1`, go to 1.
    - `investigate`: `scripts/factory/workflow.sh investigate $1`, pass its `WORKFLOW_FILE` path as below, go to 1.
    - `contract`, `validate`, `behavior-stale`, `steward`: run `scripts/factory/workflow.sh contract|validate|steward $1`. It prints `WORKFLOW_FILE: <path>`. Call `subagent({ workflow: "<path>", context: "fresh", async: false })` with that exact path. Never paste the script inline, and never read the file: it holds every brief, and reading it only spends tokens. After `validate` or `steward`, run `scripts/factory/collect.sh $1`.

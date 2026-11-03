@@ -1,6 +1,6 @@
 # P22. One entry, derived process: the change sets the tier, a function in code sets the steps
 
-**Status:** proposed, after mission 5 · **Effort:** L · **Depends on:** the MR gate's lanes (behavior-paths), P20 (token budget), P21 (boundary detection); replaces the idea of risk tiers as a separate feature
+**Status:** proposed, after mission 5; the architect step is built (D105, below) · **Effort:** L · **Depends on:** the MR gate's lanes (behavior-paths), P20 (token budget), P21 (boundary detection); replaces the idea of risk tiers as a separate feature
 
 ## Problem
 
@@ -50,6 +50,18 @@ A model may supply evidence (a boundary it saw) but never decides the tier. The 
 **The forge enforces the count.** The actual tier goes on the MR as a label (`factory:risk-high`); the forge's approval rules and CODEOWNERS require the approvals. The factory keeps not merging, and an agent's approval never counts as a person's.
 
 **Auto-merge for low, only after evidence.** Start strict: low still needs one approval. Loosen when the record allows (no revert across N low-tier MRs), and tighten automatically when the revert rate of a tier rises: the circuit breaker the Claude Code team names as missing in its own process.
+
+## The architect step (built, D105)
+
+The tier decides how much process one change gets. Before that, a job has to become changes: which missions, in what order, and why. Missions 6 and 7 showed the cost of leaving that to the person: about three hours of measuring and planning each, and a mission that reran an earlier one's work because nobody had measured that the earlier one pinned too little (coverage, not mutation score).
+
+- **One line in.** `/factory-job <name> "<what you want>"`.
+- **Measured by scripts.** `measure.sh`: tests, history, per-file nesting, size, duplication, churn, importers, mutation score from the last report, the public surface, earlier missions. Each row has an id.
+- **Planned by the architect.** Options with value, cost and what each leaves out; the choice; missions with done conditions that are commands; the team's decisions kept out of every mission.
+- **Checked before a person sees it.** Every number cited must be a measured row; every mission must be runnable.
+- **Approved once.** The specs are written from the strategy; the missions start at their contracts and run in order.
+
+Next, once the data supports it: the critic attacks the strategy as it attacks a contract, and the strategy's approval stands in for the missions' own approvals when the checks (P23) carry the missions' done conditions.
 
 ## Migration
 

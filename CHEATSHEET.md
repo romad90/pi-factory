@@ -87,7 +87,7 @@ After any model change, probe the gateway once: `doctor.sh` (full) runs `models-
 
 | File | Set |
 |---|---|
-| `.pi/agents/factory/*.md` | `model:` and `thinking:` per agent (11 agents) |
+| `.pi/agents/factory/*.md` | `model:` and `thinking:` per agent (13 agents; a profile without `factory-architect` gives it the designer's model) |
 | `.pi/settings.json` | `subagents.modelScope.allow: ["<your-provider>/*"]` |
 | `.factory/model-families.json` | a `{ "match": "*name*", "family": "x" }` line per model you use |
 
@@ -162,6 +162,20 @@ factory report               # stuck? one redacted text block to share instead o
 ```
 
 It writes `.factory/commands.env`, `behavior-paths`, `model-families.json`, `VERSION` (the factory version the project expects), `package-sha` (the factory commit CI runs), the CI include, `docs/agents/quality-bar.md`, a `GLOSSARY.md` stub, the `AGENTS.md` pointer and the `.pi/settings.json` subagents block, links the rest, and never commits (with `--migrate` it stages the `git rm` of the copies): review, commit, MR. In CI the factory jobs fetch the factory from `FACTORY_PACKAGE_GIT` (a CI/CD variable you set to a URL your CI may reach, e.g. your mirror; no default) at the commit in `.factory/package-sha`, check that commit, then link it; models stay per machine, checked by each pre-flight. `onboard` writes `package-sha` from your factory checkout: commit it with the rest. **Upgrade:** `git pull` in `~/pi-factory`, then `factory onboard` in each project when you want it to move up (bumps `.factory/VERSION` and the CI include, its own MR). The pre-flight refuses an installed factory older than the project expects, and checks the links (`factory link` repairs them). `factory version` shows both; `factory <script>` runs any factory script (`factory next <mission>`, `factory mr <mission>`).
+
+## 5b. A job: one line, the factory plans (D105)
+
+```text
+/factory-job tidy-api "make the api modules easy to change"
+```
+
+The factory measures the code (`measure.sh`: tests, history, per-file nesting, churn, importers, mutation score from the last report in `reports/mutation/mutation.json`, the public API report), then a fresh architect writes `.scratch/<job>/strategy.md`: what the numbers say, two or three options with value and cost, the choice, up to four missions in order, and the decisions that belong to your team (no mission takes them). A script checks it first (every number cited is measured, every mission has a command for "done"). Read it, then:
+
+```text
+/factory-approve tidy-api strategy
+```
+
+Each mission's `spec.md` is written from it; `/factory tidy-api` runs them in order, each from its contract (no grilling). Mutation scores need a report: run Stryker once before the job if you want them used (the architect says when they're missing).
 
 ## 6. A mission
 
