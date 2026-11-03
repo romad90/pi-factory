@@ -52,6 +52,7 @@ if [ "$cmd" = approve ] && [ "${1:-}" = strategy ] && [ -f "$dir/job.md" ]; then
   shift
   st="$dir/strategy.md"
   [ -f "$st" ] || die "no strategy at $st yet: run /factory $feature"
+  if approved_by_human "$st" Strategy approve-strategy; then echo "The strategy is already approved: nothing to do. /factory $feature continues."; exit 0; fi
   out="$(node "$here/strategy.mjs" check "$dir" "$FACTORY_DIR" "$feature" 2>&1)" || die "the strategy doesn't pass its check:"$'\n'"$out"
   who="$(approver)"; line="$(date +%F)${who:+ — by $who}${1:+ — $*}"
   tmp="$(mktemp)"
@@ -115,6 +116,7 @@ case "$cmd" in
       shift
       design="$dir/design.md"
       [ -f "$design" ] || die "no design at $design yet: run scripts/factory/workflow.sh design $feature"
+      if design_approved "$design"; then echo "G1b is already approved: nothing to do."; exit 0; fi
       who="$(approver)"; tmp="$(mktemp)"
       awk -v line="**Design approved:** $(date +%F)${who:+ — by $who}${1:+ — $*}" '
         index($0, "**Design approved:**") == 1 { next }
@@ -128,6 +130,11 @@ case "$cmd" in
       exit 0
     fi
     has_contract "$spec" || die "no validation contract in $spec yet"
+    # An approval counts once: a second /factory-approve of an approved contract
+    # (a lead relaying it again) logged a second decision and inflated the count.
+    if contract_approved "$spec"; then
+      echo "G1 is already approved (on $(approval_date "$spec" Contract)): nothing to do."; exit 0
+    fi
     if [ -f "$dir/contract-critique.md" ] && grep -q '\[blocking\]' "$dir/contract-critique.md"; then
       echo "Note: the critique still lists [blocking] findings. Approving means you accept them as they are."
     fi

@@ -66,6 +66,32 @@ function check() {
     seen.push(m.name);
   }
   if (!/^## Decisions for the team/m.test(s)) p.push("no ## Decisions for the team section (write \"- none\" if there is none)");
+
+  // Lenses: which ways of looking at the problem were used, each on evidence.
+  const lenses = section(s, "Lenses").split("\n").filter((l) => /^- \*\*[^*]+:\*\*/.test(l));
+  if (lenses.length < 2) p.push("## Lenses names fewer than two lenses (software engineering, SRE, computer science, security, product…): say which you used and on what evidence");
+  for (const l of lenses) if (!/not applied/i.test(l) && !cites(l).length) p.push(`lens "${l.match(/\*\*([^*:]+)/)[1]}": applied without citing a measurement`);
+
+  // Preconditions, as a reviewer of this plan would hold them.
+  const rows = [...measures.matchAll(/^\| (M-\d+) \| ([^|]+?) \| (.*) \|$/gm)].map((m) => ({ id: m[1], what: m[2].trim(), value: m[3] }));
+  const threshold = Number(process.env.FACTORY_PIN_THRESHOLD || 70);
+  const files = rows.filter((r) => r.what.startsWith("file ")).map((r) => {
+    const mu = r.value.match(/mutation ([\d.]+)%/);
+    return { id: r.id, path: r.what.slice(5), score: mu ? Number(mu[1]) : null };
+  });
+  const inScope = (scope, f) => scope.split(/[,\s]+/).filter(Boolean).some((x) => f === x || (x.endsWith("/") ? f.startsWith(x) : f.startsWith(`${x}/`) || f === x));
+  ms.forEach((m, i) => {
+    if (m.intent !== "refactor") return;
+    for (const f of files.filter((f) => inScope(m.scope, f.path))) {
+      if (f.score !== null && f.score >= threshold) continue;
+      const pinned = ms.slice(0, i).some((e) => (e.intent === "maintenance" || e.intent === "bugfix") && inScope(e.scope, f.path));
+      if (!pinned) p.push(`mission ${m.name}: refactors ${f.path} (${f.score === null ? "test strength not measured" : `mutation ${f.score}%`} [${f.id}]) without an earlier mission pinning it to ${threshold}%`);
+    }
+  });
+  const decisions = section(s, "Decisions for the team");
+  for (const r of rows.filter((r) => /^risk: TLS/.test(r.what))) {
+    if (!cites(decisions).includes(r.id)) p.push(`[${r.id}] (${r.what}) is a decision for the team: name it under ## Decisions for the team`);
+  }
   return p;
 }
 

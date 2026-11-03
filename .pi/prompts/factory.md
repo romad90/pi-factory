@@ -13,12 +13,13 @@ Loop:
    - `measure`: run `scripts/factory/measure.sh $1`, go to 1.
    - `architect`: `scripts/factory/workflow.sh architect $1`, pass its `WORKFLOW_FILE` path as below, go to 1.
    - `mission`: the job's next mission is named on the NEXT line. From now on, run this loop for that mission instead of `$1` (start at its `next.sh`). When that mission stops at a human step, say which job it belongs to.
-   - `approve-strategy`, `job-done`, `grill`, `approve`, `decide`, `approve-tickets`, `coverage`, `setup`, `escalate`, `blocked`, `unverified`, `approve-conclusion`, `handoff`, `report`: stop. Show the human the status and the NEXT line. These are human steps.
+   - `approve-strategy`, `job-done`, `verify-failed`, `grill`, `approve`, `decide`, `approve-tickets`, `coverage`, `setup`, `escalate`, `blocked`, `unverified`, `approve-conclusion`, `handoff`, `report`: stop. Show the human the status and the NEXT line. These are human steps.
    - `context-sync`: run `scripts/factory/context.sh sync $1`, go to 1.
    - `investigate`: `scripts/factory/workflow.sh investigate $1`, pass its `WORKFLOW_FILE` path as below, go to 1.
    - `contract`, `validate`, `behavior-stale`, `steward`: run `scripts/factory/workflow.sh contract|validate|steward $1`. It prints `WORKFLOW_FILE: <path>`. Call `subagent({ workflow: "<path>", context: "fresh", async: false })` with that exact path. Never paste the script inline, and never read the file: it holds every brief, and reading it only spends tokens. After `validate` or `steward`, run `scripts/factory/collect.sh $1`.
    - `tickets`: `scripts/factory/workflow.sh tickets $1 all`, pass its `WORKFLOW_FILE` as above. `behavior-fix`: same with `fix-behavior`. `health-fix`: same with `fix-health`. The next step is the human's approval.
    - `health`: run `scripts/factory/health.sh check $1` (no model). A non-zero exit is expected when health fails; continue the loop.
+   - `verify`: run `scripts/factory/verify.sh $1` (no model: the done condition's commands). A non-zero exit is expected when it fails; continue the loop.
    - `build`: run `scripts/factory/workflow.sh build-wave $1` and pass its `WORKFLOW_FILE` path as above. For each ticket in the result:
      - `patch` is set: `scripts/factory/integrate.sh $1 <ticket> <patch>`.
      - `patch` is null: `scripts/factory/locate-patch.sh $1 <ticket>`; if it prints a path, integrate it; if not, `scripts/factory/record-no-patch.sh $1 <ticket>`.

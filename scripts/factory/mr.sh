@@ -5,8 +5,10 @@
 # Usage: scripts/factory/mr.sh <feature> [--draft] [--dry-run]
 #
 # Body:   .scratch/<feature>/pr.md (what /pr writes), else /tmp/pr-body-<feature>.md
-# Title:  the body's first "# " line (removed from the description), else the
-#         last commit's subject
+# Title:  the body's first "# " line (removed from the description), else
+#         "<type>(<mission>): <the spec's title>", the type from its intent
+#         (feature feat, bugfix fix, refactor refactor, maintenance test),
+#         else the last commit's subject
 # Target: $FACTORY_MR_TARGET (environment or .factory/commands.env), else the
 #         remote's default branch
 # Branch: the current one, pushed to origin. Refused when it is the target or
@@ -31,7 +33,8 @@ here="$(cd "$(dirname "$0")" && pwd)"
 
 warn() { printf 'factory: %s\n' "$*" >&2; }
 
-feature="${1:?usage: mr.sh <feature> [--draft] [--dry-run]}"; shift
+case "${1:-}" in ""|-h|--help|help) sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;; -*) die "unknown option $1 (mr.sh --help)" ;; esac
+feature="${1}"; shift
 draft=""; dry=""
 for a in "$@"; do case "$a" in --draft) draft=1 ;; --dry-run) dry=1 ;; *) die "unknown option: $a" ;; esac; done
 dir="$(mission_dir "$feature")"
@@ -64,6 +67,15 @@ reviewer="$(conf FACTORY_MR_REVIEWER)"
 [ -n "$reviewer" ] || reviewer="$(verdict_field "$dir/spec.md" Reviewer 2>/dev/null | sed 's/^@//; s/[[:space:]].*//' || true)"
 
 title="$(sed -n 's/^# \{1,\}//p' "$body_file" | head -1)"
+# No heading in the body: the mission's own title, never the last commit's
+# subject (mission 6's MR was about to be called after a one-line fix).
+if [ -z "$title" ] && [ -f "$dir/spec.md" ]; then
+  h="$(sed -n 's/^# \{1,\}//p' "$dir/spec.md" | head -1 | sed -E 's/^([Ss]pec|[Mm]ission)[[:space:]]*(:|—|–|-)[[:space:]]*//')"
+  case "$(verdict_field "$dir/spec.md" Intent)" in
+    feature) ty=feat ;; bugfix) ty=fix ;; refactor) ty=refactor ;; maintenance) ty="test" ;; *) ty=chore ;;
+  esac
+  [ -z "$h" ] || title="$ty($feature): $h"
+fi
 [ -n "$title" ] || title="$(git log -1 --format=%s)"
 case "$title" in *'[skip ci]'*|*'[ci skip]'*) die "the title would skip CI: $title" ;; esac
 desc="$(mktemp)"; trap 'rm -f "$desc"' EXIT
@@ -111,7 +123,7 @@ mission_data() {
   arch="$(dirname "$(dirname "$(dirname "$(draft_patch "$feature" x)")")")/archive/$feature"
   mkdir -p "$arch" || return 0                 # no runs found: the metrics alone are still data
   bash "$here/metrics.sh" "$feature" --json > "$arch/metrics.json" 2>/dev/null || rm -f "$arch/metrics.json"
-  repo="$(basename "$(git rev-parse --show-toplevel)")${prefix:+-${prefix//\//-}}"
+  repo="$(repo_name)${prefix:+-${prefix//\//-}}"
   data="${FACTORY_DATA_DIR:-$HOME/.pi-factory/data}/$repo"; mkdir -p "$data" || return 0
   bash "$here/archive.sh" export "$feature" "$data/$feature-$(date +%Y%m%d).tar.gz" 2>/dev/null | sed 's/^/  /' || true
 }

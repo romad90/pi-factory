@@ -61,6 +61,13 @@ The tier decides how much process one change gets. Before that, a job has to bec
 - **Checked before a person sees it.** Every number cited must be a measured row; every mission must be runnable.
 - **Approved once.** The specs are written from the strategy; the missions start at their contracts and run in order.
 
+**How it thinks, without being steered (D106).** The person shouldn't have to tell the architect "this is a bot" or "pin before you refactor". So:
+
+- **The shape is measured, not declared.** `measure.sh` reads the manifests: an API server, a bot, a batch or scheduled job, a library, a front end, a command-line tool, and what it talks to (databases, HTTP services, queues); the installed practice packs. Presets become evidence the architect reads.
+- **Lenses, chosen and shown.** The architect composes the ways of looking a distinguished engineer would bring to this problem (software engineering: where change costs most; reliability: how it fails; computer science: invariants and complexity; security: boundaries and defaults; product), names them under `## Lenses` with the measurement behind each, and says which it left out and why.
+- **Risks measured as leads.** Certificate checks turned off, outgoing calls whose file never sets a timeout, empty catch blocks, a library that exits the process: found by pattern, each with where.
+- **Expectations held by code, not by repetition.** The check refuses a refactor of a file under the pin threshold without an earlier pinning mission, a plan without lenses, and a TLS risk not left to the team. Each rule is a case in the test suite's casebook; a new expectation becomes a new case, not a new instruction to remember.
+
 Next, once the data supports it: the critic attacks the strategy as it attacks a contract, and the strategy's approval stands in for the missions' own approvals when the checks (P23) carry the missions' done conditions.
 
 ## Migration

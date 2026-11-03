@@ -28,7 +28,7 @@ dir="$(mission_dir "$feature")"
 data_dir() {
   local repo prefix
   prefix="$(project_prefix)"
-  repo="$(basename "$(git rev-parse --show-toplevel)")${prefix:+-${prefix//\//-}}"
+  repo="$(repo_name)${prefix:+-${prefix//\//-}}"
   printf '%s/%s' "${FACTORY_DATA_DIR:-$HOME/.pi-factory/data}" "$repo"
 }
 

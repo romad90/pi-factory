@@ -10,6 +10,11 @@ Written by `factory-architect` to `.scratch/<job>/strategy.md` from `job.md` (th
 ## What the measurements say
 - <one finding per line, each citing the measurement it comes from: [M-4]>
 
+## Lenses
+- **Software engineering:** <the question it answered> [M-…]
+- **Reliability:** <the question it answered> [M-…]
+- **Computer science:** not applied: <why, in one line>
+
 ## Options
 ### A. <short name>
 **Value:** <what the codebase or the team gains, concretely> [M-…]
@@ -29,7 +34,7 @@ Written by `factory-architect` to `.scratch/<job>/strategy.md` from `job.md` (th
 **After:** -
 **Max tickets:** 12
 **Scope:** <files or folders, from the measurements>
-**Done when:** `<a command a script runs>` <and its pass condition>
+**Done when:** `<a command that exits 0 only when the mission is done>` (verify.sh runs it, no model)
 **Frozen paths:** <comma-separated, or ->
 **Frozen tests:** <comma-separated, or -; required for a refactor>
 
@@ -43,9 +48,12 @@ Written by `factory-architect` to `.scratch/<job>/strategy.md` from `job.md` (th
 - <a choice that changes production behavior or belongs to the team (security defaults, a public API change): what, why it matters, which measurement shows it. No mission takes it.>
 ```
 
-Rules the check enforces:
+Rules the check enforces (what a reviewer of this plan would hold it to, written as code so nobody has to repeat it):
 
 - At least two options; `**Chosen:**` names one of them.
 - Every `[M-n]` cited exists in `measures.md`; the findings, each option's value and the choice cite at least one.
 - Each mission: a name in lowercase words and dashes, not used by an existing mission; a known intent; a `**Done when:**` with a command in backticks; a number for `**Max tickets:**`; `**After:**` naming an earlier mission or `-`; a refactor names its frozen tests.
 - At most 4 missions. A job that needs more is two jobs.
+- `## Lenses` names at least two lenses; an applied lens cites a measurement.
+- A refactor doesn't touch a measured file whose mutation score is under the threshold (`FACTORY_PIN_THRESHOLD`, default 70), or isn't measured, unless an earlier maintenance or bugfix mission covers it.
+- A measured risk of certificate checks turned off is named, by its id, under `## Decisions for the team`.

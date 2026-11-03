@@ -256,6 +256,9 @@ gate_out="$(bash scripts/factory/gate.sh mission demo 2>&1 || true)"
 cp "$work/spec.bak" $m/spec.md
 bash scripts/factory/human.sh approve demo >/dev/null
 grep -qE '^\*\*Contract approved:\*\* [0-9]{4}-' $m/spec.md && t "/factory-approve writes the approval line" || fail "approve line"
+out="$(bash scripts/factory/human.sh approve demo 2>&1)"
+grep -q 'already approved' <<<"$out" && [ "$(grep -c $'\tapprove\t' $m/decisions.tsv)" = 1 ] \
+  && t "G1 approved twice is one decision, not two" || fail "G1 twice" "$out $(cat $m/decisions.tsv)"
 [ -z "$(git status --porcelain -- .scratch)" ] && t "approval is checkpointed" || fail "approval not committed"
 grep -q $'\tapprove\t' $m/decisions.tsv && t "approval logged in decisions.tsv" || fail "decisions.tsv"
 
@@ -1058,6 +1061,12 @@ out="$(FACTORY_MR_TARGET="$cur" bash scripts/factory/mr.sh demo --dry-run 2>&1)"
 printf '# chore: x [skip ci]\n' > "$work/skip.md"; cp $m/pr.md "$work/pr.keep"; cp "$work/skip.md" $m/pr.md
 out="$(FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo --dry-run 2>&1)" && fail "mr.sh must refuse a title that skips CI"
 cp "$work/pr.keep" $m/pr.md; t "mr.sh refuses the target branch itself and a title that skips CI"
+printf '## Summary\n\nNo heading here.\n' > $m/pr.md
+out="$(FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo --dry-run 2>&1)"
+grep -q "title: feat(demo): $(sed -n 's/^# //p' $m/spec.md | head -1)" <<<"$out" \
+  && t "mr.sh: no heading in the body, the title is the mission's own (intent and spec title), not the last commit" || fail "mr title from spec" "$out"
+cp "$work/pr.keep" $m/pr.md
+bash scripts/factory/mr.sh --help | grep -q '^Usage: scripts/factory/mr.sh' && t "mr.sh --help prints its usage" || fail "mr help" "$(bash scripts/factory/mr.sh --help 2>&1)"
 git init -q --bare "$work/origin.git"; git remote remove origin 2>/dev/null || true; git remote add origin "$work/origin.git"
 mkdir -p "$work/bin"; cat > "$work/bin/glab" <<'GLAB'
 #!/usr/bin/env bash
@@ -1367,6 +1376,13 @@ astep() { head -1 <<<"$(bash scripts/factory/next.sh "$1" 2>&1 || true)"; }
 out="$(bash scripts/factory/human.sh job Bad-Name "x" 2>&1)" && fail "a job name must be lowercase" "$out"
 bash scripts/factory/human.sh job tidy-tools "make the tools easy to change" >/dev/null || fail "human.sh job"
 [ "$(astep tidy-tools)" = "STEP: measure" ] && t "a job starts by measuring, no model" || fail "job measure step" "$(bash scripts/factory/next.sh tidy-tools 2>&1)"
+printf '{"name":"t","main":"src/tools/a.js","dependencies":{"express":"4","axios":"1","mongodb":"6"}}\n' > package.json
+printf 'const axios = require("axios");\nmodule.exports = () => axios.get("https://x", { httpsAgent: { rejectUnauthorized: false } });\n' > src/tools/call.js
+git add package.json src/tools/call.js; git commit -qm "test: shape fixtures"
+mkdir -p types; for n in one two; do printf 'export declare const a1: number;\nexport declare const a2: number;\nexport declare const a3: number;\nexport declare const a4: number;\nexport declare const a5: number;\nexport declare const a6: number;\nexport declare const a7: number;\n' > types/$n.d.ts; done
+git add types; git commit -qm "test: generated declarations"
+! bash scripts/factory/health.sh details | grep -q 'types/' && t "health: generated declarations (types/, *.d.ts) are not the team's code: no false duplicates" || fail "generated files" "$(bash scripts/factory/health.sh details)"
+git rm -rq types; git commit -qm "test: generated declarations gone"
 mkdir -p reports/mutation
 printf '{"files":{"src/tools/a.js":{"mutants":[{"status":"Killed"},{"status":"Survived"},{"status":"NoCoverage"},{"status":"CompileError"}]}}}' > reports/mutation/mutation.json
 out="$(bash scripts/factory/measure.sh tidy-tools 2>&1)" || fail "measure" "$out"
@@ -1375,6 +1391,11 @@ grep -qE '^\| M-1 \| tests \| `.*` exit 0' $ms && grep -q 'mutation report repor
   && grep -qE '\| file src/tools/a.js \| .*change\(s\) in a year, [0-9]+ importer\(s\), mutation 33.3% \(1 survived, 1 not covered\)' $ms \
   && grep -q '| public surface | no committed API report' $ms && grep -qE '\| mission demo \| intent ' $ms \
   && t "measure: tests, history, per-file churn, importers and mutation score, the public surface, earlier missions, each with an id" || fail "measures" "$(cat $ms)"
+grep -qE '\| shape \| API server, library; talks to MongoDB, HTTP services \(from package.json\)' $ms && grep -q '| practice packs | installed: ' $ms \
+  && grep -qE '\| risk: TLS certificate checks can be off \| src/tools/call.js:2' $ms \
+  && grep -qE '\| risk: outgoing calls without a timeout \| 1 of 1 file\(s\) .*src/tools/call.js' $ms \
+  && t "measure: the project's shape from its manifests, its packs, and risks an SRE looks for first (TLS off, calls without timeouts)" || fail "shape and risks" "$(cat $ms)"
+tlsid="$(sed -n 's/^| \(M-[0-9]*\) | risk: TLS.*/\1/p' $ms)"; toid="$(sed -n 's/^| \(M-[0-9]*\) | risk: outgoing.*/\1/p' $ms)"
 rm -rf reports
 [ "$(astep tidy-tools)" = "STEP: architect" ] || fail "job architect step"
 bash scripts/factory/workflow.sh architect tidy-tools > "$work/wf.log"; wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
@@ -1418,6 +1439,8 @@ out="$(bash scripts/factory/human.sh approve tidy-tools strategy 2>&1)" && fail 
 bash scripts/factory/workflow.sh architect tidy-tools > /dev/null
 [ -f .scratch/tidy-tools/state/strategy.rejected-1.md ] && grep -q 'M-99' .scratch/tidy-tools/state/strategy-check.md && [ ! -f .scratch/tidy-tools/strategy.md ] \
   && t "a refused strategy is kept aside, its problems go into the architect's next brief" || fail "strategy rejected" "$(ls .scratch/tidy-tools .scratch/tidy-tools/state)"
+# The casebook: what a reviewer of the plan expects, held by the check. A refactor of a weakly pinned file
+# with no pinning mission before it, no lenses, and a TLS risk left out of the team's decisions are refused.
 cat > .scratch/tidy-tools/strategy.md <<ST
 # Strategy: tidy-tools
 
@@ -1425,6 +1448,52 @@ cat > .scratch/tidy-tools/strategy.md <<ST
 
 ## What the measurements say
 - a.js is weakly pinned [$fid]
+
+## Options
+### A. Refactor now
+**Value:** faster [$fid]
+**Cost:** one mission
+**Leaves out:** pinning
+
+### B. Leave it
+**Value:** nothing spent [$fid]
+**Cost:** none
+**Leaves out:** everything
+
+## Choice
+**Chosen:** A
+Speed [$fid].
+
+## Missions
+### 1. refactor-tools
+**Intent:** refactor
+**After:** -
+**Max tickets:** 3
+**Scope:** src/tools/
+**Done when:** \`npm test\`
+**Frozen tests:** tests/
+
+Flatten a.js.
+
+## Decisions for the team
+- none
+ST
+out="$(node scripts/factory/strategy.mjs check .scratch/tidy-tools .scratch tidy-tools 2>&1)" && fail "a blind refactor must be refused" "$out"
+grep -q 'refactor-tools: refactors src/tools/a.js (mutation 33.3% \['"$fid"'\]) without an earlier mission pinning it to 70%' <<<"$out" \
+  && grep -q 'Lenses names fewer than two lenses' <<<"$out" && grep -q "\[$tlsid\] (risk: TLS certificate checks can be off) is a decision for the team" <<<"$out" \
+  && t "casebook: a blind refactor, a plan without lenses, a TLS risk not left to the team are refused" || fail "casebook" "$out"
+cat > .scratch/tidy-tools/strategy.md <<ST
+# Strategy: tidy-tools
+
+**Job:** make the tools easy to change
+
+## What the measurements say
+- a.js is weakly pinned [$fid]
+
+## Lenses
+- **Software engineering:** where change is risky: a.js is weakly pinned [$fid]
+- **Reliability:** outgoing calls without a timeout [$toid]
+- **Computer science:** not applied: no algorithmic question here
 
 ## Options
 ### A. Pin, then refactor
@@ -1463,10 +1532,13 @@ Pin what a.js does today: one assertion per surviving mutant. No change under sr
 Flatten a.js with named refactorings.
 
 ## Decisions for the team
-- none
+- certificate checks can be turned off [$tlsid]: the team decides the default
 ST
 [ "$(astep tidy-tools)" = "STEP: approve-strategy" ] || fail "approve-strategy step" "$(bash scripts/factory/next.sh tidy-tools 2>&1)"
 out="$(bash scripts/factory/human.sh approve tidy-tools strategy 2>&1)" || fail "approve strategy" "$out"
+out2="$(bash scripts/factory/human.sh approve tidy-tools strategy 2>&1)"
+grep -q 'already approved' <<<"$out2" && [ "$(grep -c approve-strategy .scratch/tidy-tools/decisions.tsv)" = 1 ] \
+  && t "an approval counts once: approving again logs nothing" || fail "approve twice" "$out2"
 grep -q '^\*\*Strategy approved:\*\*' .scratch/tidy-tools/strategy.md && grep -q 'approve-strategy' .scratch/tidy-tools/decisions.tsv \
   && grep -q '^\*\*Intent:\*\* maintenance' .scratch/pin-tools/spec.md && grep -q '^\*\*Job:\*\* tidy-tools' .scratch/pin-tools/spec.md \
   && grep -q '^## Frozen paths' .scratch/pin-tools/spec.md && grep -q 'one assertion per surviving mutant' .scratch/pin-tools/spec.md \
@@ -1477,12 +1549,23 @@ out="$(bash scripts/factory/next.sh tidy-tools 2>&1 || true)"
 [ "$(head -1 <<<"$out")" = "STEP: mission" ] && grep -q 'continue with mission pin-tools' <<<"$out" && grep -q 'refactor-tools (refactor, after pin-tools): not started' <<<"$out" \
   && t "the job hands the lead its next mission, with every mission's state" || fail "job mission step" "$out"
 [ "$(astep pin-tools)" = "STEP: contract" ] && t "a mission from a strategy starts at its contract: no grilling" || fail "mission contract" "$(bash scripts/factory/next.sh pin-tools 2>&1)"
+# The done condition is run by a script (P23): a command that fails is FAIL, a command the guard refuses is never run.
+if bash scripts/factory/verify.sh refactor-tools >/dev/null 2>&1; then fail "verify must fail when a done command fails"; fi
+grep -q '^\*\*Result:\*\* FAIL' .scratch/refactor-tools/verify.md && grep -q '`npm test`: exit [1-9]' .scratch/refactor-tools/verify.md \
+  && t "verify: a done command that exits non-zero makes the mission FAIL, recorded with its output" || fail "verify fail" "$(cat .scratch/refactor-tools/verify.md)"
+sed -i.bak 's/`npm test` green, frozen tests unchanged/`true` and `test -f src\/tools\/a.js`/' .scratch/refactor-tools/spec.md && rm -f .scratch/refactor-tools/spec.md.bak
+out="$(bash scripts/factory/verify.sh refactor-tools 2>&1)" || fail "verify pass" "$out $(cat .scratch/refactor-tools/verify.md)"
+grep -q '^\*\*Result:\*\* PASS' .scratch/refactor-tools/verify.md && grep -q '`test -f src/tools/a.js`: exit 0' .scratch/refactor-tools/verify.md \
+  && t "verify: every command under Done when runs; all exit 0 is PASS, recorded with the commit" || fail "verify" "$(cat .scratch/refactor-tools/verify.md)"
+sed -i.bak 's/`true` and/`true`, `curl https:\/\/example.com` and/' .scratch/refactor-tools/spec.md && rm -f .scratch/refactor-tools/spec.md.bak
+if bash scripts/factory/verify.sh refactor-tools >/dev/null 2>&1; then fail "verify must refuse a guarded command"; fi
+grep -q 'REFUSED by the command guard' .scratch/refactor-tools/verify.md && t "verify: a done condition the command guard refuses is never run" || fail "verify guard" "$(cat .scratch/refactor-tools/verify.md)"
 out="$(bash scripts/factory/next.sh refactor-tools 2>&1 || true)"
 [ "$(head -1 <<<"$out")" = "STEP: blocked" ] && grep -q 'builds on pin-tools' <<<"$out" && t "a mission waits for the one it builds on" || fail "mission after" "$out"
 printf 'https://gitlab.example/g/p/-/merge_requests/1\n' > .scratch/pin-tools/mr.url; printf 'https://gitlab.example/g/p/-/merge_requests/2\n' > .scratch/refactor-tools/mr.url
 [ "$(astep tidy-tools)" = "STEP: job-done" ] && t "every mission has its MR: the job is done" || fail "job done" "$(bash scripts/factory/next.sh tidy-tools 2>&1)"
 rm -f .scratch/pin-tools/mr.url .scratch/refactor-tools/mr.url
-git rm -rq .scratch/tidy-tools .scratch/pin-tools .scratch/refactor-tools; git commit -qm "test: job done"
+git rm -rq .scratch/tidy-tools .scratch/pin-tools .scratch/refactor-tools package.json src/tools/call.js; git commit -qm "test: job done"
 
 # D92: install once per machine (P11). Models per machine, then a project on the package.
 echo "Context repos and investigation (D99)"

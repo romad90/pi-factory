@@ -102,6 +102,10 @@ function events(name, dir, prefix) {
 
 function workers(mission) {
   const out = [];
+  // A run whose log stopped before the mission's last commit was collected by
+  // the lead: finished, not quiet (a ticket writer done for an hour is not stuck).
+  let lastCommitMs = 0;
+  try { lastCommitMs = 1000 * Number(git(["log", "-1", "--format=%ct", "--", path.join(root, mission)]).trim() || 0); } catch {}
   for (const base of (env.RUN_DIRS || "").split(/\s+/).filter(Boolean)) {
     let runs = [];
     try { runs = fs.readdirSync(base); } catch { continue; }
@@ -116,7 +120,7 @@ function workers(mission) {
         if (!head.includes(`Mission ${mission}`) && !head.includes(`/${mission}/`)) continue;
         const text = stripAnsi(read(p, 20000));
         const lines = text.split("\n").map((l) => l.trimEnd()).filter((l) => l.trim());
-        const done = /\b(completed|finished|Workflow complete)\b/i.test(lines.slice(-3).join(" "));
+        const done = /\b(completed|finished|Workflow complete)\b/i.test(lines.slice(-3).join(" ")) || (lastCommitMs > 0 && st.mtimeMs < lastCommitMs);
         out.push({
           run: r, agent: (head.match(/factory-[a-z-]+/) || [""])[0],
           ticket: (head.match(/ticket\s+(\d\d[\w-]*)/i) || [])[1] || "",

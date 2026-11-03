@@ -16,7 +16,7 @@ Delegation needs three things:
 
 ## How it works, in one paragraph
 
-You give a job in one line, or write the spec yourself. For a job, scripts measure the code (tests, nesting, churn, importers, mutation scores, the public surface) and an architect proposes two or three strategies with their value and cost, picks one, and splits it into missions whose done conditions are commands; you approve that plan once. Each mission then starts at its contract. A contract of numbered assertions is written, attacked by a critic, and approved by you before any ticket exists. Fresh-context agents build tickets in parallel worktrees; each patch passes a guard, lint and tests before a reviewer from another model family sees it; a validator checks behavior against cases the workers never see; a ratchet and a code steward hold code health. Scripts decide every next step and keep the record in files. CI enforces the gates on every merge request. You come back at a handful of human steps: approve the contract, the design, the tickets, the merge.
+You give a job in one line, or write the spec yourself. For a job, scripts measure the code: what kind of software it is (an API, a bot, a batch job, a library) and what it talks to, tests, nesting, churn, importers, mutation scores, the public surface, and the risks an SRE looks for first. An architect then works the way a distinguished engineer would: it picks the lenses the problem needs (software engineering, reliability, computer science, security, product) and shows the evidence behind each, compares two or three strategies by value and cost, and splits the chosen one into missions whose done conditions are commands. A script holds it to the expectations you'd otherwise repeat (no refactor of weakly tested code before it is pinned; security defaults left to your team). You approve the plan once. Each mission then starts at its contract and ends when its done condition passes, run by a script. A contract of numbered assertions is written, attacked by a critic, and approved by you before any ticket exists. Fresh-context agents build tickets in parallel worktrees; each patch passes a guard, lint and tests before a reviewer from another model family sees it; a validator checks behavior against cases the workers never see; a ratchet and a code steward hold code health. Scripts decide every next step and keep the record in files. CI enforces the gates on every merge request. You come back at a handful of human steps: approve the contract, the design, the tickets, the merge.
 
 The principles, borrowed from Factory's *Missions* and hardened over six missions:
 
@@ -39,6 +39,8 @@ A factory built on non-deterministic parts is only as good as what it measures. 
 | Run archive | What did each agent read, run and answer? | `factory archive` (D97) |
 | `factory tokens` | Where do the tokens go, request by request? | P20 |
 | `factory frictions` | Where did agents fight their setup: failed, repeated, refused calls? | P23 |
+| `measure.sh` | What is this project (API, bot, batch, library), how strong are its tests, where is change risky? | D105, D106 |
+| `verify.sh` | Does the mission meet its done condition, by command? | D106 |
 | `metrics.sh` | Rounds, first-pass rate, decisions, cost per mission | D85 |
 | Benchmark | Is this model or brief better on our own past tickets? Paired, with a confidence interval | `bench.sh` (D98) |
 | Retro | What went wrong, with evidence; after the merge, what the team found that the gates missed | `retro.sh pack`, `save`, `close` |
@@ -144,7 +146,7 @@ You type `/factory <mission>` once. The lead loops on `scripts/factory/next.sh`,
 
 | Agent | Does | Model guidance | Context |
 |---|---|---|---|
-| `factory-architect` | Turns a one-line job into a strategy: options, choice and missions, from the measurements (D105) | Frontier, family A | fresh |
+| `factory-architect` | Turns a one-line job into a strategy: the project's shape, the lenses it needs, options, choice and missions, all from measurements (D105, D106) | Frontier, family A | fresh |
 | `factory-contract-author` | Writes or amends the validation contract from the spec | Frontier, family A | fresh |
 | `factory-contract-critic` | Attacks the contract before you approve it | Frontier, **family ≠ author** | fresh |
 | `factory-designer` | Writes the program design (call stacks, files, signatures, slices) after G1, for feature and refactor missions | Frontier, family A | fresh |
@@ -227,6 +229,7 @@ A pack is a shape (how the software runs and fails), not a label: a batch bot is
 **Guaranteed by scripts and CI** (not by a model's goodwill):
 
 - No integration without lint and tests; reviewers only see green, committed code.
+- A mission with a done condition (`## Done when`) can't merge until its commands pass on the current code, run by `verify.sh`, not judged by a model.
 - A verdict counts only if `collect.sh` recorded it. Rounds come from history, and the model is the configured one.
 - Every behavior assertion is proven, or explicitly accepted as unverified by a named human on a date.
 - A judge never shares a model family with what it judges.
@@ -240,7 +243,7 @@ A pack is a shape (how the software runs and fails), not a label: a batch bot is
 
 **Not guaranteed (yet):**
 
-- **A green gate judged by a model can still be wrong.** In mission 6, four model judges passed "the public surface is unchanged" while an inferred return type had changed it; a mechanical diff of the declarations caught it after validation. Until P23's script checks land, run the API and mutation checks yourself after validation.
+- **A green gate judged by a model can still be wrong.** In mission 6, four model judges passed "the public surface is unchanged" while an inferred return type had changed it; a mechanical diff of the declarations caught it after validation. A mission's done condition is now a command `verify.sh` runs; put the API report check and the mutation threshold there (the architect does).
 - **The wall is firmer, not absolute.** Workers' worktrees don't contain `instrument/`, and the command guard blocks routes to it (git show, git log, reads). A separate repo is the hard version.
 - **Behavior evidence needs a harness.** Without one, G4 passes only on human acceptance, and the MR shows it under Known limits.
 - **The command guard is a deny-list, and it loads only in a trusted project.** It stops the known dangerous commands, not every possible one; the patch guard and CI stand behind it. An OS sandbox for agent commands is studied in the [sandboxing study](docs/research/agent-sandboxing.md).

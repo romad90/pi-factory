@@ -12,6 +12,7 @@
 #    (git archive: no .git, files the version deleted are gone), refusing when
 #    the folder has local changes, and commits "chore: pi-factory <version>".
 #    --push pushes the mirror's current branch.
+#    Then this machine's models profile, if any, is applied (a new agent gets a model).
 # 4. --projects: for each project listed in ~/.pi-factory/projects (one path
 #    per line), when its tree is clean: factory onboard --no-setup, then commit
 #    .factory/VERSION and .factory/package-sha on its current branch. A project
@@ -62,6 +63,14 @@ else
 fi
 if [ -n "$push" ]; then git -C "$mirror" push -q && echo "mirror: pushed"; fi
 
+# A new version may bring a new agent: this machine's models profile gives it
+# a model now (an agent without one stops the pre-flight). The profile is the
+# source; nothing else is changed.
+prof="${PI_FACTORY_MODELS:-$HOME/.pi-factory/models.json}"
+if [ -f "$prof" ]; then
+  node "$dst/scripts/factory/models-profile.mjs" apply --user "$prof" 2>&1 | sed 's/^/models: /' || echo "models: apply --user failed (run: factory models apply --user)"
+fi
+
 # 4. The projects.
 [ -n "$projects" ] || { echo "projects: run factory onboard --no-setup in each (or rerun with --projects)"; exit 0; }
 list="$HOME/.pi-factory/projects"
@@ -70,10 +79,15 @@ while IFS= read -r p; do
   p="${p/#\~/$HOME}"; [ -n "$p" ] && [ "${p#\#}" = "$p" ] || continue
   [ -d "$p" ] || { echo "  $p: missing, skipped"; continue; }
   if [ -n "$(git -C "$p" status --porcelain --untracked-files=no)" ]; then echo "  $p: local changes, skipped"; continue; fi
-  ( cd "$p" && bash "$dst/scripts/factory/onboard.sh" --no-setup >/dev/null 2>&1 ) || { echo "  $p: onboard failed (run it there to see why)"; continue; }
+  # Nothing in the loop reads the project list: onboard, git and its hooks get no stdin.
+  ( cd "$p" && bash "$dst/scripts/factory/onboard.sh" --no-setup </dev/null >/dev/null 2>&1 ) || { echo "  $p: onboard failed (run it there to see why)"; continue; }
   git -C "$p" add -- .factory/VERSION .factory/package-sha 2>/dev/null || true
   if git -C "$p" diff --cached --quiet; then echo "  $p: already at $v"
-  else git -C "$p" commit -q -m "chore: pi-factory $v" && echo "  $p: $v, committed on $(git -C "$p" branch --show-current)"; fi
-  rest="$(git -C "$p" status --porcelain | grep -c . || true)"
+  else git -C "$p" commit -q -m "chore: pi-factory $v" </dev/null >/dev/null 2>&1 && echo "  $p: $v, committed on $(git -C "$p" branch --show-current)"; fi
+  # Tracked files only: untracked leftovers were counted as "files onboard changed".
+  rest="$(git -C "$p" status --porcelain --untracked-files=no | grep -c . || true)"
   [ "$rest" -eq 0 ] || echo "    and $rest other file(s) onboard changed: review them (git -C $p status)"
 done < "$list"
+# The last command decides the exit status: a project's hook or a closed pipe
+# in the loop's last step must not report a sync that worked as failed (141).
+exit 0
