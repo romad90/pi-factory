@@ -28,18 +28,46 @@ const userMode = argv.includes("--user");
 const [cmd, arg] = argv.filter((a) => a !== "--user");
 const profile = arg || process.env.PI_FACTORY_MODELS || join(homedir(), ".pi-factory", "models.json");
 const placeholder = (v) => /[<>]/.test(String(v ?? ""));
-// An agent newer than the profile takes the model of the agent its role is
-// closest to, and says so, so an upgrade never leaves an agent without a model.
-const STAND_IN = { "factory-architect": "factory-designer", "factory-strategy-critic": "factory-contract-critic" };
+// An agent newer than the profile gets a model without anyone editing the
+// profile: the first of the agents closest to its role whose model is pinned
+// (not a floating alias) and, for a judge, of another family than what it
+// judges. The choice is written into the profile, said once, and the profile
+// stays the place to change it.
+const STAND_IN = {
+  "factory-architect": { from: ["factory-designer", "factory-investigator", "factory-contract-author", "factory-worker-heavy"] },
+  "factory-strategy-critic": { from: ["factory-reviewer", "factory-validator", "factory-code-steward", "factory-contract-critic"], judges: "factory-architect" },
+};
+const FLOATING = /(^|[\/:._-])(latest|current|default|stable|preview)$/i;
+function familyOf(p, id) {
+  const pkg = join(dirname(new URL(import.meta.url).pathname), "..", "..", FAMILIES);
+  const fams = [...(p.families ?? []), ...(existsSync(FAMILIES) ? readJson(FAMILIES).families ?? [] : []), ...(existsSync(pkg) ? readJson(pkg).families ?? [] : [])];
+  const glob = (m) => new RegExp("^" + m.toLowerCase().replace(/[.+?^$(){}|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$");
+  return fams.find((f) => f?.match && glob(f.match).test(String(id).toLowerCase()))?.family;
+}
 function withStandIns(p) {
   p.agents = p.agents ?? {};
-  for (const [name, from] of Object.entries(STAND_IN)) {
-    const a = p.agents[name], src = p.agents[from];
-    if ((!a?.model || placeholder(a.model)) && src?.model && !placeholder(src.model)) {
-      p.agents[name] = { ...src };
-      console.log(`${name}: not in the profile, using ${from}'s model (${src.model}); add "${name}" to the profile to choose another`);
-    }
+  const added = [];
+  for (const [name, { from, judges }] of Object.entries(STAND_IN)) {
+    const a = p.agents[name];
+    if (a?.model && !placeholder(a.model)) continue;
+    const judged = judges && p.agents[judges]?.model, judgedFam = judged && familyOf(p, judged);
+    const cands = from.map((f) => ({ f, a: p.agents[f] })).filter((c) => c.a?.model && !placeholder(c.a.model));
+    const ok = (c) => !FLOATING.test(c.a.model) && !(judgedFam && familyOf(p, c.a.model) === judgedFam);
+    const pick = cands.find(ok) ?? cands.find((c) => !(judgedFam && familyOf(p, c.a.model) === judgedFam)) ?? cands[0];
+    if (!pick) continue;
+    p.agents[name] = { ...pick.a };
+    const why = FLOATING.test(pick.a.model) ? " (a floating alias: no pinned candidate; pin one)" : "";
+    added.push(`${name}: not in the profile, given ${pick.f}'s model (${pick.a.model})${why}`);
   }
+  if (added.length && existsSync(profile)) {
+    const raw = readJson(profile);
+    raw.agents = { ...(raw.agents ?? {}) };
+    for (const n of Object.keys(STAND_IN)) if (p.agents[n] && !(raw.agents[n]?.model && !placeholder(raw.agents[n].model))) raw.agents[n] = p.agents[n];
+    writeFileSync(`${profile}.bak`, readFileSync(profile));
+    writeFileSync(profile, JSON.stringify(raw, null, 2) + "\n");
+    added.push(`written to ${profile}: edit it there to choose another`);
+  }
+  for (const l of added) console.log(l);
   return p;
 }
 const readJson = (f) => JSON.parse(readFileSync(f, "utf8"));
