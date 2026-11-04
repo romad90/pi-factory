@@ -76,7 +76,8 @@ mkdir -p "$dst/.factory/ci"
 # In a monorepo every project includes its own copy (D56): job names get the
 # project's slug, jobs run only when the project changed, from its folder.
 node "$src/scripts/factory/project-files.cjs" ci "$src/templates/gitlab/factory.gitlab-ci.yml" "$dst/.factory/ci/factory.gitlab-ci.yml" "$prefix" "$ci_mode"
-for f in factory.md contract-format.md verdict-format.md bot-harness.md ticket-format.md investigation-format.md; do
+# Every docs/agents file of the package but the quality bar (the repo's own): one list, package-links.txt.
+for f in $(sed -n 's|^docs/agents/||p' "$src/scripts/factory/package-links.txt"); do
   put "docs/agents/$f" template
 done
 put .pi/extensions/factory-guard.ts template

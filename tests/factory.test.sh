@@ -1818,6 +1818,8 @@ echo "Vendored skills"
 ( cd "$root/.pi/skills/deepen-prompt" && sed -n '/^```$/,/^```$/p' SOURCE.md | grep -v '^```' | if command -v sha256sum >/dev/null; then sha256sum -c --quiet -; else shasum -a 256 -c --quiet -; fi ) >"$work/vendor.log" 2>&1 \
   && t "deepen-prompt is vendored unchanged (hashes in its SOURCE.md)" || fail "deepen-prompt changed: update SOURCE.md on purpose, or restore the files" "$(cat "$work/vendor.log")"
 
+missing=""; for f in "$root"/docs/agents/*.md; do b="docs/agents/$(basename "$f")"; [ "$b" = docs/agents/quality-bar.md ] || grep -qx "$b" "$root/scripts/factory/package-links.txt" || missing="$missing $b"; done
+[ -z "$missing" ] && t "every docs/agents file an agent reads reaches the projects (package-links.txt)" || fail "docs not linked:$missing"
 echo "Sync a mirror (sync-mirror.sh)"
 sm="$work/sync"; mkdir -p "$sm"
 git init -q --bare "$sm/origin.git"; git -C "$root" push -q "$sm/origin.git" HEAD:refs/heads/develop   # the factory as committed (CI checks out detached)

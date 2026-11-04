@@ -42,8 +42,8 @@ version="$(cat "$pkg/.factory/VERSION")"
 note() { printf '  %s\n' "$*"; }
 
 # Copied by install-into.sh: those files must go first, or they shadow the package.
-copied=(scripts/factory .factory/briefs .factory/skills-pin .pi/agents/factory .pi/extensions/factory-guard.ts docs/factory
-        docs/agents/factory.md docs/agents/contract-format.md docs/agents/verdict-format.md docs/agents/bot-harness.md docs/agents/ticket-format.md docs/agents/investigation-format.md)
+copied=(scripts/factory .factory/briefs .factory/skills-pin .pi/agents/factory .pi/extensions/factory-guard.ts docs/factory)
+mapfile -t -O "${#copied[@]}" copied < <(grep '^docs/agents/' "$pkg/scripts/factory/package-links.txt")
 for f in "$pkg"/.pi/prompts/factory*.md; do copied+=(".pi/prompts/$(basename "$f")"); done
 for d in "$pkg"/.pi/skills/*/; do copied+=(".pi/skills/$(basename "$d")"); done
 tracked="$(git ls-files -- "${copied[@]}" | sed -n 1p)"
