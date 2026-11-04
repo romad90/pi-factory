@@ -4,6 +4,7 @@
 #   factory onboard [--ci mr|child] [--migrate]   onboard this project on the installed factory
 #   factory link [--check]                        (re)create this machine's links to the package
 #   factory models apply --user [profile]         this machine's models, for every project
+#   factory models lint | probe                   the same as models-lint, models-probe
 #   factory version                               the installed factory and what this project expects
 #   factory setup [--write]                       find and rehearse this project's commands (D102)
 #   factory report [--full]                       one redacted text with what a diagnosis needs (D102)
@@ -27,7 +28,12 @@ case "$cmd" in
     printf 'installed: %s (%s)\n' "$(cat "$here/../../.factory/VERSION")" "$(cd -P "$here/../.." && pwd)"
     if [ -f .factory/VERSION ]; then printf 'project expects: %s\n' "$(cat .factory/VERSION)"; fi
     exit 0 ;;
-  models) exec node "$here/models-profile.mjs" "$@" ;;
+  models)
+    case "${1:-}" in             # "factory models lint|probe" is what people type
+      lint) shift; exec bash "$here/factory.sh" models-lint "$@" ;;
+      probe) shift; exec bash "$here/factory.sh" models-probe "$@" ;;
+    esac
+    exec node "$here/models-profile.mjs" "$@" ;;
 esac
 case "$cmd" in */*|.*) echo "factory: unknown command: $cmd" >&2; exit 2 ;; esac
 if [ -f "$here/$cmd.sh" ]; then exec bash "$here/$cmd.sh" "$@"; fi

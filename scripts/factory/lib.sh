@@ -603,6 +603,11 @@ job_switch() {
     git switch -q "$want" 2>/dev/null || { echo "can't switch to $want (git switch $want shows why)"; return 1; }
     echo "factory: mission $m continues on its branch $want" >&2; return 0
   fi
+  # git can't hold a branch job/<job> and job/<job>/<mission> together.
+  if git show-ref -q --verify "refs/heads/job/$job"; then
+    echo "a branch named job/$job exists, and git can't create $want next to it: rename it (git branch -m job/$job base/$job), then run again"
+    return 1
+  fi
   prev="$(job_prev_mission "$job" "$m")"; base="$cur"
   if [ -n "$prev" ] && git show-ref -q --verify "refs/heads/$(job_branch "$job" "$prev")"; then base="$(job_branch "$job" "$prev")"; fi
   git switch -q -c "$want" "$base" 2>/dev/null || { echo "can't create $want from $base (git switch -c $want $base shows why)"; return 1; }
