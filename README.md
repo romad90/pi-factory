@@ -199,7 +199,7 @@ In Pi, from the project: trust it once (that loads the command guard), then `/su
 
 | You want to | Type |
 |---|---|
-| Give the factory a job in one line | `/factory-job <name> "<what you want>"`, then `/factory-approve <name> strategy` once |
+| Give the factory a job in one line | `/factory-job <name> "<what you want>"`, then `/factory-approve <name> strategy` once; each mission gets its own stacked branch and MR |
 | Start or continue a mission (or a job) | `/factory <mission>` |
 | Approve the contract (G1) | `/factory-approve <mission>` |
 | Approve the proposed tickets | `/factory-approve <mission> tickets` |

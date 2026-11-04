@@ -1584,9 +1584,12 @@ grep -q '^\*\*Strategy approved:\*\*' .scratch/tidy-tools/strategy.md && grep -q
   && grep -q '^## Frozen tests' .scratch/refactor-tools/spec.md && grep -q '^\*\*After:\*\* pin-tools' .scratch/refactor-tools/spec.md \
   && [ -z "$(git status --porcelain .scratch)" ] \
   && t "approving the strategy once writes each mission's spec from it, committed" || fail "strategy approve" "$out $(cat .scratch/pin-tools/spec.md 2>&1)"
+jbase="$(git branch --show-current)"
 out="$(bash scripts/factory/next.sh tidy-tools 2>&1 || true)"
 [ "$(head -1 <<<"$out")" = "STEP: mission" ] && grep -q 'continue with mission pin-tools' <<<"$out" && grep -q 'refactor-tools (refactor, after pin-tools): not started' <<<"$out" \
   && t "the job hands the lead its next mission, with every mission's state" || fail "job mission step" "$out"
+[ "$(git branch --show-current)" = job/tidy-tools/pin-tools ] && grep -q "on its own branch job/tidy-tools/pin-tools (from $jbase)" <<<"$out" \
+  && t "a job's first mission gets its own branch, from the branch the job started on (D109)" || fail "job branch" "$out"
 [ "$(astep pin-tools)" = "STEP: contract" ] && t "a mission from a strategy starts at its contract: no grilling" || fail "mission contract" "$(bash scripts/factory/next.sh pin-tools 2>&1)"
 # The done condition is run by a script (P23): a command that fails is FAIL, a command the guard refuses is never run.
 if bash scripts/factory/verify.sh refactor-tools >/dev/null 2>&1; then fail "verify must fail when a done command fails"; fi
@@ -1601,9 +1604,32 @@ if bash scripts/factory/verify.sh refactor-tools >/dev/null 2>&1; then fail "ver
 grep -q 'REFUSED by the command guard' .scratch/refactor-tools/verify.md && t "verify: a done condition the command guard refuses is never run" || fail "verify guard" "$(cat .scratch/refactor-tools/verify.md)"
 out="$(bash scripts/factory/next.sh refactor-tools 2>&1 || true)"
 [ "$(head -1 <<<"$out")" = "STEP: blocked" ] && grep -q 'builds on pin-tools' <<<"$out" && t "a mission waits for the one it builds on" || fail "mission after" "$out"
-printf 'https://gitlab.example/g/p/-/merge_requests/1\n' > .scratch/pin-tools/mr.url; printf 'https://gitlab.example/g/p/-/merge_requests/2\n' > .scratch/refactor-tools/mr.url
+printf 'https://gitlab.example/g/p/-/merge_requests/1\n' > .scratch/pin-tools/mr.url
+echo "// local" >> src/tools/call.js
+out="$(bash scripts/factory/next.sh tidy-tools 2>&1 || true)"
+[ "$(head -1 <<<"$out")" = "STEP: blocked" ] && grep -q 'uncommitted changes' <<<"$out" && [ "$(git branch --show-current)" = job/tidy-tools/pin-tools ] \
+  && t "the next mission's branch is not created over uncommitted changes" || fail "job branch dirty" "$out"
+git checkout -q -- src/tools/call.js
+out="$(bash scripts/factory/next.sh tidy-tools 2>&1 || true)"
+[ "$(head -1 <<<"$out")" = "STEP: mission" ] && [ "$(git branch --show-current)" = job/tidy-tools/refactor-tools ] \
+  && grep -q 'on its own branch job/tidy-tools/refactor-tools (from job/tidy-tools/pin-tools)' <<<"$out" \
+  && t "the next mission stacks on the previous one's branch: its work and state are there" || fail "job branch stacked" "$out"
+printf '# Refactor the tools\n\nBody.\n' > .scratch/refactor-tools/pr.md
+prev_origin="$(git remote get-url origin 2>/dev/null || true)"; git remote remove origin 2>/dev/null || true
+git init -q --bare "$work/job-origin.git"; git remote add origin "$work/job-origin.git"
+git push -q origin job/tidy-tools/pin-tools 2>/dev/null
+out="$(FACTORY_MR_TARGET=production bash scripts/factory/mr.sh refactor-tools --dry-run 2>&1)"
+grep -q 'MR: job/tidy-tools/refactor-tools → job/tidy-tools/pin-tools' <<<"$out" \
+  && t "mr.sh: a stacked mission's MR targets the previous mission's branch while it is open" || fail "mr stacked" "$out"
+git push -q origin --delete job/tidy-tools/pin-tools 2>/dev/null
+out="$(FACTORY_MR_TARGET=production bash scripts/factory/mr.sh refactor-tools --dry-run 2>&1)"
+grep -q 'MR: job/tidy-tools/refactor-tools → production' <<<"$out" \
+  && t "mr.sh: once the previous mission's branch is gone (merged), the MR targets the usual branch" || fail "mr unstacked" "$out"
+printf 'https://gitlab.example/g/p/-/merge_requests/2\n' > .scratch/refactor-tools/mr.url
 [ "$(astep tidy-tools)" = "STEP: job-done" ] && t "every mission has its MR: the job is done" || fail "job done" "$(bash scripts/factory/next.sh tidy-tools 2>&1)"
-rm -f .scratch/pin-tools/mr.url .scratch/refactor-tools/mr.url
+rm -f .scratch/pin-tools/mr.url .scratch/refactor-tools/mr.url .scratch/refactor-tools/pr.md
+git switch -q "$jbase" && git branch -qD job/tidy-tools/pin-tools job/tidy-tools/refactor-tools
+git remote remove origin; [ -z "$prev_origin" ] || git remote add origin "$prev_origin"
 git rm -rq .scratch/tidy-tools .scratch/pin-tools .scratch/refactor-tools package.json src/tools/call.js; git commit -qm "test: job done"
 
 # D92: install once per machine (P11). Models per machine, then a project on the package.

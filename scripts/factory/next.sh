@@ -101,8 +101,11 @@ if [ ! -f "$spec" ] && [ -f "$dir/job.md" ]; then
     STATUS+="  $m ($intent${after:+, after $after}): $state"$'\n'
     if [ -z "$next_m" ] && [ "$state" != "MR opened" ]; then next_m="$m"; fi
   done < <(node "$here/strategy.mjs" list "$dir")
-  [ -n "$next_m" ] || step job-done "every mission of $feature has its MR: merge them in order, then scripts/factory/retro.sh close <mission> after each merge"
-  step mission "continue with mission $next_m: run the loop for $next_m (next.sh $next_m) in this session"
+  [ -n "$next_m" ] || step job-done "every mission of $feature has its MR, each on top of the one before: merge them in order (each deletes its branch, and GitLab moves the next MR onto the target), then scripts/factory/retro.sh close <mission> after each merge"
+  err="$(mktemp)"
+  if ! out="$(job_switch "$feature" "$next_m" 2>"$err")"; then rm -f "$err"; step blocked "$out"; fi
+  sw="$(cat "$err")"; rm -f "$err"; [ -z "$sw" ] || STATUS+="${sw#factory: }"$'\n'
+  step mission "continue with mission $next_m on branch $(git branch --show-current): run the loop for $next_m (next.sh $next_m) in this session"
 fi
 # A mission written from a strategy starts after the one it builds on (P22).
 after="$(verdict_field "$spec" After)"

@@ -175,7 +175,7 @@ The factory measures the code (`measure.sh`: what kind of software it is from it
 /factory-approve tidy-api strategy
 ```
 
-Each mission's `spec.md` is written from it; `/factory tidy-api` runs them in order, each from its contract (no grilling). Before the MR, `verify.sh <mission>` runs the commands under its `## Done when` (any spec can have that section); the MR gate requires them passing on the current code. Mutation scores need a report: run Stryker once before the job if you want them used (the architect says when they're missing).
+Each mission's `spec.md` is written from it; `/factory tidy-api` runs them in order, each from its contract (no grilling), **each on its own branch** `job/<job>/<mission>`: the first from the branch you started the job on, each next one from the previous mission's branch (D109). Its MR targets the previous mission's branch while that one is open, and deletes its branch when merged, so GitLab moves the next MR onto the target: merge them in order. The factory switches branches itself (never over uncommitted changes); `FACTORY_JOB_BRANCHES=0` keeps a job on one branch. Before the MR, `verify.sh <mission>` runs the commands under its `## Done when` (any spec can have that section); the MR gate requires them passing on the current code. Mutation scores need a report: run Stryker once before the job if you want them used (the architect says when they're missing).
 
 ## 6. A mission
 
