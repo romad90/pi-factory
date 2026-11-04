@@ -31,6 +31,13 @@ items="$tmp/items.tsv"; : > "$items"
 add() {                     # <key> <agent> <worktree:true|false> <brief args...>
   local key="$1" agent="$2" wt="$3"; shift 3
   bash "$here/brief.sh" "$@" > "$tmp/$key.brief"
+  # An agent told to read a factory file that isn't here improvises, and its
+  # whole run is spent (the architect without its strategy format, rc.48).
+  local f missing=""
+  for f in $(grep -oE '(docs/agents|scripts/factory)/[A-Za-z0-9_.-]+\.(md|sh|mjs)' "$tmp/$key.brief" | sort -u); do
+    [ -e "$f" ] || missing="$missing $f"
+  done
+  [ -z "$missing" ] || die "the $agent brief names files this project doesn't have:$missing. Run factory link (or factory onboard) here, then run again; no agent was started"
   printf '%s\t%s\t%s\t%s\n' "$key" "$agent" "$wt" "$tmp/$key.brief" >> "$items"
 }
 

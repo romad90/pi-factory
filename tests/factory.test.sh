@@ -847,6 +847,13 @@ bash scripts/factory/pause.sh demo "context" >/dev/null
 expect_step paused "paused mission"
 bash scripts/factory/pause.sh resume demo >/dev/null
 expect_step behavior-stale "resume returns to the same step"
+out="$(bash scripts/factory/pause.sh demo 'provider error: 429 {"message":"project output_tokens quota exceeded","window":"hour"}')"
+grep -q '^\*\*Resume after:\*\* ' .scratch/demo/state/PAUSED.md && grep -q 'until .* (a quota window)' <<<"$out" \
+  && out="$(bash scripts/factory/next.sh demo 2>&1)" && grep -q 'a quota window: wait until' <<<"$out" \
+  && ! bash scripts/factory/pause.sh resume demo >/dev/null 2>&1 && [ -f .scratch/demo/state/PAUSED.md ] \
+  && t "an hourly quota pauses until it resets: next.sh says when, and resume refuses before" || fail "quota pause" "$out $(cat .scratch/demo/state/PAUSED.md)"
+FACTORY_RESUME_NOW=1 bash scripts/factory/pause.sh resume demo >/dev/null
+expect_step behavior-stale "FACTORY_RESUME_NOW=1 resumes a quota pause anyway"
 
 echo "Fix lane"
 bash scripts/factory/fix.sh start helm-name "rename app to kebab case" --mission demo >/dev/null
@@ -1398,6 +1405,11 @@ grep -qE '\| shape \| API server, library; talks to MongoDB, HTTP services \(fro
 tlsid="$(sed -n 's/^| \(M-[0-9]*\) | risk: TLS.*/\1/p' $ms)"; toid="$(sed -n 's/^| \(M-[0-9]*\) | risk: outgoing.*/\1/p' $ms)"
 rm -rf reports
 [ "$(astep tidy-tools)" = "STEP: architect" ] || fail "job architect step"
+mv docs/agents/strategy-format.md "$work/sf.md"
+out="$(bash scripts/factory/workflow.sh architect tidy-tools 2>&1)" && fail "a brief naming a missing file must not start an agent" "$out"
+grep -q "names files this project doesn't have: docs/agents/strategy-format.md" <<<"$out" && [ -z "$(ls .scratch/tidy-tools/workflows 2>/dev/null)" ] \
+  && t "a brief that names a factory file the project lacks starts no agent, and says how to link it" || fail "brief files" "$out"
+mv "$work/sf.md" docs/agents/strategy-format.md
 bash scripts/factory/workflow.sh architect tidy-tools > "$work/wf.log"; wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
 grep -q '"agent": "factory-architect"' "$wf" && grep -q 'strategy-format.md' "$wf" && grep -q 'measures.md' "$wf" \
   && t "architect wave: a fresh architect reads the job, the measurements and the format" || fail "architect wave" "$(cat "$wf")"
