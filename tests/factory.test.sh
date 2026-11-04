@@ -1585,6 +1585,11 @@ grep -q '^\*\*Strategy approved:\*\*' .scratch/tidy-tools/strategy.md && grep -q
   && [ -z "$(git status --porcelain .scratch)" ] \
   && t "approving the strategy once writes each mission's spec from it, committed" || fail "strategy approve" "$out $(cat .scratch/pin-tools/spec.md 2>&1)"
 jbase="$(git branch --show-current)"
+git branch -q job/tidy-tools
+out="$(bash scripts/factory/next.sh tidy-tools 2>&1 || true)"
+[ "$(head -1 <<<"$out")" = "STEP: blocked" ] && grep -q 'git branch -m job/tidy-tools base/tidy-tools' <<<"$out" && [ "$(git branch --show-current)" = "$jbase" ] \
+  && t "a branch named after the job blocks with the rename to run, not a git error" || fail "job branch clash" "$out"
+git branch -qD job/tidy-tools
 out="$(bash scripts/factory/next.sh tidy-tools 2>&1 || true)"
 [ "$(head -1 <<<"$out")" = "STEP: mission" ] && grep -q 'continue with mission pin-tools' <<<"$out" && grep -q 'refactor-tools (refactor, after pin-tools): not started' <<<"$out" \
   && t "the job hands the lead its next mission, with every mission's state" || fail "job mission step" "$out"
