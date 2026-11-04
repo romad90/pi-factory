@@ -57,6 +57,18 @@ remote_default="$(git symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/nu
 target="$(conf FACTORY_MR_TARGET)"; target="${target:-$remote_default}"
 [ -n "$target" ] || die "no target branch: set FACTORY_MR_TARGET in .factory/commands.env"
 [ "$branch" != "$target" ] || die "you are on $target itself: check out the mission branch"
+# D109: a job's mission goes on top of the previous mission's MR while that one
+# is open (its branch is on the remote); merged with its branch deleted, GitLab
+# moves this MR onto the target. Each MR then shows one mission's work.
+job="$(spec_job "$dir/spec.md" || true)"; stacked=""
+if [ -n "$job" ] && [ "$branch" = "$(job_branch "$job" "$feature")" ]; then
+  prev="$(job_prev_mission "$job" "$feature" 2>/dev/null || true)"
+  if [ -n "$prev" ] && [ -n "$(git ls-remote --heads origin "$(job_branch "$job" "$prev")" 2>/dev/null)" ]; then
+    target="$(job_branch "$job" "$prev")"; stacked="$prev"
+  fi
+fi
+remove_src=false; [ -z "$job" ] || [ "$branch" != "$(job_branch "$job" "$feature")" ] || remove_src=true
+rm_flag=""; [ "$remove_src" = false ] || rm_flag=--remove-source-branch
 for g in $(conf FACTORY_MR_BLOCKED_BRANCHES); do
   # shellcheck disable=SC2254
   case "$branch" in $g) die "branch $branch matches FACTORY_MR_BLOCKED_BRANCHES ($g): push it under another name" ;; esac
@@ -102,6 +114,10 @@ also_in_mr() {
   printf '\nMerge with **squash** (set on this MR): `develop` gets one commit; the detailed history stays here.\n'
 }
 also_in_mr >> "$desc" || true
+if [ -n "$stacked" ]; then
+  printf '\n## Builds on\n\nMission `%s` of job `%s` (%s): merge that MR first; this one then moves onto its target by itself.\n' \
+    "$stacked" "$job" "$(cat "$(mission_dir "$stacked")/mr.url" 2>/dev/null || echo "its MR")" >> "$desc"
+fi
 
 [ -z "$(git status --porcelain --untracked-files=no)" ] || warn "uncommitted changes are not in the MR"
 echo "MR: $branch → $target"
@@ -140,7 +156,7 @@ if command -v glab >/dev/null 2>&1 && glab auth status >/dev/null 2>&1; then
     echo "updated MR !$existing"
   else
     out="$(glab mr create --source-branch "$branch" --target-branch "$target" --title "$title" \
-      --description "$(cat "$desc")" ${reviewer:+--reviewer "$reviewer"} --squash-before-merge --yes 2>&1)" || die "glab: $out"
+      --description "$(cat "$desc")" ${reviewer:+--reviewer "$reviewer"} --squash-before-merge ${rm_flag:+"$rm_flag"} --yes 2>&1)" || die "glab: $out"
     record "$(printf '%s\n' "$out" | grep -o 'https://[^ ]*merge_requests/[0-9]*' | head -1)"
   fi
   exit 0
@@ -160,14 +176,14 @@ if [ -n "$token" ]; then
   remote="$(git remote get-url origin)"
   api="$(conf FACTORY_GITLAB_API)"
   # shellcheck disable=SC2016
-  res="$(REVIEWER="$reviewer" TITLE="$title" SRC="$branch" TGT="$target" REMOTE="$remote" API="$api" TOKEN="$token" DESC_FILE="$desc" node -e '
+  res="$(REMOVE_SRC="$remove_src" REVIEWER="$reviewer" TITLE="$title" SRC="$branch" TGT="$target" REMOTE="$remote" API="$api" TOKEN="$token" DESC_FILE="$desc" node -e '
 const fs = require("fs"); const e = process.env;
 const m = e.REMOTE.match(/^(?:https?:\/\/(?:[^@\/]+@)?([^\/]+)\/|(?:ssh:\/\/)?[^@]+@([^:\/]+)(?::\d+)?[:\/])(.+?)(?:\.git)?\/?$/);
 if (!m) { console.log("ERR cannot read the project from the remote " + e.REMOTE.replace(/\/\/[^@]*@/, "//")); process.exit(0); }
 const host = m[1] || m[2], path = m[3];
 const base = (e.API || `https://${host}/api/v4`).replace(/\/$/, "") + "/projects/" + encodeURIComponent(path) + "/merge_requests";
 const h = { "PRIVATE-TOKEN": e.TOKEN, "Content-Type": "application/json" };
-const body = { source_branch: e.SRC, target_branch: e.TGT, title: e.TITLE, description: fs.readFileSync(e.DESC_FILE, "utf8"), remove_source_branch: false, squash: true };
+const body = { source_branch: e.SRC, target_branch: e.TGT, title: e.TITLE, description: fs.readFileSync(e.DESC_FILE, "utf8"), remove_source_branch: e.REMOVE_SRC === "true", squash: true };
 (async () => {
   const q = `${base}?state=opened&source_branch=${encodeURIComponent(e.SRC)}&target_branch=${encodeURIComponent(e.TGT)}`;
   let r = await fetch(q, { headers: h });
@@ -193,7 +209,7 @@ fi
 # 3. push options: GitLab creates the MR; the description is pasted by hand
 desc_keep="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/mr-description-$feature.md"
 mkdir -p "$(dirname "$desc_keep")"; cp "$desc" "$desc_keep"     # outside the tree: never dirties it
-git push -u origin "$branch" -o merge_request.create -o "merge_request.target=$target" -o "merge_request.title=$title"
+git push -u origin "$branch" -o merge_request.create -o "merge_request.target=$target" -o "merge_request.title=$title" ${rm_flag:+-o merge_request.remove_source_branch}
 echo
 echo "The push opened the MR (title and target set), but a push can't carry a multi-line description or squash."
 echo "Paste the description from: $desc_keep   (and tick Squash commits)"

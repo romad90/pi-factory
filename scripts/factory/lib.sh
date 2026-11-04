@@ -579,6 +579,36 @@ reattach_head() {
   return 1
 }
 
+# --- a job's missions, each on its own branch, stacked (P22, D109) ---------------
+# Mission n branches from mission n-1's branch, the first from the branch the
+# job started on: each MR shows one mission's work, and every earlier mission's
+# state is in the tree. FACTORY_JOB_BRANCHES=0 keeps everything on one branch.
+job_branch() { printf 'job/%s/%s' "$1" "$2"; }
+spec_job() { verdict_field "$1" Job 2>/dev/null | sed 's/[[:space:]].*//'; }
+job_prev_mission() {                       # <job> <mission>: the one before it in the strategy
+  node "$FACTORY_SCRIPTS/strategy.mjs" list "$(mission_dir "$1")" | awk -F'\t' -v m="$2" '$1 == m { print p; exit } { p = $1 }'
+}
+# job_switch <job> <mission>: puts the checkout on the mission's branch, creating
+# it if needed (said on stderr). Prints why and returns 1 when it can't.
+job_switch() {
+  local job="$1" m="$2" want cur prev base
+  [ "${FACTORY_JOB_BRANCHES:-1}" != 0 ] || return 0
+  want="$(job_branch "$job" "$m")"; cur="$(git branch --show-current)"
+  [ "$cur" != "$want" ] || return 0
+  if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+    echo "mission $m goes on its own branch $want, and the checkout has uncommitted changes: commit or stash them (git status), then run again"
+    return 1
+  fi
+  if git show-ref -q --verify "refs/heads/$want"; then
+    git switch -q "$want" 2>/dev/null || { echo "can't switch to $want (git switch $want shows why)"; return 1; }
+    echo "factory: mission $m continues on its branch $want" >&2; return 0
+  fi
+  prev="$(job_prev_mission "$job" "$m")"; base="$cur"
+  if [ -n "$prev" ] && git show-ref -q --verify "refs/heads/$(job_branch "$job" "$prev")"; then base="$(job_branch "$job" "$prev")"; fi
+  git switch -q -c "$want" "$base" 2>/dev/null || { echo "can't create $want from $base (git switch -c $want $base shows why)"; return 1; }
+  echo "factory: mission $m on its own branch $want (from $base)" >&2
+}
+
 # mission_guard <feature>: prints why the factory must not run this mission
 # here and returns 1; silent and 0 when it may. Catches a misspelled name (it
 # would start a new mission) and a checkout switched to another branch (by a
