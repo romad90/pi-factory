@@ -1746,9 +1746,18 @@ node -e 'const s=require(process.argv[1]).subagents;process.exit(s.agentOverride
   && t "factory models apply --user: this machine's models, for every project" || fail "apply --user" "$(cat "$PI_CODING_AGENT_DIR/settings.json")"
 printf '{"agents":{"factory-designer":{"model":"gw/maker-2","thinking":"high"}}}' > "$work/profile-old.json"
 out="$(bash "$root/scripts/factory/factory.sh" models apply --user "$work/profile-old.json")"
-grep -q "factory-architect: not in the profile, using factory-designer's model (gw/maker-2)" <<<"$out" \
+grep -q "factory-architect: not in the profile, given factory-designer's model (gw/maker-2)" <<<"$out" \
   && node -e 'process.exit(require(process.argv[1]).subagents.agentOverrides["factory-architect"].model==="gw/maker-2"?0:1)' "$PI_CODING_AGENT_DIR/settings.json" \
-  && t "a profile older than the architect gives it the designer's model, and says so" || fail "stand-in" "$out"
+  && node -e 'process.exit(require(process.argv[1]).agents["factory-architect"].model==="gw/maker-2"?0:1)' "$work/profile-old.json" \
+  && t "a profile older than the architect gives it the designer's model, says so, and writes it into the profile" || fail "stand-in" "$out"
+out="$(bash "$root/scripts/factory/factory.sh" models apply --user "$work/profile-old.json")"
+! grep -q "not in the profile" <<<"$out" && t "the second sync is silent: the stand-in is in the profile now" || fail "stand-in once" "$out"
+# Pinned before floating; a judge never takes the family of what it judges.
+printf '%s' '{"agents":{"factory-designer":{"model":"gw/maker-latest"},"factory-investigator":{"model":"gw/maker-2.1"},"factory-reviewer":{"model":"gw/maker-3"},"factory-validator":{"model":"gw/judge-1"},"factory-contract-critic":{"model":"gw/small-1"}},"families":[{"match":"gw/maker*","family":"maker"},{"match":"gw/judge*","family":"judge"},{"match":"gw/small*","family":"small"}]}' > "$work/profile-new.json"
+out="$(bash "$root/scripts/factory/factory.sh" models apply --user "$work/profile-new.json")"
+grep -q "factory-architect: not in the profile, given factory-investigator's model (gw/maker-2.1)" <<<"$out" \
+  && grep -q "factory-strategy-critic: not in the profile, given factory-validator's model (gw/judge-1)" <<<"$out" \
+  && t "a new agent's stand-in: a pinned model before a floating one, a judge of another family than what it judges" || fail "stand-in choice" "$out"
 rm -f "$PI_CODING_AGENT_DIR/settings.json"
 bash "$root/scripts/factory/factory.sh" version | grep -q "project expects: $(cat "$root/.factory/VERSION")" && t "factory version: installed and expected" || fail "factory version"
 echo 99.0.0 > .factory/VERSION

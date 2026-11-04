@@ -181,6 +181,7 @@ scripts/factory/install-pi-config.sh          # worktree hook that hides instrum
 
 # 2. Your models, once per machine (never in a repository)
 #    ~/.pi-factory/models.json: a model and thinking level per agent, an allow list, the families
+#    an agent a new version brings gets a pinned model close to its role, written back here (D108)
 factory models apply --user
 
 # 3. In each project (a monorepo project: its folder), on its own branch

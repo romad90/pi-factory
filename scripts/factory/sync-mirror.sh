@@ -12,7 +12,8 @@
 #    (git archive: no .git, files the version deleted are gone), refusing when
 #    the folder has local changes, and commits "chore: pi-factory <version>".
 #    --push pushes the mirror's current branch.
-#    Then this machine's models profile, if any, is applied (a new agent gets a model).
+#    Then this machine's models profile, if any, is applied (a new agent gets a
+#    model, written back into the profile), and with --projects in each project.
 # 4. --projects: for each project listed in ~/.pi-factory/projects (one path
 #    per line), when its tree is clean: factory onboard --no-setup, then commit
 #    .factory/VERSION and .factory/package-sha on its current branch. A project
@@ -81,7 +82,9 @@ while IFS= read -r p; do
   if [ -n "$(git -C "$p" status --porcelain --untracked-files=no)" ]; then echo "  $p: local changes, skipped"; continue; fi
   # Nothing in the loop reads the project list: onboard, git and its hooks get no stdin.
   ( cd "$p" && bash "$dst/scripts/factory/onboard.sh" --no-setup </dev/null >/dev/null 2>&1 ) || { echo "  $p: onboard failed (run it there to see why)"; continue; }
-  git -C "$p" add -- .factory/VERSION .factory/package-sha 2>/dev/null || true
+  # The profile's family rules and model scope, so nobody runs apply by hand.
+  if [ -f "$prof" ]; then ( cd "$p" && node "$dst/scripts/factory/models-profile.mjs" apply "$prof" </dev/null >/dev/null 2>&1 ) || echo "  $p: models apply failed (run: factory models apply)"; fi
+  git -C "$p" add -- .factory/VERSION .factory/package-sha .factory/model-families.json .pi/settings.json 2>/dev/null || true
   if git -C "$p" diff --cached --quiet; then echo "  $p: already at $v"
   else git -C "$p" commit -q -m "chore: pi-factory $v" </dev/null >/dev/null 2>&1 && echo "  $p: $v, committed on $(git -C "$p" branch --show-current)"; fi
   # Tracked files only: untracked leftovers were counted as "files onboard changed".
