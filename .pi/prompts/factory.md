@@ -9,7 +9,7 @@ Start:
 Loop:
 1. Run `scripts/factory/next.sh $1`. Read its first line, `STEP: <code>`. Only that line decides what you do: the ticket table below it (ESCALATE, blocked, FAIL) is status, never a reason to stop.
 2. Act:
-   - `paused`: run `scripts/factory/pause.sh resume $1`, show its output, go to 1.
+   - `paused`: run `scripts/factory/pause.sh resume $1` and show its output; if it says "Still paused" (a quota window), stop there; otherwise go to 1.
    - `measure`: run `scripts/factory/measure.sh $1`, go to 1.
    - `architect`, `strategy-critic`: `scripts/factory/workflow.sh architect|strategy-critic $1`, pass its `WORKFLOW_FILE` path as below, go to 1.
    - `mission`: the job's next mission is named on the NEXT line. From now on, run this loop for that mission instead of `$1` (start at its `next.sh`). When that mission stops at a human step, say which job it belongs to.
@@ -40,4 +40,5 @@ Rules:
 - If a subagent asks for a decision through the supervisor channel, record it the same way (`human.sh ask $1 <ticket> --stdin` and the question verbatim in the quoted heredoc); stop unless it prints `AUTO-ANSWERED`. Never answer it yourself, never let it time out into a default.
 - The command guard may block a tool call ("blocked by the factory guard"). Never try another way to do the same thing: stop and show the human what was blocked.
 - Watchdog: every reply of yours runs a script or a subagent, or stops at a human step. If you notice you are repeating yourself or writing without a tool call, stop.
+- Any agent or workflow that fails with a provider error (429, rate limit, quota, 5xx, overloaded) — the architect, a critic, a judge, a wave — is not a failure of the work: run `scripts/factory/pause.sh $1 "provider error: <the error line, verbatim>"`, show its output, and stop. Never run the step again in this session: the limit hasn't moved.
 - Context: after a completed wave, if your context is above about 70%, run `scripts/factory/pause.sh $1 "context"` and tell the human to start a new session with `/factory $1`.

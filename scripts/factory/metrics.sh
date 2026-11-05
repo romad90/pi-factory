@@ -80,8 +80,11 @@ if [ -f "$dir/decisions.tsv" ]; then      # P8: human interventions vs questions
 fi
 usage_line="-"
 if [ -s "$dir/usage.tsv" ]; then      # D85: tokens per run, from pi-subagents' metadata
+  # No cached token at all is a gateway that doesn't report it, not a 0% hit
+  # rate (a gateway that caches may still return no cache fields).
   usage_line="$(awk -F'\t' 'NR > 1 { r++; i += $5; o += $6; c += $7; t += $10; if ($3 ~ /worker/) w += $5 + $6 }
-    END { printf "%d runs · %.1fM in (%.0f%% cached), %.1fk out · %d turns · workers %.1fM", r, i / 1e6, (i ? 100 * c / i : 0), o / 1e3, t, w / 1e6 }' "$dir/usage.tsv")"
+    END { cached = c ? sprintf("%.0f%% cached", 100 * c / i) : "cache not reported"
+          printf "%d runs · %.1fM in (%s), %.1fk out · %d turns · workers %.1fM", r, i / 1e6, cached, o / 1e3, t, w / 1e6 }' "$dir/usage.tsv")"
 fi
 models_list=""
 [ ${#models[@]} -gt 0 ] && models_list="$(printf '%s\n' "${models[@]}" | sort -u | paste -sd, - | sed 's/,/, /g')"

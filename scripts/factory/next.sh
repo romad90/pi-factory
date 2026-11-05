@@ -51,6 +51,8 @@ if [ -f "$spec" ] && [ "$(verdict_field "$spec" Intent)" = refactor ]; then
   [ -z "$missing" ] || step blocked "## Frozen tests names what doesn't exist here:$missing. Run the refactor on a branch that has the characterization tests"
 fi
 if [ -f "$dir/state/PAUSED.md" ]; then
+  ra="$(sed -n 's/^\*\*Resume after:\*\* //p' "$dir/state/PAUSED.md")"
+  [ -z "$ra" ] || [ ! "$(date '+%F %H:%M')" \< "$ra" ] || step paused "a quota window: wait until $ra, then /factory $feature (nothing to do before; a run now fails the same way)"
   step paused "resume: scripts/factory/pause.sh resume $feature (shows where it stopped), then next.sh again"
 fi
 if [ -f "$dir/state/open-question.md" ]; then
