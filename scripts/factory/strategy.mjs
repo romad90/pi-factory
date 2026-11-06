@@ -64,6 +64,9 @@ function check() {
       p.push(`${at}: a mission with this name already exists`);
     if (!INTENTS.includes(m.intent)) p.push(`${at}: **Intent:** must be one of ${INTENTS.join(", ")}`);
     if (!/`[^`]+`/.test(m.done)) p.push(`${at}: **Done when:** needs a command in backticks`);
+    // Stryker keeps only the last --mutate: a repeated one checks one file and fails on the others ("not in report").
+    for (const c of m.done.match(/`[^`]+`/g) || []) if (/stryker/.test(c) && (c.match(/(^|\s)(--mutate|-m)(\s|=)/g) || []).length > 1)
+      p.push(`${at}: **Done when:** repeats --mutate, and Stryker keeps only the last one: give one --mutate with the files joined by commas`);
     if (!/^\d+$/.test(m.max)) p.push(`${at}: **Max tickets:** must be a number`);
     if (m.after !== "-" && !seen.includes(m.after)) p.push(`${at}: **After:** ${m.after} is not an earlier mission`);
     if (m.intent === "refactor" && !m.frozenTests.length) p.push(`${at}: a refactor names its **Frozen tests:**`);
