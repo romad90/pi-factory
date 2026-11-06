@@ -4,6 +4,7 @@
 // decides; nothing here asks a model.
 //
 // Usage: node prose-lint.mjs [--glossary GLOSSARY.md] <file>...
+//        node prose-lint.mjs --glossary GLOSSARY.md   (what the glossary gives the check)
 // Prints one finding per line, "<file>:<line>: <rule>: <excerpt>"; exit 1
 // when there is any. Code, quotes, links, headings, tables and field lines
 // are not prose and are not checked.
@@ -18,6 +19,9 @@ for (let i = 0; i < args.length; i++) {
 }
 
 const MAX_WORDS = Number(process.env.FACTORY_PROSE_MAX_WORDS || 25);
+// An instruction (a sentence that starts with a command) gets 20 (STE: procedures).
+const MAX_INSTRUCTION = Number(process.env.FACTORY_PROSE_MAX_INSTRUCTION || 20);
+const COMMAND = /^(?:(?:do not|don't|never|always|then|first|now)\s+)?(run|write|read|use|add|check|keep|put|say|give|make|set|stop|show|list|name|fix|remove|delete|open|call|pass|do|go|leave|take|send|report|cite|compare|choose|copy|move|commit|push|merge|start|wait|ask|answer|record|mark|count|split|find|look|verify|test|build|install|edit|replace|return|skip|try|note|state|quote)\b/i;
 // Words that leave the reader to guess (STE: one meaning, no vague words).
 const VAGUE = /\b(appropriate(ly)?|properly|as needed|if necessary|etc\.?|and so on|various|should|might|maybe|probably|simply|basically|some kind of)\b/i;
 // The passive hides who acts: "the file is written" — by whom?
@@ -41,6 +45,10 @@ if (glossary && existsSync(glossary)) {
   }
 }
 
+if (!files.length) {                     // --glossary alone: what the check will use
+  console.log(`glossary: ${avoid.size} word(s) to flag${avoid.size ? ": " + [...avoid].map(([w, t]) => `${w} → ${t}`).join(", ") : " (add \"Not: a, b\" to an entry, or a Not column to the table)"}`);
+  process.exit(0);
+}
 const out = [];
 for (const f of files) {
   if (!existsSync(f)) continue;
@@ -54,7 +62,8 @@ for (const f of files) {
     for (const s of text.split(/(?<=[.!?])\s+/)) {
       const words = s.split(/\s+/).filter((w) => /[A-Za-z]/.test(w));
       const at = `${f}:${i + 1}`, ex = s.trim().slice(0, 90);
-      if (words.length > MAX_WORDS) out.push(`${at}: long sentence (${words.length} words, at most ${MAX_WORDS}): ${ex}`);
+      const limit = COMMAND.test(s.trim()) ? MAX_INSTRUCTION : MAX_WORDS;
+      if (words.length > limit) out.push(`${at}: long ${limit === MAX_INSTRUCTION ? "instruction" : "sentence"} (${words.length} words, at most ${limit}): ${ex}`);
       const v = s.match(VAGUE); if (v) out.push(`${at}: vague word "${v[0]}": ${ex}`);
       const p = s.match(PASSIVE); if (p) out.push(`${at}: passive "${p[0]}" (say who does it): ${ex}`);
       for (const [w, term] of avoid) if (new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(s)) out.push(`${at}: "${w}" is not this project's word: use "${term}" (GLOSSARY.md): ${ex}`);
