@@ -1852,7 +1852,20 @@ grep -qE 'spec.md:3: long sentence \(3[0-9] words' <<<"$out" && grep -q 'spec.md
   && t "prose-lint: long, vague, passive and off-glossary words; code, fences and field lines left alone" || fail "prose-lint" "$out"
 [ "$(bash "$root/scripts/factory/prose.sh" prose-x --count)" = 4 ] && [ "$(FACTORY_PROSE=off bash "$root/scripts/factory/prose.sh" prose-x --count)" = 0 ] \
   && t "prose.sh counts a mission's findings; FACTORY_PROSE=off turns it off" || fail "prose.sh" "$(bash "$root/scripts/factory/prose.sh" prose-x)"
+out="$(node "$root/scripts/factory/prose-lint.mjs" --glossary GLOSSARY.md)"
+[ "$out" = "glossary: 2 word(s) to flag: task → Mission, job → Mission" ] && t "prose-lint --glossary says what the glossary gives the check" || fail "glossary report" "$out"
+printf 'Run the tests on every ticket and then write a verdict with the result and the commit before the next one.\nThe worker runs the tests on every ticket and then writes a verdict with the result and the commit before the next.\n' > .scratch/prose-x/pr.md
+out="$(node "$root/scripts/factory/prose-lint.mjs" .scratch/prose-x/pr.md || true)"
+grep -q 'pr.md:1: long instruction (21 words, at most 20)' <<<"$out" && ! grep -q 'pr.md:2:' <<<"$out" \
+  && t "an instruction gets 20 words, a description 25 (STE)" || fail "instruction length" "$out"
+mkdir -p .scratch/prose-x/verdicts; printf '# Verdict\n**Result:** FAIL\n- The contract is ambiguous about retries.\n' > .scratch/prose-x/verdicts/01-code.md
+out="$(bash "$root/scripts/factory/prose-baseline.sh" .scratch/prose-x)"
+grep -qE '^\| prose-x \| [0-9]+ \| [0-9]+ \| [0-9]+ \| [0-9]+ \| [0-9]+ \| 1 \| 1 \|$' <<<"$out" \
+  && t "prose-baseline: per mission, the check's findings next to ambiguity remarks and FAIL verdicts" || fail "prose-baseline" "$out"
 rm -rf .scratch/prose-x GLOSSARY.md; [ ! -f "$work/glossary.bak" ] || mv "$work/glossary.bak" GLOSSARY.md
+now="$(bash "$root/scripts/dev/prose-self.sh" --count)"; was="$(cat "$root/tests/prose-baseline.txt")"
+[ "$now" -le "$was" ] && t "the factory's own text (briefs, docs, step messages) doesn't get less plain: $now findings, at most $was" \
+  || fail "the factory's own text got less plain: $now findings, baseline $was (scripts/dev/prose-self.sh lists them)"
 
 echo "Vendored skills"
 ( cd "$root/.pi/skills/deepen-prompt" && sed -n '/^```$/,/^```$/p' SOURCE.md | grep -v '^```' | if command -v sha256sum >/dev/null; then sha256sum -c --quiet -; else shasum -a 256 -c --quiet -; fi ) >"$work/vendor.log" 2>&1 \
