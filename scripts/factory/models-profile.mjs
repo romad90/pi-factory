@@ -122,8 +122,14 @@ if (cmd === "capture") {
   if (existsSync(file)) writeFileSync(`${file}.bak`, readFileSync(file));
   writeFileSync(file, JSON.stringify(s, null, 2) + "\n");
   console.log(`applied ${profile} to ${file}: ${set} agents (agentOverrides)${sub.modelScope?.allow ? ", model scope" : ""}`);
-  if (Array.isArray(p.families) && p.families.length) console.log("families: run apply (without --user) in each project to add the profile's rules to .factory/model-families.json");
+  if (Array.isArray(p.families) && p.families.length) console.log("families: sync-mirror.sh --projects adds the profile's rules to each project (or run apply, without --user, in a project)");
 } else if (cmd === "apply") {
+  // The factory's own source is public and shared: one machine's models don't belong in it.
+  let own = ""; try { own = JSON.parse(readFileSync("package.json", "utf8")).name || ""; } catch {}
+  if (/(^|\/)pi-factory$/.test(own) && existsSync("scripts/factory/next.sh") && process.env.FACTORY_APPLY_IN_SOURCE !== "1") {
+    console.error("this is the factory's source: models here would be one machine's settings in a shared repo. Use: factory models apply --user (then sync-mirror applies it to the projects)");
+    process.exit(2);
+  }
   if (!existsSync(profile)) { console.error(`no profile at ${profile} (create it with: capture, from a configured repo)`); process.exit(1); }
   const p = withStandIns(readJson(profile));
   let set = 0;

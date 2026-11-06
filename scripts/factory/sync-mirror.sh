@@ -76,10 +76,14 @@ fi
 [ -n "$projects" ] || { echo "projects: run factory onboard --no-setup in each (or rerun with --projects)"; exit 0; }
 list="$HOME/.pi-factory/projects"
 [ -f "$list" ] || { echo "projects: no $list (one project path per line)"; exit 0; }
+# What blocks a project: its own tracked changes, inside its folder (in a
+# monorepo, another module's work is not this project's), not the factory's
+# mission state (.scratch/) nor the version files this sync rewrites anyway.
+own_changes() { git -C "$1" status --porcelain --untracked-files=no -- . ':(exclude).scratch' ':(exclude).factory/VERSION' ':(exclude).factory/package-sha'; }
 while IFS= read -r p; do
   p="${p/#\~/$HOME}"; [ -n "$p" ] && [ "${p#\#}" = "$p" ] || continue
   [ -d "$p" ] || { echo "  $p: missing, skipped"; continue; }
-  if [ -n "$(git -C "$p" status --porcelain --untracked-files=no)" ]; then echo "  $p: local changes, skipped"; continue; fi
+  if [ -n "$(own_changes "$p")" ]; then echo "  $p: local changes, skipped (git -C $p status -- .)"; continue; fi
   # Nothing in the loop reads the project list: onboard, git and its hooks get no stdin.
   ( cd "$p" && bash "$dst/scripts/factory/onboard.sh" --no-setup </dev/null >/dev/null 2>&1 ) || { echo "  $p: onboard failed (run it there to see why)"; continue; }
   # The profile's family rules and model scope, so nobody runs apply by hand.
@@ -88,7 +92,7 @@ while IFS= read -r p; do
   if git -C "$p" diff --cached --quiet; then echo "  $p: already at $v"
   else git -C "$p" commit -q -m "chore: pi-factory $v" </dev/null >/dev/null 2>&1 && echo "  $p: $v, committed on $(git -C "$p" branch --show-current)"; fi
   # Tracked files only: untracked leftovers were counted as "files onboard changed".
-  rest="$(git -C "$p" status --porcelain --untracked-files=no | grep -c . || true)"
+  rest="$(own_changes "$p" | grep -c . || true)"
   [ "$rest" -eq 0 ] || echo "    and $rest other file(s) onboard changed: review them (git -C $p status)"
 done < "$list"
 # The last command decides the exit status: a project's hook or a closed pipe

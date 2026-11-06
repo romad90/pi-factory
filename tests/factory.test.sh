@@ -1892,6 +1892,21 @@ git -C "$sm/mirror" checkout -q -- pi-factory; mkdir "$sm/mirror/pi-factory/.git
 if out2="$(bash "$sm/clone/scripts/factory/sync-mirror.sh" "$sm/mirror" 2>&1)"; then fail "sync-mirror must refuse a nested .git" "$out2"; fi
 grep -q 'has local changes' <<<"$out" && grep -q 'holds a .git' <<<"$out2" \
   && t "sync-mirror: idempotent; refuses local changes in the folder and a copied .git" || fail "sync-mirror refusals" "$out $out2"
+rm -rf "$sm/mirror/pi-factory/.git"
+# --projects in a monorepo: another module's work and the factory's own state don't block a project; its own change does.
+smono="$sm/scope-mono"; mkdir -p "$smono/modules/app/.scratch/m" "$smono/modules/other"; git -C "$smono" init -q
+echo a > "$smono/modules/app/a.txt"; echo s > "$smono/modules/app/.scratch/m/spec.md"; echo o > "$smono/modules/other/o.txt"
+git -C "$smono" add -A; git -C "$smono" commit -qm init
+echo changed >> "$smono/modules/other/o.txt"; echo changed >> "$smono/modules/app/.scratch/m/spec.md"
+mkdir -p "$sm/home/.pi-factory"; echo "$smono/modules/app" > "$sm/home/.pi-factory/projects"
+out="$(HOME="$sm/home" bash "$sm/clone/scripts/factory/sync-mirror.sh" "$sm/mirror" --projects 2>&1)" || true
+! grep -q 'local changes, skipped' <<<"$out" && t "sync --projects: another module's changes and .scratch/ state don't skip a project" || fail "sync project scope" "$out"
+echo mine >> "$smono/modules/app/a.txt"
+out="$(HOME="$sm/home" bash "$sm/clone/scripts/factory/sync-mirror.sh" "$sm/mirror" --projects 2>&1)" || true
+grep -q "app: local changes, skipped" <<<"$out" && t "sync --projects: the project's own tracked change skips it" || fail "sync project own change" "$out"
+mkdir -p "$sm/src"; printf '{"name":"pi-factory"}\n' > "$sm/src/package.json"; mkdir -p "$sm/src/scripts/factory"; touch "$sm/src/scripts/factory/next.sh"
+out="$(cd "$sm/src" && node "$root/scripts/factory/models-profile.mjs" apply "$work/profile.json" 2>&1)" && fail "apply in the factory source must refuse" "$out"
+grep -q "this is the factory's source" <<<"$out" && t "models apply refuses the factory's own source: one machine's models stay out of it" || fail "apply in source" "$out"
 
 echo "Setup by rehearsal (D102)"
 # head missing from the image: lib.sh's stand-in covers what the scripts call.
