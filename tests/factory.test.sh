@@ -43,6 +43,12 @@ bash "$root/scripts/factory/install-into.sh" "$repo" --pack api --pack batch >"$
 brief_out="$(bash scripts/factory/brief.sh worker probe 01 HEAD)"   # captured: grep -q closing the pipe early made this flaky
 grep -q '^Read: docs/agents/factory.md' <<<"$brief_out" && ! grep -q 'AGENTS.md' <<<"$brief_out" \
   && t "briefs name the factory rules, not AGENTS.md (already in context)" || fail "brief read list"
+grep -q 'as docs/agents/writing.md says' <<<"$brief_out" && [ -f docs/agents/writing.md ] && ! grep -q 'terms of this project as GLOSSARY.md' <<<"$brief_out" \
+  && t "every brief points at the plain-writing rules (D111)" || fail "brief writing" "$(tail -6 <<<"$brief_out")"
+echo '# Glossary' > GLOSSARY.md
+grep -q 'terms of this project as GLOSSARY.md defines them' <<<"$(bash scripts/factory/brief.sh worker probe 01 HEAD)" \
+  && t "a project with a GLOSSARY.md gets its terms named in every brief" || fail "brief glossary"
+rm GLOSSARY.md
 [ -f docs/agents/contract-checklist-api.md ] && [ -f docs/agents/quality-bar-batch.md ] && [ ! -f docs/agents/contract-checklist-bots.md ] \
   && t "only the requested practice packs are installed" || fail "packs" "$(ls docs/agents)"
 bad_fm="$(node -e '
@@ -1825,6 +1831,28 @@ bash "$root/scripts/factory/onboard.sh" --migrate >"$work/migrate.log" 2>&1 || f
   && grep -q 'FACTORY_TEST_CMD="true"' .factory/commands.env && [ -f .pi/settings.json ] \
   && t "onboard --migrate removes the copied factory, keeps the project's own files, links the package" || fail "migrate result" "$(git status --short | head -20)"
 cd "$repo"
+
+echo "Plain writing (D111)"
+mkdir -p .scratch/prose-x/verdicts
+cat > .scratch/prose-x/spec.md <<'PROSE'
+# prose-x
+**Intent:** maintenance
+The file is written by the worker, and then the reviewer should check every case that the worker touched before it goes on to the next ticket of the mission.
+Run `npm test --if-needed etc should`.
+```
+the code is written here, should be skipped
+```
+- Each task names its owner.
+PROSE
+[ ! -f GLOSSARY.md ] || mv GLOSSARY.md "$work/glossary.bak"
+printf '%s\n' '# Glossary' '- **Mission** — one MR of work. Not: task, job' > GLOSSARY.md
+out="$(node "$root/scripts/factory/prose-lint.mjs" --glossary GLOSSARY.md .scratch/prose-x/spec.md || true)"
+grep -qE 'spec.md:3: long sentence \(3[0-9] words' <<<"$out" && grep -q 'spec.md:3: vague word "should"' <<<"$out" && grep -q 'spec.md:3: passive "is written"' <<<"$out" \
+  && grep -q 'spec.md:8: "task" is not this project.s word: use "Mission"' <<<"$out" && ! grep -qE 'spec.md:(2|4|6):' <<<"$out" \
+  && t "prose-lint: long, vague, passive and off-glossary words; code, fences and field lines left alone" || fail "prose-lint" "$out"
+[ "$(bash "$root/scripts/factory/prose.sh" prose-x --count)" = 4 ] && [ "$(FACTORY_PROSE=off bash "$root/scripts/factory/prose.sh" prose-x --count)" = 0 ] \
+  && t "prose.sh counts a mission's findings; FACTORY_PROSE=off turns it off" || fail "prose.sh" "$(bash "$root/scripts/factory/prose.sh" prose-x)"
+rm -rf .scratch/prose-x GLOSSARY.md; [ ! -f "$work/glossary.bak" ] || mv "$work/glossary.bak" GLOSSARY.md
 
 echo "Vendored skills"
 ( cd "$root/.pi/skills/deepen-prompt" && sed -n '/^```$/,/^```$/p' SOURCE.md | grep -v '^```' | if command -v sha256sum >/dev/null; then sha256sum -c --quiet -; else shasum -a 256 -c --quiet -; fi ) >"$work/vendor.log" 2>&1 \

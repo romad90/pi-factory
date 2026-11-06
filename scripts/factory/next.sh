@@ -38,6 +38,9 @@ step() {                                  # <code> <human explanation>
 
 # D67: a misspelled name or a switched branch stops here, before any step.
 if ! why="$(mission_guard "$feature")"; then step blocked "$why"; fi
+# D111: plain writing, a warning on every step until its numbers say block.
+pn="$(bash "$here/prose.sh" "$feature" --count 2>/dev/null || echo 0)"
+[ "${pn:-0}" = 0 ] || STATUS+="Plain writing: $pn finding(s) by docs/agents/writing.md (scripts/factory/prose.sh $feature lists them)."$'\n'
 # D88: a misspelled "## Frozen paths" heading would silently unfreeze the code
 # the mission must not touch; stop before any step builds on it.
 if [ -f "$spec" ] && bad="$(grep -nE '^#{1,6}[[:space:]]*[Ff]rozen' "$spec" | grep -vE ':## Frozen (paths|tests)[[:space:]]*$' | head -1)" && [ -n "$bad" ]; then

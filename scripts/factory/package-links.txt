@@ -13,3 +13,4 @@ docs/agents/ticket-format.md
 docs/agents/investigation-format.md
 docs/agents/design-format.md
 docs/agents/strategy-format.md
+docs/agents/writing.md
