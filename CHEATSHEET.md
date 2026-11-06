@@ -391,3 +391,7 @@ docs/agents/*-<pack>.md              practice pack checklists and bar items (rep
 .factory/health-baseline.json        the ratchet (repo-owned)
 instrument/scenarios/                behavior cases (validator only)
 ```
+
+## Plain writing (D111)
+
+Every brief points agents at `docs/agents/writing.md` (short sentences, active voice, one word for one thing) and at the project's `GLOSSARY.md`. In the glossary, `- **Mission** — one MR of work. Not: task, job` makes `task` and `job` findings. `next.sh` shows the count; `scripts/factory/prose.sh <mission>` lists them. A warning for now; `FACTORY_PROSE=off` turns it off.
