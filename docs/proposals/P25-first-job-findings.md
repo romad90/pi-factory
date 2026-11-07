@@ -33,6 +33,19 @@ The lead deliberated for paragraphs over ambiguous rules ("may I run `git status
 
 A mission that only adds tests (a pin mission) is the most reversible kind. When A shows its contract and tickets needed no correction, those approvals fold into the strategy approval for that intent first (item 12). MRs stay with the person: merging is the team's.
 
+## Unattended within quota (second reading of the same talk)
+
+What the first reading missed, and what our weekend shows:
+
+- **G. Give judges the tool, then guard.** A judge wrote seven diff files at the project root: without a command that shows a ticket's diff, tests and mutation result, each agent rebuilds its own, differently, and leaves the pieces (her "every agent rebuilds the world"). First read the evidence folder and name, for each stray file, the command the agent lacked; then `factory review-kit <mission> <ticket>` prints exactly that. The guard (item 2) only catches what is left.
+- **H. Hands and eyes per project.** The validator reads code and test output; it does not run the system. Onboarding generates a small verification harness (load the package, call its public entry points; for a service, start it and call it), the validator runs it, and missions keep it current.
+- **I. Context, not control.** Each human intervention leaves an artifact that prevents the next one: a doc line, a script, a guard rule. `/factory-decide` asks for it; an intervention without one goes to the friction pool (C).
+- **J. Resume after a quota pause, without the person.** When a pause records "resume after HH:MM", a one-shot timer runs the mission at that time, non-interactively. Only after a quota pause, never after a human step. First check that Pi runs a prompt non-interactively; if it can't, stop here.
+
+**Done when:** a rehearsal mission goes from approval to MR through a simulated quota pause with no person; judges leave no file outside `.scratch/`; the harness catches a planted behavior change while every test stays green.
+
+Not taken: the outer loop (issues and chat triggering jobs), several fuzzing verifiers per change, auto-merge.
+
 ## Must fix
 
 1. **A verdict is a file, or nothing.** A reviewer reported PASS and wrote no verdict file; `collect.sh` ran before any file existed and only said "no verdicts". Fix: a judge run that ends without its file is re-run once, then stops the mission; `collect.sh` waits for the file (short timeout) and says where it looked.
