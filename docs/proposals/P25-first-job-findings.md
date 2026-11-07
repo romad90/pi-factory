@@ -1,8 +1,28 @@
 # P25. What the first real job found
 
-Status: queued, to build when the job ends (no factory change during a mission). Order: what cost a verdict or blocked the loop first.
+Status: queued, to build when the job ends (no factory change during a mission). Order: the trust metric and the rehearsal first (they prove the rest), then shorter instructions, then what cost a verdict or blocked the loop.
 
 The job: a one-line refactor job on a TypeScript library inside a monorepo, run on the installed package (D105–D112). The architect step, the strategy critic, stacked job branches and the quota pause all ran for real. What broke, each with its fix:
+
+## First: measure trust, rehearse the real environment
+
+Source: Lauren Tan with Matt Pocock (2026): autonomy is climbed rung by rung, and each rung is earned by verification and by removing the reasons an agent needs a person.
+
+- **A. Interventions per mission, planned and unplanned.** This job needed the person about fifteen times: four were planned gates (strategy, contract, tickets, MR); the rest were the factory's own environment (missing format docs, Stryker against the links, a missing verdict file, stray files, a committed report, quotas, a dirty tree). `factory learn` gets the column, from `decisions.tsv` and a new record each time `next.sh` returns `blocked`, `escalate` or `paused`. It is the trust metric: every fix below should lower the unplanned count, and the next job shows whether it did.
+- **B. A dress rehearsal in CI.** 378 tests passed and the first real job still found these bugs: the tests use a simple project, the job ran in a module of a monorepo, on the installed package, with Stryker and symlinks. A CI job runs a whole scripted job (fake models) on a fixture monorepo in package mode with a Stryker done command, every release. Most items below would have failed it.
+- **C. Frictions are pooled, then fixed in batches.** This document is that pool, written by hand. At the end of each job, `factory frictions` lists the job's unplanned interventions, grouped; the fixes come from the groups (root causes), not from the single incidents.
+
+## Shorter instructions
+
+The lead deliberated for paragraphs over ambiguous rules ("may I run `git status`?"); a frontier model needs the workflow, and scripts that print exactly what to do. Today: the lead prompt 914 words, the architect agent 957, the worker brief 647, briefs and agent files about 5,100 in all.
+
+- **D. Rules move into scripts.** Each fix in this document ends with a script that prints the exact next command, and the prompt line it replaces is deleted. A rule a script enforces is not repeated in a prompt.
+- **E. A word budget, with a ratchet.** `tests/prompt-budget.txt` holds the word count of the lead prompt, each agent file and each brief; the tests fail when one grows past it. Targets for this release: lead prompt under 450 words, architect under 500, worker brief under 400. A prompt that grows must name the failure it prevents.
+- **F. Workflow, not implementation detail.** Prompts keep the steps and the stops; commands, paths and formats live in the scripts and the format docs they already point to.
+
+## Autonomy: two-way doors first
+
+A mission that only adds tests (a pin mission) is the most reversible kind. When A shows its contract and tickets needed no correction, those approvals fold into the strategy approval for that intent first (item 12). MRs stay with the person: merging is the team's.
 
 ## Must fix
 
