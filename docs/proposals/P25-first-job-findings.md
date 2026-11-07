@@ -4,6 +4,15 @@ Status: queued, to build when the job ends (no factory change during a mission).
 
 The job: a one-line refactor job on a TypeScript library inside a monorepo, run on the installed package (D105–D112). The architect step, the strategy critic, stacked job branches and the quota pause all ran for real. What broke, each with its fix:
 
+## Method (how this is built, in this order)
+
+1. **A postmortem from the raw record, before any fix.** A script builds the job's timeline from the Pi session files, `decisions.tsv`, the job branches' `git log` and the evidence folder (kept private, on the machine), not from memory. Each human intervention is classified: planned gate, factory environment, missing verification, ambiguous instruction, external limit. The counts per class set the order of the fixes below; this list is a hypothesis until they do.
+2. **Each bug reproduced before it is fixed.** The dress rehearsal (B) gets one case per bug that fails on the current release; the fix makes it pass. A bug without a failing case is not fixed.
+3. **An error budget.** A mission may need at most 3 unplanned interventions. While the last job is over budget, the factory takes reliability fixes only, no new features (SRE error budget policy).
+4. **Prompts minimized against the rehearsal.** Instruction sections are removed one at a time (delta debugging); a section stays only if removing it fails the rehearsal or the bench. The word budget (E) records the result.
+
+**Done when:** the rehearsal fails on rc.53 and passes on the release with these fixes; the next real job's script-counted unplanned interventions are 3 or fewer (this job: about 11); the prompt word counts meet E with the rehearsal and bench still green.
+
 ## First: measure trust, rehearse the real environment
 
 Source: Lauren Tan with Matt Pocock (2026): autonomy is climbed rung by rung, and each rung is earned by verification and by removing the reasons an agent needs a person.
