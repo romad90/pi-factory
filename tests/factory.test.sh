@@ -975,6 +975,14 @@ out="$(bash scripts/factory/coverage.sh demo 2>&1)" && fail "an unknown QB- item
 grep -q '09-fix-dup: cites QB-NOPE-99, which is not in docs/agents/quality-bar.md' <<<"$out" \
   && t "G2 refuses a QB- item the project's quality bar doesn't have" || fail "coverage unknown QB" "$out"
 rm -f $m/issues/09-fix-dup.md
+# P3 (deps-node-22): the ticket writer named a file that doesn't exist, as a
+# fact (`lib/client/request-queue/enqueue.test.js`). A path a ticket names
+# exists, or the ticket says the change creates it.
+printf '# 09-fix-dup\n**Size:** S\n\nSome tests live under `lib/` (for example `lib/client/request-queue/enqueue.test.js`): tap still runs them.\nAdd a new test in `tests/fresh-check.test.js`.\nSee `scripts/factory/coverage.sh` and `docs/*.md`.\n\n## Covers\nQB-CLEAR-01\n\n## Blocked by\nNone.\n' > $m/issues/09-fix-dup.md
+out="$(bash scripts/factory/coverage.sh demo 2>&1)" && fail "a ticket naming a missing file must be refused" "$out"
+grep -q '09-fix-dup: names `lib/client/request-queue/enqueue.test.js`, which does not exist here' <<<"$out" && ! grep -q 'fresh-check\|coverage.sh`, which\|docs/\*' <<<"$out" \
+  && t "G2 refuses a ticket that names a missing file as a fact; a file it creates, an existing one or a pattern pass" || fail "coverage paths" "$out"
+rm -f $m/issues/09-fix-dup.md
 git rm -q -r src/lib; git commit -q -m "fix: remove duplication"
 bash scripts/factory/human.sh approve demo tickets >/dev/null
 expect_step health "fix built, health checked again"
