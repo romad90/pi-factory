@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { check } from "../scripts/factory/guard-rules.mjs";
 
 const main = mkdtempSync(join(tmpdir(), "replay-main-"));
-mkdirSync(join(main, ".git"));
+mkdirSync(join(main, ".git")); mkdirSync(join(main, ".factory"));   // a real project has both
 const workerGit = mkdtempSync(join(tmpdir(), "replay-gitdir-"));
 writeFileSync(join(workerGit, "HEAD"), "ref: refs/heads/pi-subagents/01-x-abc123-s0-t0\n");
 const worker = mkdtempSync(join(tmpdir(), "replay-worker-"));
