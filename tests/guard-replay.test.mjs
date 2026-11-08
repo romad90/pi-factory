@@ -3,11 +3,12 @@
 // a human decision (ids are rows of that mission's cause taxonomy). Each must
 // now pass in the context it ran in. The second test holds the line: what
 // those fixes must not let through.
-// Run: node --test tests/
+// Run: node --test tests/guard-replay.test.mjs. Lesson fixtures (ids L-…, D115) carry {root}, {home}
+// and {tmp}, filled here.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { check } from "../scripts/factory/guard-rules.mjs";
 
@@ -18,7 +19,7 @@ writeFileSync(join(workerGit, "HEAD"), "ref: refs/heads/pi-subagents/01-x-abc123
 const worker = mkdtempSync(join(tmpdir(), "replay-worker-"));
 writeFileSync(join(worker, ".git"), `gitdir: ${workerGit}\n`);
 const cwdOf = { lead: main, judge: main, worker };
-const fill = (v) => (typeof v === "string" ? v.replaceAll("{root}", main)
+const fill = (v) => (typeof v === "string" ? v.replaceAll("{root}", main).replaceAll("{home}", homedir()).replaceAll("{tmp}", tmpdir())
   : Array.isArray(v) ? v.map(fill)
   : v && typeof v === "object" ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, fill(x)])) : v);
 
