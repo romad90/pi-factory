@@ -3,6 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { toContract } from "./cockpit-contract.mjs";
 
 const env = process.env;
 const root = env.FACTORY_DIR || ".scratch";
@@ -176,6 +177,8 @@ function mission(name, lines) {
   return {
     name, title: heading(spec), intent: firstWord(field(spec, "Intent")), step, next, human: get("H") === "1", otherBranch: get("O"),
     paused: exists(path.join(dir, "state", "PAUSED.md")),
+    question: q.trim(),
+    mr: read(path.join(dir, "mr.url")).trim().split("\n")[0] || "",   // D119: a mission with mr.url is closed, whatever step it showed
     contract: { total: Object.keys(assertions).length, approved: (() => {   // D101: the line and its human.sh row
       const d = (spec.match(/^\*\*Contract approved:\*\* (\d{4}-\d{2}-\d{2})/m) || [])[1];
       const last = decisions.filter((r) => r.kind === "approve" || r.kind === "amend").pop();
@@ -208,4 +211,5 @@ try {
     .map((f) => { try { return JSON.parse(read(path.join(benchDir, "compare", f))); } catch { return null; } })
     .filter(Boolean).sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 10);
 } catch {}
-process.stdout.write(JSON.stringify({ generated: new Date().toISOString(), factoryDir: root, factory, missions, bench }, null, 1) + "\n");
+// D119: every view reads one versioned contract, the same here and in a cloud deployment.
+process.stdout.write(JSON.stringify(toContract({ generated: new Date().toISOString(), factoryDir: root, factory, missions, bench }), null, 1) + "\n");

@@ -10,7 +10,8 @@
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
 code,pre,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
 header{display:flex;align-items:center;gap:16px;padding:14px 24px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:2}
-header h1{font-size:16px;margin:0;font-weight:700;letter-spacing:.2px}
+header{flex-wrap:wrap}
+header h1{font-size:16px;margin:0;font-weight:700;letter-spacing:.2px;white-space:nowrap}
 .crumbs{color:var(--soft);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .crumbs a{color:var(--blue);text-decoration:none}
 .spacer{flex:1}
@@ -69,14 +70,38 @@ th{color:var(--soft);font-weight:600;font-size:12px}
 select{background:#12151B;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px 6px;font:inherit}
 .scatter text{fill:var(--soft);font-size:11px}
 .scatter .pt text{fill:var(--ink);font-size:12px}
+.waiting{display:flex;gap:8px;align-items:center;padding:6px 12px;border-radius:8px;text-decoration:none;font-size:13px;min-width:0}
+.waiting b{white-space:nowrap}.waiting span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.w-you{background:#2a2010;color:var(--amber);border:1px solid #6b4b14}
+.w-factory{background:#11261c;color:var(--green);border:1px solid #1f4d36}
+.w-lead,.w-nobody{background:#1E232D;color:var(--soft);border:1px solid var(--line)}
+.inbox{display:grid;gap:16px}
+.ask{border-color:#6b4b14;padding:0;overflow:hidden}
+.ask .top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 16px;background:#1d1a14;border-bottom:1px solid #3a2e17}
+.ask .k{color:var(--amber);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.8px}
+.ask .body{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:20px;padding:16px}
+@media (max-width:900px){.ask .body{grid-template-columns:1fr}}
+.ask .q{font-size:17px;font-weight:650;margin:0 0 12px;line-height:1.35}
+.opt{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.opt.sug{border:2px solid var(--blue)}
+.opt .l{font-weight:600}.opt .tag{font-size:11px;font-weight:700;background:var(--blue);color:#0F1115;border-radius:4px;padding:1px 6px;margin-left:6px}
+.opt .e{color:var(--soft);margin:4px 0 8px}
+.cmd{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.cmd code{flex:1 1 240px;background:#0B0D11;border:1px solid var(--line);border-radius:6px;padding:6px 9px;word-break:break-all}
+button.copy{font:inherit;font-size:12.5px;background:#1E232D;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 12px;min-height:34px;cursor:pointer}
+.ev{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.ev li{display:grid;grid-template-columns:70px 1fr;gap:8px}
+.ev .lab{font-weight:600;font-size:12px;color:var(--soft)}
+.ev .lab.bad{color:var(--red)}
 </style>
 </head>
 <body>
 <header>
   <h1>Factory Cockpit</h1>
   <nav class="crumbs" id="crumbs"></nav>
+  <a class="waiting w-nobody" id="waiting" href="#/"></a>
   <span class="spacer"></span>
-  <span class="keys"><b>B</b> benchmarks · <b>L</b> leads · <b>M</b> mission · <b>R</b> rounds · <b>↑↓</b> ticket · <b>Enter</b> open · <b>Esc</b> up</span>
+  <span class="keys"><b>N</b> needs you · <b>L</b> missions · <b>B</b> benchmarks · <b>M</b> mission · <b>R</b> rounds · <b>↑↓</b> ticket · <b>Enter</b> open · <b>Esc</b> up</span>
   <span class="age" id="age"></span>
 </header>
 <main id="app"><p class="muted">Loading state.json…</p></main>
@@ -85,11 +110,11 @@ select{background:#12151B;color:var(--ink);border:1px solid var(--line);border-r
 let state = null, sel = 0, lastOk = 0, lastText = "";
 const $ = (s) => document.querySelector(s);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const route = () => { const p = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent); return { m: p[0] === "m" ? p[1] : "", t: p[2] === "t" ? p[3] : "", b: p[0] === "bench" ? (p[1] || "-") : "" }; };
-const go = (m, t) => { location.hash = m ? `#/m/${encodeURIComponent(m)}${t ? `/t/${encodeURIComponent(t)}` : ""}` : "#/"; };
+const route = () => { const p = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent); return { m: p[0] === "m" ? p[1] : "", t: p[2] === "t" ? p[3] : "", b: p[0] === "bench" ? (p[1] || "-") : "", list: p[0] === "missions" }; };
+const go = (m, t) => { location.hash = m ? `#/m/${encodeURIComponent(m)}${t ? `/t/${encodeURIComponent(t)}` : ""}` : "#/missions"; };
 const STATE_LABEL = { pass: "PASS", review: "review", build: "build", escalate: "ESCALATE", blocked: "blocked" };
 const pill = (s) => `<span class="pill s-${esc(s)}">${esc(STATE_LABEL[s] || s)}</span>`;
-const stepPill = (m) => m.otherBranch ? `<span class="pill s-blocked" title="${esc(m.next)}">on ${esc(m.otherBranch)}</span>`
+const stepPill = (m) => m.phase === "closed" ? `<span class="pill s-pass" title="${esc(m.mr)}">closed</span>` : m.otherBranch ? `<span class="pill s-blocked" title="${esc(m.next)}">on ${esc(m.otherBranch)}</span>`
   : `<span class="pill ${m.human ? "s-human" : "s-review"}">${esc(m.step || "?")}${m.human ? " · needs you" : ""}</span>`;
 const fmtK = (n) => n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? Math.round(n / 1e3) + "k" : String(n);
 const ago = (iso) => { const s = (Date.now() - new Date(iso)) / 1000; return s < 90 ? `${Math.round(s)} s` : s < 5400 ? `${Math.round(s / 60)} min` : s < 129600 ? `${Math.round(s / 3600)} h` : `${Math.round(s / 86400)} d`; };
@@ -243,17 +268,44 @@ function benchView(name) {
   </div>`;
 }
 
+// D119: the home page is what waits for a person, one card per decision,
+// each with what every answer does and the command to copy (read-only).
+function waitingBar() {
+  const w = state.waitingOn; const el = $("#waiting"); if (!w || !el) return;
+  const who = { you: "Waiting on you", factory: "Working", lead: "Lead's turn", nobody: "Idle" }[w.who] || w.who;
+  el.className = `waiting w-${w.who}`; el.href = w.who === "you" ? "#/" : w.mission ? `#/m/${encodeURIComponent(w.mission)}` : "#/missions";
+  el.innerHTML = `<b>${esc(who)}${w.who === "you" && w.count > 1 ? ` · ${w.count}` : ""}</b><span>${esc(w.text)}</span>`;
+}
+function card(c) {
+  return `<article class="panel ask" data-card="${esc(c.id)}">
+    <div class="top"><span class="k">${esc(c.title)}</span><span class="muted">${esc(c.mission)}${c.ticket ? " · " + esc(c.ticket) : ""}${c.since ? " · last event " + ago(c.since) + " ago" : ""}</span>
+      <span class="spacer"></span><a href="#/m/${encodeURIComponent(c.mission)}${c.ticket ? "/t/" + encodeURIComponent(c.ticket) : ""}" style="color:var(--blue)">open ${c.ticket ? "ticket" : "mission"}</a></div>
+    <div class="body"><div><p class="q">${esc(c.question)}</p>
+      ${c.options.map((o) => `<div class="opt${o.suggested ? " sug" : ""}"><span class="l">${esc(o.label)}</span>${o.suggested ? `<span class="tag">suggested</span>` : ""}
+        <div class="e">${esc(o.effect)}</div>${o.command ? `<div class="cmd"><code class="mono">${esc(o.command)}</code><button type="button" class="copy" data-copy="${esc(o.command)}">Copy</button></div>` : ""}</div>`).join("")}
+      ${c.factorySays ? `<div class="muted mono" style="font-size:12px">next.sh: ${esc(c.factorySays)}</div>` : ""}</div>
+      <aside><h2>Evidence</h2>${c.evidence?.length ? `<ul class="ev">${c.evidence.map((e) => `<li><span class="lab${/FAIL/.test(e.label) ? " bad" : ""}">${esc(e.label)}</span><span>${esc(e.text || "")}${e.path ? `<div class="muted mono" style="font-size:11.5px">${esc(e.path)}</div>` : ""}</span></li>`).join("")}</ul>` : `<p class="empty">No file to show.</p>`}</aside></div>
+  </article>`;
+}
+function inboxView() {
+  const cards = state.inbox || [];
+  return factoryLine() + `<div class="row" style="margin-bottom:12px"><h2 style="margin:0;font-size:20px">Needs you <span class="muted" style="font-size:14px;font-weight:400">${cards.length} open · oldest first</span></h2><a href="#/missions" style="color:var(--blue)">all missions</a></div>
+    ${cards.length ? `<div class="inbox">${cards.map(card).join("")}</div>` : `<div class="panel"><p class="empty">Nothing waits for you. ${esc(state.waitingOn?.text || "")}</p></div>`}`;
+}
+
 function render() {
   if (!state) return;
   const r = route(), m = r.m && mission(r.m), t = m && r.t && m.tickets.find((x) => x.name === r.t);
   if (r.b) {
-    $("#crumbs").innerHTML = `<a href="#/">Leads</a><span>·</span><span>Factory</span><span>›</span><a href="#/bench">Benchmarks</a>`;
+    waitingBar();
+    $("#crumbs").innerHTML = `<a href="#/missions">Missions</a><span>·</span><span>Factory</span><span>›</span><a href="#/bench">Benchmarks</a>`;
     $("#app").innerHTML = benchView(r.b === "-" ? "" : r.b);
     const bs = $("#bsel"); if (bs) bs.onchange = () => { location.hash = `#/bench/${encodeURIComponent(bs.value)}`; };
     const ax = $("#axx"), ay = $("#axy"); if (ax) ax.onchange = () => { axX = ax.value; render(); }; if (ay) ay.onchange = () => { axY = ay.value; render(); };
     return;
   }
-  const crumbs = [`<a href="#/">Leads</a>`];
+  waitingBar();
+  const crumbs = [`<a href="#/">Needs you</a>`, `<span>·</span><a href="#/missions">Missions</a>`];
   if (m) crumbs.push(`<span>›</span><a href="#/m/${encodeURIComponent(m.name)}">${esc(m.name)}</a>`);
   if (t) crumbs.push(`<span>›</span><span>${esc(t.name)}</span>`);
   $("#crumbs").innerHTML = crumbs.join("");
@@ -264,12 +316,13 @@ function render() {
   document.querySelectorAll("pre[data-key]").forEach((el) => {
     kept[el.dataset.key] = { top: el.scrollTop, bottom: el.scrollHeight - el.scrollTop - el.clientHeight < 8 };
   });
-  $("#app").innerHTML = t ? ticketView(m, t) : m ? missionView(m) : r.m ? `<p class="err">No mission “${esc(r.m)}”.</p>` + leads() : leads();
+  $("#app").innerHTML = t ? ticketView(m, t) : m ? missionView(m) : r.m ? `<p class="err">No mission “${esc(r.m)}”.</p>` + leads() : r.list ? leads() : inboxView();
   document.querySelectorAll("pre[data-key]").forEach((el) => {
     const k = kept[el.dataset.key];
     el.scrollTop = !k || k.bottom ? el.scrollHeight : k.top;
   });
   document.querySelectorAll("[data-m]").forEach((el) => (el.onclick = () => go(el.dataset.m)));
+  document.querySelectorAll("button[data-copy]").forEach((el) => (el.onclick = () => { navigator.clipboard?.writeText(el.dataset.copy).then(() => { el.textContent = "Copied"; }, () => {}); }));
   document.querySelectorAll("[data-t]").forEach((el) => (el.onclick = () => go(r.m, el.dataset.t)));
 }
 
@@ -290,9 +343,10 @@ document.addEventListener("keydown", (e) => {
   const items = m ? m.tickets : state.missions;
   if (e.key === "b" || e.key === "B") { location.hash = "#/bench"; }
   else if (e.key === "l" || e.key === "L") { sel = 0; go(""); }
+  else if (e.key === "n" || e.key === "N") { location.hash = "#/"; }
   else if (e.key === "m" || e.key === "M") { const name = m ? m.name : (state.missions[sel] || state.missions[0])?.name; if (name) go(name); }
   else if ((e.key === "r" || e.key === "R") && m) { const t = r.t ? m.tickets.find((x) => x.name === r.t) : (m.tickets[sel] || active(m)); if (t) go(m.name, t.name); }
-  else if (e.key === "Escape") { if (r.t) go(r.m); else if (r.m) go(""); }
+  else if (e.key === "Escape") { if (r.t) go(r.m); else if (r.m) go(""); else if (r.list) location.hash = "#/"; }
   else if (e.key === "ArrowDown" || e.key === "j") { sel = Math.min(sel + 1, items.length - 1); render(); e.preventDefault(); }
   else if (e.key === "ArrowUp" || e.key === "k") { sel = Math.max(sel - 1, 0); render(); e.preventDefault(); }
   else if (e.key === "Enter") { if (m && !r.t && m.tickets[sel]) go(m.name, m.tickets[sel].name); else if (!m && state.missions[sel]) go(state.missions[sel].name); }
