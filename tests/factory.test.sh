@@ -1342,6 +1342,16 @@ for _ in $(seq 100); do [ "$(git worktree list | wc -l)" -gt "$wt0" ] && break; 
 kill -TERM -- "-$tobpid" 2>/dev/null || true; wait "$tobpid" 2>/dev/null || true
 for _ in $(seq 50); do [ "$(git worktree list | wc -l)" = "$wt0" ] && break; sleep 0.1; done
 [ "$(git worktree list | wc -l)" = "$wt0" ] && t "test on base: an interrupt still removes its temporary worktree (trap, D101)" || fail "tob trap" "$(git worktree list)"
+# The same interrupt while `git worktree add` still holds its lock (red once in
+# CI): a git on PATH that adds the worktree locked, then hangs.
+mkdir -p "$work/lockgit"; realgit="$(command -v git)"
+printf '#!/bin/sh\nif [ "$1" = worktree ] && [ "$2" = add ]; then shift 2; "%s" worktree add --lock "$@"; sleep 30; exit 0; fi\nexec "%s" "$@"\n' "$realgit" "$realgit" > "$work/lockgit/git"; chmod +x "$work/lockgit/git"
+PATH="$work/lockgit:$PATH" setsid bash scripts/factory/test-on-base.sh tob-feature 01-a "$work/tob-adds.patch" "$tobbase" > "$work/tob-int.log" 2>&1 & tobpid=$!
+for _ in $(seq 100); do [ "$(git worktree list | wc -l)" -gt "$wt0" ] && break; sleep 0.1; done
+git worktree list --porcelain | grep -q '^locked' || fail "tob lock: the worktree should be locked here" "$(git worktree list --porcelain)"
+kill -TERM -- "-$tobpid" 2>/dev/null || true; wait "$tobpid" 2>/dev/null || true
+for _ in $(seq 50); do [ "$(git worktree list | wc -l)" = "$wt0" ] && break; sleep 0.1; done
+[ "$(git worktree list | wc -l)" = "$wt0" ] && t "test on base: an interrupt during 'worktree add' (locked) still removes the worktree" || fail "tob lock trap" "$(git worktree list)"
 git checkout -q -- .factory/commands.env
 FACTORY_TEST_ON_BASE=0 bash scripts/factory/integrate.sh tob-feature 01-a "$work/tob-pins.patch" > "$work/tob.log" 2>&1 && grep -q 'test on base: off' "$work/tob.log" \
   && t "FACTORY_TEST_ON_BASE=0 turns the check off" || fail "tob off" "$(cat "$work/tob.log")"
