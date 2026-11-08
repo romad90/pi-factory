@@ -22,7 +22,7 @@ tickets=("$dir"/issues/*.md)
 [ ${#tickets[@]} -gt 0 ] || die "no tickets in $dir/issues"
 
 violations=0
-declare -A cover=()
+declare -A cover=() qb=()
 
 for t in "${tickets[@]}"; do
   name="$(ticket_name "$t")"
@@ -42,6 +42,12 @@ for t in "${tickets[@]}"; do
   fi
 
   for id in $covers; do
+    # E38: a health-fix ticket covers the quality-bar item its finding names.
+    if [[ "$id" == QB-* ]]; then
+      if grep -q -- "$id" docs/agents/quality-bar.md 2>/dev/null; then qb[$id]="${qb[$id]:-}${qb[$id]:+, }$name"
+      else echo "VIOLATION  $name: cites $id, which is not in docs/agents/quality-bar.md"; violations=$((violations + 1)); fi
+      continue
+    fi
     if ! grep -qx "$id" <<<"$ids"; then
       echo "VIOLATION  $name: cites $id, which is unknown or withdrawn"
       violations=$((violations + 1)); continue
@@ -52,6 +58,7 @@ done
 
 echo
 echo "Assertion → tickets"
+for id in "${!qb[@]}"; do printf '  %-18s %s (quality bar)\n' "$id" "${qb[$id]}"; done
 for id in $ids; do
   if [ -n "${cover[$id]:-}" ]; then
     printf '  %-18s %s\n' "$id" "${cover[$id]}"

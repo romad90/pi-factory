@@ -927,6 +927,20 @@ bash scripts/factory/checkpoint.sh demo >/dev/null
 expect_step health-fix "failing health report asks for fix tickets"
 bash scripts/factory/workflow.sh tickets demo fix-health >"$work/wf.log"
 grep -q 'fix ticket per finding in .scratch/demo/verdicts/health.md' "$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")" && t "fix-health tickets drafted by the ticket writer" || fail "fix-health wave"
+# E38: a health-fix ticket covers the quality-bar item its finding names
+# (ticket-format.md); G2 read only VAL- IDs and refused every one of them.
+printf '# 09-fix-dup\n**Size:** S\n\n## Covers\nQB-CLEAR-01\n\n## Blocked by\nNone.\n' > $m/issues/09-fix-dup.md
+out="$(bash scripts/factory/coverage.sh demo 2>&1)" \
+  && grep -q 'QB-CLEAR-01 .*09-fix-dup' <<<"$out" \
+  && t "G2 accepts a fix ticket that covers a quality-bar item of the project (E38)" || fail "coverage QB" "$out"
+wbq="$(bash scripts/factory/brief.sh worker demo 09-fix-dup 2>&1)"
+grep -q 'QB-CLEAR-01' <<<"$wbq" && ! grep -q 'not found in spec.md' <<<"$wbq" \
+  && t "the health fix's worker brief carries the quality-bar item it answers to" || fail "brief QB" "$(grep -n 'QB\|Covers\|not found' <<<"$wbq")"
+sed -i.bak 's/QB-CLEAR-01/QB-NOPE-99/' $m/issues/09-fix-dup.md && rm -f $m/issues/09-fix-dup.md.bak
+out="$(bash scripts/factory/coverage.sh demo 2>&1)" && fail "an unknown QB- item must be refused" "$out"
+grep -q '09-fix-dup: cites QB-NOPE-99, which is not in docs/agents/quality-bar.md' <<<"$out" \
+  && t "G2 refuses a QB- item the project's quality bar doesn't have" || fail "coverage unknown QB" "$out"
+rm -f $m/issues/09-fix-dup.md
 git rm -q -r src/lib; git commit -q -m "fix: remove duplication"
 bash scripts/factory/human.sh approve demo tickets >/dev/null
 expect_step health "fix built, health checked again"
