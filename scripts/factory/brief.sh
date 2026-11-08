@@ -86,7 +86,11 @@ if [[ "$text" == *"{{TICKET_TEXT}}"* || "$text" == *"{{ASSERTIONS}}"* ]]; then
     if [ "$ids" = enabler ]; then atext="none: an enabler ticket (it unblocks others; no assertion of its own)"
     elif [ -n "$ids" ]; then
       # shellcheck disable=SC2086
-      atext="$(assertion_blocks "$d/spec.md" $ids)"; [ -n "$atext" ] || atext="(listed under ## Covers but not found in spec.md: $(echo $ids))"
+      vids="$(grep -v '^QB-' <<<"$ids" || true)"; qids="$(grep '^QB-' <<<"$ids" || true)"
+      atext=""; [ -z "$vids" ] || atext="$(assertion_blocks "$d/spec.md" $vids)"
+      # E38: a health fix carries the quality-bar lines it answers to.
+      for q in $qids; do atext+="${atext:+$'\n'}$(grep -- "$q" docs/agents/quality-bar.md 2>/dev/null | head -3)"; done
+      [ -n "$atext" ] || atext="(listed under ## Covers but not found in spec.md: $(echo $ids))"
     fi
   fi
   text="${text//"{{TICKET_TEXT}}"/"$ttext"}"

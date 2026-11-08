@@ -256,7 +256,7 @@ ticket_covers() {
     /^## Covers/           { in_c = 1; next }
     in_c && /^## /         { exit }
     in_c {
-      while (match($0, /VAL-[A-Z0-9]+-[0-9][0-9][0-9]/)) {
+      while (match($0, /VAL-[A-Z0-9]+-[0-9][0-9][0-9]|QB-[A-Z]+-[0-9][0-9]/)) {   # QB-: a health fix (E38)
         print substr($0, RSTART, RLENGTH)
         $0 = substr($0, RSTART + RLENGTH)
       }
