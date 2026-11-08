@@ -340,6 +340,10 @@ grep -q 'Given a user, when they say hi, then the bot says hello.' <<<"$wb" && !
 # the mission's base; it once diffed only the ticket's last commit and failed a round.
 grep -q "git diff --name-status $(cd . && bash -c '. scripts/factory/lib.sh; mission_base demo') 01-hello\|git diff --name-status $(bash -c '. scripts/factory/lib.sh; mission_base demo') HEAD" <<<"$rb" \
   && t "the reviewer's brief names the mission's base commit for cross-cutting assertions" || fail "mission base in review brief" "$(grep -n 'base' <<<"$rb")"
+# E36: the mission's diff counted the factory's own version files (an
+# onboarding mid-mission) against a file-scope assertion and failed a round.
+grep -q "':(exclude).scratch' ':(exclude).factory'" <<<"$rb" \
+  && t "the mission's diff for cross-cutting assertions leaves out the factory's own files" || fail "factory files in mission diff" "$(grep -n 'exclude' <<<"$rb")"
 expect_step approve-tickets "proposed tickets wait for a human"
 bash scripts/factory/human.sh approve demo tickets >/dev/null
 grep -q $'\tapprove-tickets\t' $m/decisions.tsv && t "/factory-approve <f> tickets logs the approval" || fail "approve tickets"
