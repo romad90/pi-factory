@@ -1187,6 +1187,13 @@ const s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); const
 process.exit(s.contract === 1 && s.waitingOn.who === "you" && c && c.question === "Should the count start at zero?"
   && c.options[0].command.startsWith("/factory-decide demo ") && s.missions.find((x) => x.name === "demo").phase === "needs-you" ? 0 : 1);' "$work/all.json" \
   && t "status.sh --all: contract v1, the open question is a Needs-you card with its command, and waitingOn says you (D119)" || fail "status contract" "$(head -c 2000 "$work/all.json")"
+mkdir -p "$work/learn"; printf 'id\twhen_utc\tmission\tevent\tcost\tcause_class\tcause\tsufficient\tevidence\tstatus\nE39\t17:48\tdemo\treviewer refused\t1 round\tfactory_bug\tguard did not expand $PWD\tyes\tguard.log\tfixed #133\n' > "$work/learn/taxonomy.tsv"
+FACTORY_LEARN_DIR="$work/learn" FACTORY_STATUS_METRICS=0 bash scripts/factory/status.sh --all --json > "$work/health.json"
+node -e '
+const s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+process.exit(s.causes.length === 1 && s.causes[0].id === "E39" && s.causes[0].status === "fixed #133" && s.health.causes.byClass.factory_bug === 1
+  && s.health.missions.some((m) => m.name === "demo") && typeof s.health.guard.total === "number" ? 0 : 1);' "$work/health.json" \
+  && t "status.sh --all: Health carries the classified causes, cost and decisions per mission, refusals judged again (D122)" || fail "health" "$(head -c 1500 "$work/health.json")"
 node -e 'const j=require(process.argv[1]); process.exit(j.factory && j.factory.missions>=1 && "costPerMr" in j.factory ? 0 : 1)' "$work/all.json" \
   && t "status.sh --all: the factory's totals across missions, for the factory engineer (D97)" || fail "status factory" "$(head -c 600 "$work/all.json")"
 rm -f $m/state/open-question.md
