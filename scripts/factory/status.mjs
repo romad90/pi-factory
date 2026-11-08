@@ -171,7 +171,8 @@ function critique(dir) {
   const f = path.join(dir, "contract-critique.md"), t = read(f);
   if (!t) return null;
   const mtime = (p) => { try { return fs.statSync(p).mtimeMs; } catch { return 0; } };
-  return { ...parseCritique(t), at: new Date(mtime(f)).toISOString(), afterContract: mtime(f) >= mtime(path.join(dir, "spec.md")) };
+  let amendments = 0; try { amendments = fs.readdirSync(path.join(dir, "amendments")).filter((x) => x.endsWith(".md")).length; } catch {}
+  return { ...parseCritique(t), round: amendments + 1, at: new Date(mtime(f)).toISOString(), afterContract: mtime(f) >= mtime(path.join(dir, "spec.md")) };
 }
 
 function mission(name, lines) {

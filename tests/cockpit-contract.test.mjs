@@ -147,3 +147,18 @@ test("D124: a worker's question about installing suggests the person's dependenc
   assert.equal(c.options[0].command, `/factory-deps deps-node-22 "<what you changed>"`);
   assert.equal(c.options.find((o) => o.suggested).label, "Change the dependencies yourself, then record it");
 });
+
+test("D126: from round 3, a blocking finding that names no wrong change that would pass doesn't keep Amend suggested", async () => {
+  const { parseCritique } = await import("../scripts/factory/cockpit-contract.mjs");
+  const text = (passes) => ["**Critique result:** FINDINGS", "", "### F1 — Matrix entries need not control the test environment", "", "- [blocking] VAL-CI-001 checks matrix entries only.",
+    ...(passes ? ["", "Passes wrongly: a run_tests job that hard-codes runs-on: ubuntu-latest."] : []), "", "Suggested fix: require runs-on to use the matrix.", "", "## Review limits"].join("\n");
+  const card = (round, passes) => inbox({ missions: [mission({ step: "approve", human: true, contract: { total: 16 },
+    critique: { ...parseCritique(text(passes)), round, afterContract: true } })] })[0];
+  assert.equal(card(2, false).options.find((o) => o.suggested).label, "Amend", "rounds 1 and 2: any blocking finding");
+  assert.equal(card(5, true).options.find((o) => o.suggested).label, "Amend", "a wrong change that would pass keeps it blocking");
+  const late = card(5, false);
+  assert.equal(late.options.find((o) => o.suggested).label, "Approve");
+  assert.match(late.question, /Round 5\./);
+  assert.match(late.evidence[0].text, /names no wrong change that would pass/);
+  assert.match(card(5, true).evidence[0].text, /Passes wrongly: a run_tests job that hard-codes/);
+});

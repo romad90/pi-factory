@@ -284,6 +284,15 @@ SPEC
 expect_step contract "contract without critique"
 echo "No findings. Critique result: approve" > $m/contract-critique.md
 expect_step approve "critique present, not approved"
+# D126: from the third round, next.sh says which blocking findings name a wrong
+# change that would pass (deps-node-22: 6 critiques, 5 amendments, 63 min at G1).
+mkdir -p $m/amendments; printf '# Amendment request\n**Status:** done\n' | tee $m/amendments/a1.md > $m/amendments/a2.md
+printf '**Critique result:** FINDINGS\n\n### F1 — [blocking] a\n\nx\n\nPasses wrongly: a job that ignores the matrix.\n\n### F2 — b\n\n- [blocking] y\n' > $m/contract-critique.md
+out="$(bash scripts/factory/next.sh demo 2>&1)"
+grep -q 'Contract round 3: 1 of 2 blocking finding(s) name a wrong change that would pass. Approving accepts the others; it is recorded.' <<<"$out" \
+  && grep -q 'Passes wrongly' .factory/briefs/contract-critic.md \
+  && t "G1: from round 3, next.sh counts the blocking findings that name a wrong change that would pass (D126)" || fail "critic rounds" "$out"
+rm -rf $m/amendments; echo "No findings. Critique result: approve" > $m/contract-critique.md
 # D101: an approval line typed by hand (or by an agent) has no decisions.tsv row: it approves nothing.
 cp $m/spec.md "$work/spec.bak"; printf '\n**Contract approved:** %s\n' "$(date +%F)" >> $m/spec.md
 out="$(bash scripts/factory/next.sh demo 2>&1)"

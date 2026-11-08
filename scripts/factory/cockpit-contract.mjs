@@ -78,14 +78,19 @@ const STEPS = {
   approve: (m) => {
     // The critique's findings are the evidence; a blocking one makes Amend the suggestion.
     const c = m.critique, blocking = (c?.findings || []).filter((f) => f.level === "blocking").length;
-    const evidence = (c?.findings || []).map((f) => ({ label: `${f.id} ${f.level}`, level: f.level, text: `${f.title}. ${f.text}${f.fix ? `\nFix: ${f.fix}` : ""}`,
+    // D126: from round 3, only a blocking finding that names a wrong change
+    // that would pass keeps Amend the suggestion.
+    const round = c?.round || 1, real = (c?.findings || []).filter((f) => f.level === "blocking" && f.passes).length;
+    const amend = blocking > 0 && (round < 3 || real > 0);
+    const evidence = (c?.findings || []).map((f) => ({ label: `${f.id} ${f.level}`, level: f.level,
+      text: `${f.title}. ${f.text}${f.passes ? `\nPasses wrongly: ${f.passes}` : f.level === "blocking" && round >= 3 ? "\n(names no wrong change that would pass)" : ""}${f.fix ? `\nFix: ${f.fix}` : ""}`,
       path: `${m.factoryDir || ".scratch"}/${m.name}/contract-critique.md` }));
     if (c && !c.afterContract) evidence.unshift({ label: "stale", level: "blocking", text: "The critique is older than the contract: the critic hasn't judged this version.", path: "" });
     return { title: "Contract (G1)",
-      question: `Approve the contract of ${m.name}? ${m.contract?.total ?? "?"} assertions; the critic found ${blocking} blocking and ${(c?.findings || []).length - blocking} non-blocking problem${(c?.findings || []).length - blocking === 1 ? "" : "s"}.`,
+      question: `Approve the contract of ${m.name}?${round > 1 ? ` Round ${round}.` : ""} ${m.contract?.total ?? "?"} assertions; the critic found ${blocking} blocking and ${(c?.findings || []).length - blocking} non-blocking problem${(c?.findings || []).length - blocking === 1 ? "" : "s"}.`,
       options: [
-        { label: "Approve", effect: "The tickets are written next; you approve them before any build.", command: `/factory-approve ${m.name}`, suggested: !blocking },
-        { label: "Amend", effect: `The contract author rewrites it with your change, the critic reads it again, you approve again.${blocking ? " Answer the blocking findings in your change." : ""}`, command: `/factory-amend ${m.name} ${q("<the change>")}`, suggested: !!blocking }],
+        { label: "Approve", effect: `The tickets are written next; you approve them before any build.${blocking ? " Approving accepts the open findings; it is recorded." : ""}`, command: `/factory-approve ${m.name}`, suggested: !amend },
+        { label: "Amend", effect: `The contract author rewrites it with your change, the critic reads it again, you approve again.${blocking ? " Answer the blocking findings in your change." : ""}`, command: `/factory-amend ${m.name} ${q("<the change>")}`, suggested: amend }],
       evidence };
   },
   "approve-tickets": (m) => ({ title: "Tickets", question: `Approve the ${m.counts?.total ?? ""} tickets of ${m.name}? Edit, split or delete them first if you like.`.replace("  ", " "),
@@ -134,8 +139,11 @@ export function parseCritique(t) {
     const tag = body.match(/^\s*[-*]?\s*\[(blocking|non-blocking)\]\s*/m);
     const level = a.level || (tag ? tag[1] : "unknown");
     if (tag) body = body.replace(tag[0], "");
+    // D126: the concrete wrong change the finding lets pass, on its own line.
+    const passes = (body.match(/^\s*[-*]?\s*Passes wrongly:\s*(.+)$/im) || [])[1]?.trim() || "";
+    body = body.replace(/^\s*[-*]?\s*Passes wrongly:.*$/im, "");
     const paras = body.split(/\n\s*\n/).map((x) => x.replace(/\s+/g, " ").trim()).filter(Boolean);
-    findings.push({ id: a.id, level, title: a.title, text: (paras.find((x) => !/^Suggested fix:/i.test(x)) || "").slice(0, 700),
+    findings.push({ id: a.id, level, title: a.title, passes: passes.slice(0, 400), text: (paras.find((x) => !/^Suggested fix:/i.test(x)) || "").slice(0, 700),
       fix: (paras.find((x) => /^Suggested fix:/i.test(x)) || "").replace(/^Suggested fix:\s*/i, "").slice(0, 500) });
   });
   return { result: firstWord(field(t, "Critique result")), findings };
