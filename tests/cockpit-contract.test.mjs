@@ -124,3 +124,19 @@ test("approve-tickets: each ticket is a line of evidence", () => {
     tickets: [{ name: "01-a", num: "01", title: "Upgrade tap", size: "M", covers: ["VAL-DEPS-001"], blockedBy: [] }, { name: "02-b", num: "02", title: "Lockfile", covers: [], blockedBy: ["01"] }] })] });
   assert.deepEqual(c.evidence.map((e) => e.text), ["Upgrade tap · size M · covers VAL-DEPS-001", "Lockfile · after 01"]);
 });
+
+test("parseCritique reads the level from the heading or from the finding's first bullet (both seen in deps-node-22)", async () => {
+  const { parseCritique } = await import("../scripts/factory/cockpit-contract.mjs");
+  const c = parseCritique([
+    "**Critique result:** FINDINGS", "", "## Findings", "",
+    "### F6 — [blocking] VAL-TEST-006 can pass when a script never starts tap", "", "A script can fail before tap starts.", "", "Suggested fix: require each script to start tap 21.", "",
+    "### F1 — CI matrix lists do not prove that CI runs all required combinations", "", "- [blocking] VAL-CI-001 checks the lists only.", "", "Suggested fix: Require all four combinations.", "",
+    "### F2 — The watch stop point has two readings", "", "- [non-blocking] Stop after start, or after results?", "", "## Review limits", "None.",
+  ].join("\n"));
+  assert.equal(c.result, "FINDINGS");
+  assert.deepEqual(c.findings.map((f) => [f.id, f.level, f.text, f.fix]), [
+    ["F6", "blocking", "A script can fail before tap starts.", "require each script to start tap 21."],
+    ["F1", "blocking", "VAL-CI-001 checks the lists only.", "Require all four combinations."],
+    ["F2", "non-blocking", "Stop after start, or after results?", ""],
+  ]);
+});

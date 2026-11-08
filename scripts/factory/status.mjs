@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { toContract } from "./cockpit-contract.mjs";
+import { parseCritique, toContract } from "./cockpit-contract.mjs";
 import { replay } from "./run-detail.mjs";
 
 const env = process.env;
@@ -170,18 +170,8 @@ function timeline(name) {
 function critique(dir) {
   const f = path.join(dir, "contract-critique.md"), t = read(f);
   if (!t) return null;
-  const findings = [];
-  const re = /^###\s+(F\d+)\s*[—-]+\s*\[(blocking|non-blocking)\]\s*(.+)$/gm;
-  let m; const at = [];
-  while ((m = re.exec(t))) at.push({ id: m[1], level: m[2], title: m[3].trim(), start: re.lastIndex, head: m.index });
-  at.forEach((a, i) => {
-    const body = t.slice(a.start, i + 1 < at.length ? at[i + 1].head : undefined).split(/\n## /)[0].trim();
-    const paras = body.split(/\n\s*\n/).map((x) => x.replace(/\s+/g, " ").trim()).filter(Boolean);
-    findings.push({ id: a.id, level: a.level, title: a.title, text: (paras.find((x) => !/^Suggested fix:/i.test(x)) || "").slice(0, 700),
-      fix: (paras.find((x) => /^Suggested fix:/i.test(x)) || "").replace(/^Suggested fix:\s*/i, "").slice(0, 500) });
-  });
   const mtime = (p) => { try { return fs.statSync(p).mtimeMs; } catch { return 0; } };
-  return { result: firstWord(field(t, "Critique result")), findings, at: new Date(mtime(f)).toISOString(), afterContract: mtime(f) >= mtime(path.join(dir, "spec.md")) };
+  return { ...parseCritique(t), at: new Date(mtime(f)).toISOString(), afterContract: mtime(f) >= mtime(path.join(dir, "spec.md")) };
 }
 
 function mission(name, lines) {

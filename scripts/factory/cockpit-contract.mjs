@@ -113,6 +113,29 @@ function stepCard(m) {
   return { id: `${m.name}:step:${m.step}`, mission: m.name, kind: m.step, ticket: "", ...base, evidence, factorySays: m.next, since: lastEvent(m) };
 }
 
+// The contract critic's file (contract-critique.md): its result and each
+// finding with its level, what it says and the suggested fix.
+export function parseCritique(t) {
+  const firstWord = (x) => (x || "").trim().split(/\s+/)[0] || "";
+  const field = (text, name) => (text.match(new RegExp(`^\\*\\*${name}:\\*\\*\\s*(.+)$`, "m")) || [])[1]?.trim() || "";
+  const findings = [];
+  // The critic writes the level in the heading ("### F6 — [blocking] …") or
+  // as the finding's first bullet ("- [blocking] …"): both seen in one mission.
+  const re = /^###\s+(F\d+)\s*[—–-]+\s*(?:\[(blocking|non-blocking)\]\s*)?(.+)$/gm;
+  let m; const at = [];
+  while ((m = re.exec(t))) at.push({ id: m[1], level: m[2] || "", title: m[3].trim(), start: re.lastIndex, head: m.index });
+  at.forEach((a, i) => {
+    let body = t.slice(a.start, i + 1 < at.length ? at[i + 1].head : undefined).split(/\n## /)[0].trim();
+    const tag = body.match(/^\s*[-*]?\s*\[(blocking|non-blocking)\]\s*/m);
+    const level = a.level || (tag ? tag[1] : "unknown");
+    if (tag) body = body.replace(tag[0], "");
+    const paras = body.split(/\n\s*\n/).map((x) => x.replace(/\s+/g, " ").trim()).filter(Boolean);
+    findings.push({ id: a.id, level, title: a.title, text: (paras.find((x) => !/^Suggested fix:/i.test(x)) || "").slice(0, 700),
+      fix: (paras.find((x) => /^Suggested fix:/i.test(x)) || "").replace(/^Suggested fix:\s*/i, "").slice(0, 500) });
+  });
+  return { result: firstWord(field(t, "Critique result")), findings };
+}
+
 export function inbox(snapshot) {
   const cards = [];
   for (const m0 of snapshot.missions || []) {
