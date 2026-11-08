@@ -787,6 +787,16 @@ const run = (m.timeline || []).find((x) => x.run === "r1abc");
 process.exit(r.calls === 1 && run && run.role === "worker" && run.calls === 1 && run.ticket === "01-hello" && Date.parse(run.start) <= Date.parse(run.end)
   && m.span && m.span.runs >= 1 && s.roles.indexOf("worker") > s.roles.indexOf("ticket-writer") ? 0 : 1);' "$arch" "$work/tl.json" \
   && t "status: the mission's runs by role from the archive, with tool calls counted once at collect (D119)" || fail "timeline" "$(cat "$arch/run.json"; head -c 1500 "$work/tl.json")"
+# F10: a contract run finished before an amendment rewrote spec.md is still
+# archived (deps-node-22: 6 critiques, 0 contract runs in the archive).
+printf '{"model":"gw/author-1","usage":{"input":1000,"output":100,"cost":0,"turns":3},"durationMs":30000,"cwd":"%s"}' "$(git rev-parse --show-toplevel)" > "$work/usage/run/c9ctr_factory-contract-author_meta.json"
+printf '{"type":"tool","name":"read","args":"spec.md"}\n' > "$work/usage/run/c9ctr_factory-contract-author_transcript.jsonl"
+touch -r "$m/spec.md" "$work/spec.mtime"; touch "$m/spec.md"   # the amendment's rewrite, after the run
+touch -d "@$(( $(date +%s) - 5 ))" "$work/usage/run/c9ctr_factory-contract-author_meta.json"
+out="$(FACTORY_USAGE_DIRS="$work/usage" bash scripts/factory/archive.sh collect demo)"
+[ -f "$(dirname "$arch")/c9ctr_factory-contract-author/run.json" ] \
+  && t "archive: a contract run before an amendment's rewrite of spec.md is still archived (F10)" || fail "archive contract run" "$out / $(ls "$(dirname "$arch")")"
+touch -r "$work/spec.mtime" "$m/spec.md"
 # P20: request sizes from the child transcript (pi-subagents' records): the
 # a 25k-token test log takes the reviewer's request from 10k to 35k; the next one would be 36.2k.
 ta="$work/tokens-archive/r7rev_factory-reviewer"; mkdir -p "$ta"
