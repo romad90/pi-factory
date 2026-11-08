@@ -401,3 +401,21 @@ test("a heredoc's body is not a redirection (dry run on 0.87)", () => {
   for (const cmd of ["node <<'JS' > out.txt\nconsole.log(1)\nJS", "cat <<EOF\nx\nEOF\necho y > notes.md", "node <<'JS'\nconsole.log(1)\nJS\n git diff > diff.txt"])
     assert.equal(bash(cmd, p)?.rule, "scratch", `still a write outside .scratch/: ${JSON.stringify(cmd)}`);
 });
+
+test("a quoted or variable redirect target is still a path (review on 0.87)", () => {
+  mkdirSync(join(main, ".scratch", "m", "tmp"), { recursive: true });
+  for (const cmd of [
+    "log=.scratch/m/tmp/t.log; npm test > \"$log\" 2>&1",
+    "log='.scratch/m/tmp/t.log'; npm test >> ${log}",
+    "npm test > \".scratch/m/tmp/t.log\" 2>&1",
+    "npm test 2>&1 | tee '.scratch/m/tmp/t.log'",
+    "npm test > \"$TMPDIR/t.log\"",
+    "npm test > \"$(mktemp)\"",
+  ]) assert.equal(bash(cmd), null, `should allow: ${cmd}`);
+  for (const cmd of [
+    "log=notes.md; npm test > \"$log\"",
+    "npm test > \"diff.txt\"",
+    "npm test > \"$unset_var\"",
+    "out=src/x.patch; git diff | tee \"$out\"",
+  ]) assert.equal(bash(cmd)?.rule, "scratch", `should block: ${cmd}`);
+});
