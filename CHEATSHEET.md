@@ -321,6 +321,7 @@ If the merge left your branch's dependency versions, take the target's `package.
 | `scripts/factory/readiness.sh` | what the repo still lacks for Step 2 |
 | `scripts/factory/skills-pin.sh verify\|check-global` | skills drifted or shadowed? |
 | `scripts/factory/reset-ticket.sh <f> <ticket> [reason]` | rebuild a ticket from round 1 (verdict, round copies and integration marker removed, one commit) |
+| `/factory-rereview <f> <ticket> <why>` (`reset-ticket.sh <f> <ticket> --review "<why>"`) | review an integrated ticket again instead of rebuilding it: its code stands, the verdict is set aside, the round copies stay, an open question about it is closed (F4) |
 | `scripts/factory/self-check.sh <f>` | from a worker's worktree: the checks integration will run (workers run it themselves) |
 | `scripts/factory/resolve.sh <f> <ticket> "<question>"` | would this question be auto-answered, and by which rule? |
 | `scripts/factory/health.sh baseline` | after setting `FACTORY_LINT_CMD`: records today's lint errors, so only new ones fail |

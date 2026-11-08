@@ -1063,6 +1063,23 @@ grep -q 'lint baseline present' "$work/pre.log" && t "pre-flight reports the lin
   && [ "$(git log -1 --format=%s)" = 'chore(maint): reset 03-more' ] && grep -q $'03-more\treset\t.*rebuild after lint fix' .scratch/maint/decisions.tsv \
   && [ -z "$(bash -c '. scripts/factory/lib.sh; verdict_round .scratch/maint/verdicts/03-more-code.md')" ] \
   && t "reset-ticket: verdict and round copies gone, logged, one commit" || fail "reset 03" "$(cat "$work/reset.log"; ls .scratch/maint/verdicts)"
+# F4 (E27, E29, E36): an integrated ticket whose review failed on something
+# no patch can change (a contract later amended, a scope rule) went back to
+# build, where workers had nothing to do. --review sends it back to review:
+# the integration stays, the verdict is set aside, its history kept.
+mk="$(cat .scratch/maint/state/02-tests.integrated)"
+printf '# Verdict: 02-tests\n**Result:** FAIL\n**Commit:** %s\n\n## Assertions\n- VAL-M-001: FAIL — outside the file scope\n' "$mk" > .scratch/maint/verdicts/02-tests-code.md
+cp .scratch/maint/verdicts/02-tests-code.md .scratch/maint/verdicts/02-tests-code.r1.md; git add .scratch/maint; git commit -qm "test: a scope FAIL on an integrated ticket"
+printf '**Ticket:** 02-tests\n\nNothing to change: hand over as is?\n' > .scratch/maint/state/open-question.md
+grep -q '/factory-rereview maint 02-tests' <<<"$(bash scripts/factory/next.sh maint 2>&1)" \
+  && t "a question about an integrated ticket names the way to review it again instead of rebuilding it" || fail "rereview hint" "$(bash scripts/factory/next.sh maint 2>&1 | tail -3)"
+bash scripts/factory/reset-ticket.sh maint 02-tests --review "VAL-M-001 amended: the fixture is in scope" >"$work/rr.log" \
+  && [ ! -e .scratch/maint/verdicts/02-tests-code.md ] && [ -f .scratch/maint/verdicts/02-tests-code.r1.md ] \
+  && [ -f .scratch/maint/state/02-tests.integrated ] && [ ! -e .scratch/maint/state/open-question.md ] \
+  && grep -q $'02-tests\trereview\t.*VAL-M-001 amended' .scratch/maint/decisions.tsv && [ -z "$(git status --porcelain -- .scratch)" ] \
+  && bash -c '. scripts/factory/lib.sh; compute_ticket_state maint; [[ " ${T_REVIEW[*]} " == *" 02-tests "* ]] && [[ " ${T_BUILD[*]} " != *" 02-tests "* ]]' \
+  && t "reset-ticket --review: an integrated ticket goes back to review, not build; history kept, question closed, one commit" || fail "rereview" "$(cat "$work/rr.log"; ls .scratch/maint/verdicts .scratch/maint/state)"
+if bash scripts/factory/reset-ticket.sh maint 03-more --review "x" >/dev/null 2>&1; then fail "rereview must refuse a ticket that isn't integrated"; fi
 bash scripts/factory/reset-ticket.sh maint 02-tests >/dev/null && [ ! -e .scratch/maint/state/02-tests.integrated ] \
   && bash -c '. scripts/factory/lib.sh; compute_ticket_state maint; [[ " ${T_BUILD[*]} " == *" 02-tests "* ]]' \
   && t "reset-ticket: an integrated ticket loses its marker and goes back to build" || fail "reset 02"

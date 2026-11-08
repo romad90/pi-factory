@@ -60,7 +60,10 @@ if [ -f "$dir/state/PAUSED.md" ]; then
 fi
 if [ -f "$dir/state/open-question.md" ]; then
   STATUS="$(cat "$dir/state/open-question.md")"$'\n'
-  step decide "human: answer with /factory-decide $feature <your answer, and why>. Irreversible choices never default (D47)."
+  qt="$(sed -n 's/^\*\*Ticket:\*\* //p' "$dir/state/open-question.md" | head -1)"
+  rr=""; [ -n "$qt" ] && [ -n "$(ticket_marker "$feature" "$qt" 2>/dev/null)" ] \
+    && rr=" $qt is integrated: if its code is right and only its review must run again (a contract you amended, a FAIL no patch can change), /factory-rereview $feature $qt <why> sends it to review instead of build (F4)."
+  step decide "human: answer with /factory-decide $feature <your answer, and why>. Irreversible choices never default (D47).$rr"
 fi
 # P22, the architect step: a job (one line from a person) is measured by
 # scripts, planned by the architect, approved once, then run mission by mission.
