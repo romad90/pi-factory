@@ -63,6 +63,11 @@ test("replay: the fixes let nothing dangerous through", () => {
   ]) assert.ok(bash(cmd), `should block a lead or judge write: ${JSON.stringify(cmd)}`);
   for (const cmd of ["cd .scratch/m/tmp/a && echo x > ../b.log", "cd .scratch/m && (cd tmp && echo x > y.log)", "cd /tmp && echo x > y.log"])
     assert.equal(bash(cmd), null, `should allow: ${cmd}`);
+  // $PWD is the working folder (E39), and a variable set from it is too: it
+  // never makes an outside write look inside .scratch/.
+  for (const cmd of ['echo x > "$PWD/notes.md"', 'D="$PWD/.."; echo x > "$D/notes.md"', 'export TMPDIR="$PWD/src"; echo x > "$TMPDIR/a.js"'])
+    assert.ok(bash(cmd), `should block: ${cmd}`);
+  assert.equal(bash('echo x > "${PWD}/.scratch/m/tmp/a.log"'), null);
   // Subagent launches: only a generated workflow, fresh and blocking; only the
   // review axis directly, fresh, in this project; only read-only actions.
   const wf = "./.scratch/m/workflows/20261108-000000-build-wave.js";
