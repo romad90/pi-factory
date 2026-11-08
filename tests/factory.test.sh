@@ -466,6 +466,21 @@ printf '# Verdict: 01-hello\n**Commit:** %s\n\nLooks fine to me.\n' "$c1" > $m/v
 bash scripts/factory/collect.sh demo > "$work/collect.log"
 grep -q 'sent back to review' "$work/collect.log" && [ ! -f $m/verdicts/01-hello-code.md ] && [ ! -f $m/verdicts/01-hello-code.r3.md ] \
   && t "a verdict without a Result line is sent back to review, not counted as a round" || fail "invalid verdict" "$(cat "$work/collect.log"; ls $m/verdicts)"
+# D117 (E33, E34): a review that judged no assertion (the guard blocked its
+# test runs: 0 pass, 0 fail, all unverified) is not a finding on the code. Set
+# aside, not a round, reviewed again; a second one in a row escalates with why.
+not_run_verdict() { printf '# Verdict: 01-hello\n**Result:** FAIL\n**Commit:** %s\n\n## Assertions\n- VAL-HELLO-001: UNVERIFIED — The factory guard blocked the test command before execution.\n\n## Issues\n- [blocking] Review execution stopped before tests ran.\n' "$c1" > $m/verdicts/01-hello-code.md; }
+not_run_verdict
+out="$(bash scripts/factory/collect.sh demo)"
+grep -q 'judged no assertion' <<<"$out" && [ ! -f $m/verdicts/01-hello-code.r3.md ] && ! grep -q 'guard blocked' $m/verdicts/01-hello-code.md \
+  && [ -f $m/state/01-hello.not-run-verdict.md ] && [ "$(bash scripts/factory/next.sh demo 2>&1 | head -1)" = "STEP: review" ] \
+  && t "a review that judged no assertion is set aside, not a round, and reviewed again (D117)" || fail "review not run" "$out $(ls $m/verdicts $m/state)"
+not_run_verdict
+out="$(bash scripts/factory/collect.sh demo)"
+grep -q 'judged no assertion again' <<<"$out" && [ -f $m/state/01-hello.stuck ] && grep -q 'factory guard blocked' $m/state/01-hello.stuck \
+  && [ "$(bash scripts/factory/next.sh demo 2>&1 | head -1)" = "STEP: escalate" ] && [ ! -f $m/verdicts/01-hello-code.r3.md ] \
+  && t "a second review in a row that judged nothing escalates, with the reviewer's reasons (D117)" || fail "review not run twice" "$out $(cat $m/state/01-hello.stuck 2>&1)"
+rm -f $m/state/01-hello.stuck $m/state/01-hello.not-run $m/state/01-hello.not-run-verdict.md $m/verdicts/01-hello-code.md
 # P25 (1): a review run that leaves no file is not a verdict: back to review once, then escalated.
 out="$(bash scripts/factory/collect.sh demo)"
 grep -q '01-hello-code.md .*no verdict file at /.*/verdicts/01-hello-code.md: the review run left none' <<<"$out" && [ ! -f $m/state/01-hello.stuck ] \
