@@ -11,7 +11,7 @@
 #         (feature feat, bugfix fix, refactor refactor, maintenance test),
 #         else the last commit's subject
 # Target: $FACTORY_MR_TARGET (environment or .factory/commands.env), else the
-#         remote's default branch
+#         remote's default branch, else the branch the mission came from (D116)
 # Branch: the current one, pushed to origin. Refused when it is the target or
 #         matches a pattern in $FACTORY_MR_BLOCKED_BRANCHES (space-separated
 #         globs, e.g. "chore/*" where such branches deploy).
@@ -70,8 +70,7 @@ for f in "$dir/pr.md" "/tmp/pr-body-$feature.md"; do [ -s "$f" ] && { body_file=
 
 branch="$(git rev-parse --abbrev-ref HEAD)"
 [ "$branch" != HEAD ] || die "detached HEAD: check out the mission branch"
-remote_default="$(git symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##' || true)"
-target="$(conf FACTORY_MR_TARGET)"; target="${target:-$remote_default}"
+target="$(mr_target "$branch")"
 [ -n "$target" ] || die "no target branch: set FACTORY_MR_TARGET in .factory/commands.env"
 [ "$branch" != "$target" ] || die "you are on $target itself: check out the mission branch"
 # D109: a job's mission goes on top of the previous mission's MR while that one

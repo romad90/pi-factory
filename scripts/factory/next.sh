@@ -118,6 +118,10 @@ if [ -n "$after" ] && [ "$after" != "-" ] && [ "$(verdict_field "$(mission_dir "
   step blocked "$feature builds on $after, which isn't validated yet: finish $after first (/factory $after), then /factory $feature on a branch that has its work"
 fi
 [ -f "$spec" ] || step grill "human, main session: /grill-with-docs, then /to-spec → $spec. Or give the factory a job instead: /factory-job <name> \"<what you want>\" (the architect plans it)"
+# D116: the mission on its own branch before any step writes its state.
+err="$(mktemp)"
+if ! out="$(mission_switch "$feature" "$spec" 2>"$err")"; then rm -f "$err"; step blocked "$out"; fi
+sw="$(cat "$err")"; rm -f "$err"; [ -z "$sw" ] || STATUS+="${sw#factory: }"$'\n'
 
 # D99: a bug between services is investigated before any contract. Context
 # repos are cloned read-only; explorers map one repo each, fresh; the

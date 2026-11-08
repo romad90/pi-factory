@@ -182,7 +182,7 @@ Each mission's `spec.md` is written from it; `/factory tidy-api` runs them in or
 | # | You | Factory |
 |---|---|---|
 | 1 | Optional, for anything bigger than a fix: `/skill:deep-prompt` → `.scratch/<f>/depth.md` (expert moves, raw material, methods, the outside check). Then `/grill-with-docs` on that file, then `/to-spec` → `.scratch/<f>/spec.md` (start with `**Intent:** feature`) | |
-| 2 | `/factory <f>` | pre-flight, contract author, then critic |
+| 2 | `/factory <f>`, from the branch its MR goes into (no `git checkout -b`) | the mission moves to its own branch `mission/<f>` (a job's: `job/<job>/<f>`), then pre-flight, contract author, then critic |
 | 3 | Read the contract + critique. `/factory-approve <f>`, or `/factory-amend <f> "<change>"` | amend reruns author + critic |
 | 3b | Feature or refactor: read `design.md` (with the MR's reviewer if the spec names one), then `/factory-approve <f> design`, or edit it | designer drafts it after G1 |
 | 4 | | ticket writer proposes tickets, as vertical slices |

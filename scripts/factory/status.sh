@@ -36,7 +36,8 @@ mission_lines() {
     printf 'S\tother-branch\nN\t%s\nH\t0\nO\t%s\n' "$why" "$(printf '%s' "$why" | sed -n "s/.*is on branch '\([^']*\)'.*/\1/p")"
     return 0
   fi
-  out="$(FACTORY_NOTIFY=0 bash "$here/next.sh" "$f" 2>/dev/null || true)"
+  # Read-only: showing a step never moves the checkout (D109, D116).
+  out="$(FACTORY_NOTIFY=0 FACTORY_MISSION_BRANCHES=0 FACTORY_JOB_BRANCHES=0 bash "$here/next.sh" "$f" 2>/dev/null || true)"
   printf 'S\t%s\n' "$(printf '%s\n' "$out" | sed -n 's/^STEP: //p' | head -1)"
   printf 'N\t%s\n' "$(printf '%s\n' "$out" | sed -n 's/^NEXT → //p' | head -1)"
   printf 'H\t%s\n' "$([[ "$HUMAN_STEPS" == *" $(printf '%s\n' "$out" | sed -n 's/^STEP: //p' | head -1) "* ]] && echo 1 || echo 0)"
