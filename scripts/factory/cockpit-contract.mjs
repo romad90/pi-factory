@@ -9,6 +9,8 @@
 //   inbox: [card]   one card per thing a person must decide, oldest first
 //   missions[].phase: "needs-you" | "running" | "lead" | "closed" | "parked"
 //   missions[].span: { start, end, runs, cost, calls, refused } over the archived runs
+//   health: { missions: [{ name, cost, decisions, runs, refused, rounds }], guard: { total, refused,
+//            allowed, unknown, byRule: [{ rule, total, allowed, refused, unknown }] }, causes: { byClass, open } }
 //   roles: lane order for timelines (the mission's runs carry role, start, end,
 //          model, cost, calls and refusals: missions[].timeline)
 // A card: { id, mission, kind, ticket, title, question, since,
@@ -157,11 +159,40 @@ export function span(timeline) {
   };
 }
 
+// D122: the factory engineer's view across missions: what each mission cost
+// you and the model, the guard's refusals judged again today (allowed today =
+// fixed since), and the causes the learning loop classified.
+export function health(snapshot) {
+  const ms = snapshot.missions || [];
+  const missions = ms.map((m) => {
+    const s = span(m.timeline);
+    return { name: m.name, phase: m.phase || "", cost: s ? s.cost : m.usage?.cost || 0, decisions: m.interventions?.human || 0,
+      runs: s ? s.runs : 0, refused: s ? s.refused : 0, rounds: (m.tickets || []).reduce((a, t) => a + (t.round || 0), 0) };
+  });
+  const refusals = ms.flatMap((m) => (m.timeline || []).flatMap((r) => r.refused || []));
+  const byRule = new Map();
+  for (const g of refusals) {
+    const e = byRule.get(g.rule) || { rule: g.rule, total: 0, allowed: 0, refused: 0, unknown: 0 };
+    e.total++; e[g.today === "allowed" || g.today === "refused" ? g.today : "unknown"]++; byRule.set(g.rule, e);
+  }
+  const count = (k) => refusals.filter((g) => g.today === k).length;
+  const causes = snapshot.causes || [];
+  const byClass = {};
+  for (const c of causes) byClass[c.class || "other"] = (byClass[c.class || "other"] || 0) + 1;
+  return {
+    missions,
+    guard: { total: refusals.length, refused: count("refused"), allowed: count("allowed"), unknown: refusals.length - count("refused") - count("allowed"),
+      byRule: [...byRule.values()].sort((a, b) => b.total - a.total) },
+    causes: { total: causes.length, byClass, open: causes.filter((c) => /^open/i.test(c.status)).length },
+  };
+}
+
 export function toContract(snapshot) {
   const cards = inbox(snapshot);
+  const missions = (snapshot.missions || []).map((m) => ({ ...m, phase: phase(m, cards), span: span(m.timeline) }));
   return {
     contract: CONTRACT_VERSION, ...snapshot,
-    waitingOn: waitingOn(snapshot, cards), inbox: cards, roles: ROLES,
-    missions: (snapshot.missions || []).map((m) => ({ ...m, phase: phase(m, cards), span: span(m.timeline) })),
+    waitingOn: waitingOn(snapshot, cards), inbox: cards, roles: ROLES, missions,
+    health: health({ ...snapshot, missions }), causes: snapshot.causes || [],
   };
 }

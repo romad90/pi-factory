@@ -88,3 +88,18 @@ test("span sums the archived runs: wall time, cost, tool calls, refusals", async
   ]);
   assert.deepEqual(s, { start: "2026-11-08T16:13:31Z", end: "2026-11-08T16:22:04Z", runs: 2, cost: 0.35, calls: 87, refused: 4 });
 });
+
+test("health: refusals judged again today (allowed = fixed since), by rule; causes by class; cost and decisions per mission", async () => {
+  const { health } = await import("../scripts/factory/cockpit-contract.mjs");
+  const run = (refused, cost) => ({ start: "2026-11-08T16:00:00Z", end: "2026-11-08T16:01:00Z", cost, calls: 1, refused });
+  const h = health({
+    missions: [
+      { name: "a", interventions: { human: 7 }, tickets: [{ round: 1 }, { round: 4 }], timeline: [run([{ rule: "strayWrite", today: "allowed" }, { rule: "strayWrite", today: "refused" }], 1.5), run([{ rule: "push", today: "refused" }], 0.5)] },
+      { name: "b", interventions: { human: 2 }, tickets: [], usage: { cost: 1.32 }, timeline: [] },
+    ],
+    causes: [{ class: "factory_bug", status: "open" }, { class: "factory_bug", status: "fixed #133" }, { class: "model_weakness", status: "n/a" }],
+  });
+  assert.deepEqual(h.missions.map((m) => [m.name, m.cost, m.decisions, m.rounds, m.refused]), [["a", 2, 7, 5, 3], ["b", 1.32, 2, 0, 0]]);
+  assert.deepEqual(h.guard, { total: 3, refused: 2, allowed: 1, unknown: 0, byRule: [{ rule: "strayWrite", total: 2, allowed: 1, refused: 1, unknown: 0 }, { rule: "push", total: 1, allowed: 0, refused: 1, unknown: 0 }] });
+  assert.deepEqual(h.causes, { total: 3, byClass: { factory_bug: 2, model_weakness: 1 }, open: 1 });
+});

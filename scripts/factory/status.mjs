@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { toContract } from "./cockpit-contract.mjs";
+import { replay } from "./run-detail.mjs";
 
 const env = process.env;
 const root = env.FACTORY_DIR || ".scratch";
@@ -155,7 +156,7 @@ function timeline(name) {
       start: new Date(start).toISOString(), end: new Date(end).toISOString(), ms: end - start,
       cost: j.usage?.cost || 0, input: j.usage?.input || 0, output: j.usage?.output || 0,
       calls: typeof j.calls === "number" ? j.calls : null, result: j.outcome?.result || (j.outcome?.integrated ? "integrated" : ""),
-      refused: (Array.isArray(j.guard) ? j.guard : []).map((g) => ({ at: g.date || "", rule: g.rule || "", tool: g.tool || "", input: String(g.input || "").slice(0, 300) })),
+      refused: (Array.isArray(j.guard) ? j.guard : []).map((g) => ({ at: g.date || "", rule: g.rule || "", tool: g.tool || "", input: String(g.input || "").slice(0, 300), today: replay(g).today })),
     });
   }
   return runs.sort((a, b) => a.start.localeCompare(b.start)).slice(-200);
@@ -231,6 +232,14 @@ const missions = groups.map((g) => mission(g.name, g.lines));
 let factory = null;
 try { if (env.METRICS) factory = JSON.parse(read(env.METRICS)).total || null; } catch {}
 // D98: the factory engineer's benchmarks, newest comparison first (bench.sh compare).
+// D122: the causes the learning loop classified (taxonomy.tsv, private to the
+// machine), for the factory engineer's Health page. Only with --all.
+let causes = [];
+if (env.ALL) {
+  const learn = env.FACTORY_LEARN_DIR || (archiveRoot ? path.join(path.dirname(archiveRoot), "learn") : "");
+  causes = tsv(path.join(learn, "taxonomy.tsv")).map((r) => ({ id: r.id || "", when: r.when_utc || "", mission: r.mission || "", event: r.event || "",
+    cost: r.cost || "", class: r.cause_class || "", cause: r.cause || "", status: r.status || "", evidence: r.evidence || "" }));
+}
 const benchDir = env.FACTORY_BENCH_DIR || ".factory/bench";
 let bench = [];
 try {
@@ -239,4 +248,4 @@ try {
     .filter(Boolean).sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 10);
 } catch {}
 // D119: every view reads one versioned contract, the same here and in a cloud deployment.
-process.stdout.write(JSON.stringify(toContract({ generated: new Date().toISOString(), factoryDir: root, factory, missions, bench }), null, 1) + "\n");
+process.stdout.write(JSON.stringify(toContract({ generated: new Date().toISOString(), factoryDir: root, factory, missions, bench, causes }), null, 1) + "\n");

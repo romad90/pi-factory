@@ -121,7 +121,7 @@ details summary{cursor:pointer;color:var(--soft)}
   <nav class="crumbs" id="crumbs"></nav>
   <a class="waiting w-nobody" id="waiting" href="#/"></a>
   <span class="spacer"></span>
-  <span class="keys"><b>N</b> needs you · <b>L</b> missions · <b>B</b> benchmarks · <b>M</b> mission · <b>R</b> rounds · <b>↑↓</b> ticket · <b>Enter</b> open · <b>Esc</b> up</span>
+  <span class="keys"><b>N</b> needs you · <b>L</b> missions · <b>H</b> health · <b>B</b> benchmarks · <b>M</b> mission · <b>R</b> rounds · <b>↑↓</b> ticket · <b>Enter</b> open · <b>Esc</b> up</span>
   <span class="age" id="age"></span>
 </header>
 <main id="app"><p class="muted">Loading state.json…</p></main>
@@ -130,7 +130,7 @@ details summary{cursor:pointer;color:var(--soft)}
 let state = null, sel = 0, lastOk = 0, lastText = "";
 const $ = (s) => document.querySelector(s);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const route = () => { const p = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent); return { m: p[0] === "m" ? p[1] : "", t: p[2] === "t" ? p[3] : "", run: p[2] === "run" ? p[3] : "", b: p[0] === "bench" ? (p[1] || "-") : "", list: p[0] === "missions" }; };
+const route = () => { const p = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent); return { m: p[0] === "m" ? p[1] : "", t: p[2] === "t" ? p[3] : "", run: p[2] === "run" ? p[3] : "", b: p[0] === "bench" ? (p[1] || "-") : "", list: p[0] === "missions", h: p[0] === "health" }; };
 const go = (m, t) => { location.hash = m ? `#/m/${encodeURIComponent(m)}${t ? `/t/${encodeURIComponent(t)}` : ""}` : "#/missions"; };
 const STATE_LABEL = { pass: "PASS", review: "review", build: "build", escalate: "ESCALATE", blocked: "blocked" };
 const pill = (s) => `<span class="pill s-${esc(s)}">${esc(STATE_LABEL[s] || s)}</span>`;
@@ -414,9 +414,48 @@ function inboxView() {
     ${cards.length ? `<div class="inbox">${cards.map(card).join("")}</div>` : `<div class="panel"><p class="empty">Nothing waits for you. ${esc(state.waitingOn?.text || "")}</p></div>`}`;
 }
 
+// D122: the factory engineer's page: where rounds and your time go, which
+// refusals today's guard would let through, and the causes the learning loop
+// classified, with their status.
+function hbars(rows, key, fmt, color) {
+  const max = Math.max(...rows.map((r) => r[key]), 0) || 1;
+  return rows.map((r) => `<div style="display:grid;grid-template-columns:minmax(120px,220px) 1fr 70px;gap:10px;align-items:center;margin:6px 0">
+    <a href="#/m/${encodeURIComponent(r.name)}" class="mono" style="color:var(--ink);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.name)}</a>
+    <span style="height:12px;background:#222733;border-radius:3px"><span style="display:block;height:12px;width:${(100 * r[key]) / max}%;background:${color};border-radius:3px"></span></span>
+    <span style="text-align:right;font-variant-numeric:tabular-nums">${fmt(r[key])}</span></div>`).join("");
+}
+function healthView() {
+  const h = state.health || { missions: [], guard: { total: 0, byRule: [] }, causes: { total: 0, byClass: {} } };
+  const g = h.guard, c = h.causes, ms = h.missions;
+  const tile = (k, v, sub, color) => `<div class="panel rec"><div class="k">${k}</div><div class="v"${color ? ` style="color:${color}"` : ""}>${v}</div><div class="muted" style="font-size:12.5px">${sub}</div></div>`;
+  const STATUS = (st) => /^fixed|^merged/i.test(st) ? "s-pass" : /^open/i.test(st) ? "s-fail" : "s-blocked";
+  return `<div class="grid recs" style="margin-bottom:16px">
+      ${tile("Guard refusals", g.total, g.total ? `${g.allowed} allowed by today's guard (fixed since) · ${g.refused} still refused${g.unknown ? ` · ${g.unknown} not replayable (F10)` : ""}` : "none archived", g.refused ? "var(--red)" : "")}
+      ${tile("Causes classified", c.total, c.total ? `${c.open} open · ${Object.entries(c.byClass).map(([k, v]) => `${esc(k)} ${v}`).join(" · ")}` : "no taxonomy.tsv on this machine (factory learn-loop)")}
+      ${tile("Your decisions", ms.reduce((a, m) => a + m.decisions, 0), `over ${ms.length} mission${ms.length === 1 ? "" : "s"}`)}
+      ${tile("Model cost", "$" + ms.reduce((a, m) => a + m.cost, 0).toFixed(2), "archived runs, or usage.tsv")}
+    </div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:16px;margin-bottom:16px">
+      <div class="panel"><h2>Cost per mission</h2>${ms.length ? hbars(ms, "cost", (v) => "$" + v.toFixed(2), "var(--blue)") : `<p class="empty">No mission.</p>`}</div>
+      <div class="panel"><h2>Your decisions per mission</h2>${ms.length ? hbars(ms, "decisions", (v) => String(v), "var(--amber)") : `<p class="empty">No mission.</p>`}</div>
+    </div>
+    <div class="panel" style="margin-bottom:16px"><h2>Guard refusals by rule, judged again today</h2>
+      ${g.byRule.length ? `<table><tr><th>Rule</th><th>Refused then</th><th>Allowed today</th><th>Still refused</th><th>Not replayable</th></tr>${g.byRule.map((r) => `<tr><td class="mono">${esc(r.rule)}</td><td>${r.total}</td><td style="color:var(--green)">${r.allowed}</td><td style="color:${r.refused ? "var(--red)" : "inherit"}">${r.refused}</td><td class="muted">${r.unknown}</td></tr>`).join("")}</table>
+      <p class="muted" style="font-size:12.5px;margin-bottom:0">Allowed today: the refusal was a guard bug, fixed since. Still refused: either the guard is right, or the bug is still there; open the run from the mission's timeline to judge. Not replayable: guard.log cut the input at 300 characters (F10).</p>` : `<p class="empty">No refusal in the archived runs.</p>`}</div>
+    <div class="panel"><h2>Causes · taxonomy.tsv</h2>
+      ${(state.causes || []).length ? `<div style="overflow-x:auto"><table><tr><th>Id</th><th>Class</th><th>Mission</th><th>What happened</th><th>Cause</th><th>Cost</th><th>Status</th></tr>${state.causes.map((x) => `<tr><td class="mono">${esc(x.id)}</td><td>${esc(x.class)}</td><td class="mono">${esc(x.mission)}</td><td>${esc(x.event)}</td><td>${esc(x.cause)}</td><td>${esc(x.cost)}</td><td><span class="pill ${STATUS(x.status)}">${esc(x.status || "?")}</span></td></tr>`).join("")}</table></div>`
+        : `<p class="empty">No classified cause on this machine. factory learn-loop writes the evidence; the classes go in .git/pi-factory/learn/taxonomy.tsv.</p>`}</div>`;
+}
+
 function render() {
   if (!state) return;
   const r = route(), m = r.m && mission(r.m), t = m && r.t && m.tickets.find((x) => x.name === r.t);
+  if (r.h) {
+    waitingBar();
+    $("#crumbs").innerHTML = `<a href="#/">Needs you</a><span>·</span><a href="#/missions">Missions</a><span>·</span><span>Factory</span><span>›</span><a href="#/health">Health</a>`;
+    $("#app").innerHTML = healthView();
+    return;
+  }
   if (r.b) {
     waitingBar();
     $("#crumbs").innerHTML = `<a href="#/missions">Missions</a><span>·</span><span>Factory</span><span>›</span><a href="#/bench">Benchmarks</a>`;
@@ -426,7 +465,7 @@ function render() {
     return;
   }
   waitingBar();
-  const crumbs = [`<a href="#/">Needs you</a>`, `<span>·</span><a href="#/missions">Missions</a>`];
+  const crumbs = [`<a href="#/">Needs you</a>`, `<span>·</span><a href="#/missions">Missions</a>`, m ? "" : `<span>·</span><a href="#/health">Health</a>`];
   if (m) crumbs.push(`<span>›</span><a href="#/m/${encodeURIComponent(m.name)}">${esc(m.name)}</a>`);
   if (t) crumbs.push(`<span>›</span><span>${esc(t.name)}</span>`);
   if (m && r.run) crumbs.push(`<span>›</span><span>run ${esc(r.run.slice(0, 8))}</span>`);
@@ -466,6 +505,7 @@ document.addEventListener("keydown", (e) => {
   const r = route(), m = r.m && mission(r.m);
   const items = m ? m.tickets : state.missions;
   if (e.key === "b" || e.key === "B") { location.hash = "#/bench"; }
+  else if (e.key === "h" || e.key === "H") { location.hash = "#/health"; }
   else if (e.key === "l" || e.key === "L") { sel = 0; go(""); }
   else if (e.key === "n" || e.key === "N") { location.hash = "#/"; }
   else if (e.key === "m" || e.key === "M") { const name = m ? m.name : (state.missions[sel] || state.missions[0])?.name; if (name) go(name); }
