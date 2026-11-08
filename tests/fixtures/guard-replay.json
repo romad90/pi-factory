@@ -137,5 +137,13 @@
    "command": "cd .scratch/server-survives-bad-input/tmp/review-01-3ada25197b95/commit && node_modules/.bin/tap --no-cov -R tap test/server-bad-input.test.js > ../bad-input.log 2>&1; result=$?; cat ../bad-input.log; exit \"$result\"",
    "timeout": 180
   }
+ },
+ {
+  "id": "E39",
+  "context": "judge",
+  "tool": "bash",
+  "input": {
+   "command": "mkdir -p .scratch/server-survives-bad-input/tmp/review-03-3ff8390; export TMPDIR=\"$PWD/.scratch/server-survives-bad-input/tmp/review-03-3ff8390\"; node_modules/.bin/tap --no-cov -R terse test/server-bad-input.test.js > \"$TMPDIR/targeted.log\" 2>&1 && npm test > \"$TMPDIR/npm-test.log\" 2>&1"
+  }
  }
 ]

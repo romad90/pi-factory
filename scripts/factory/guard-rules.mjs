@@ -244,13 +244,15 @@ export function stripHeredocs(cmd) {
 // > "$log"` was refused as "writing ''". Unquote targets and expand variables the
 // command itself assigns (and TMPDIR, mktemp); anything still unknown stays
 // refused.
-export function resolveTargets(cmd) {
-  const vars = { TMPDIR: tmpdir() };
-  for (const m of String(cmd).matchAll(/(?:^|[;&|\n(]|\s)([A-Za-z_][A-Za-z0-9_]*)=(?:"([^"]*)"|'([^']*)'|([^\s;&|'"()]+))/g)) {
-    vars[m[1]] = m[2] ?? m[3] ?? m[4] ?? "";
-  }
+// E39: $PWD is the working folder, and a variable set from another one
+// (TMPDIR="$PWD/.scratch/m/tmp") is expanded where it is set.
+export function resolveTargets(cmd, cwd = process.cwd()) {
+  const vars = { TMPDIR: tmpdir(), PWD: cwd };
   const expand = (t) => t.replace(/\$\(mktemp\b[^)]*\)/g, join(tmpdir(), "mktemp"))
     .replace(/\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?/g, (all, n) => (Object.hasOwn(vars, n) ? vars[n] : all));
+  for (const m of String(cmd).matchAll(/(?:^|[;&|\n(]|\s)([A-Za-z_][A-Za-z0-9_]*)=(?:"([^"]*)"|'([^']*)'|([^\s;&|'"()]+))/g)) {
+    vars[m[1]] = m[3] ?? expand(m[2] ?? m[4] ?? "");
+  }
   return String(cmd)
     .replace(/(\d?(?:>>?|>\|)\s*|\btee\s+(?:-a\s+)?)(["'])([^"'\n]*)\2/g, (all, op, _q, t) => (/\s/.test(t) ? all : op + expand(t)))
     .replace(/(\d?(?:>>?|>\|)\s*|\btee\s+(?:-a\s+)?)(\$[^\s;&|<>]+)/g, (all, op, t) => op + expand(t));
@@ -447,7 +449,7 @@ export function check({ tool, input = {}, cwd = process.cwd() }) {
       // root dirtied the tree and blocked the next ticket's worktree.
       const root = projectRoot(cwd);
       if (root) {
-        const out = strayWrite(resolveTargets(stripHeredocs(raw)).replace(/'[^']*'|"[^"]*"/g, "''"), cwd, root);
+        const out = strayWrite(resolveTargets(stripHeredocs(raw), cwd).replace(/'[^']*'|"[^"]*"/g, "''"), cwd, root);
         if (out) return blocked("scratch", `writing ${out} outside .scratch/ (working files go under .scratch/<mission>/tmp/; the factory's scripts write the rest)`);
       }
     }
