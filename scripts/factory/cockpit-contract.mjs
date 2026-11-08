@@ -8,6 +8,9 @@
 //   waitingOn: { who: "you" | "factory" | "lead" | "nobody", text, mission?, count? }
 //   inbox: [card]   one card per thing a person must decide, oldest first
 //   missions[].phase: "needs-you" | "running" | "lead" | "closed" | "parked"
+//   missions[].span: { start, end, runs, cost, calls, refused } over the archived runs
+//   roles: lane order for timelines (the mission's runs carry role, start, end,
+//          model, cost, calls and refusals: missions[].timeline)
 // A card: { id, mission, kind, ticket, title, question, since,
 //           options: [{ label, effect, command, suggested }],
 //           evidence: [{ label, text, path }] }
@@ -140,11 +143,25 @@ export function waitingOn(snapshot, cards) {
   return { who: "nobody", count: 0, text: "no open mission" };
 }
 
+// Lanes, in the order work flows through a mission; unknown roles go last.
+export const ROLES = ["contract-author", "contract-critic", "architect", "strategy-critic", "designer", "investigator", "explorer",
+  "ticket-writer", "worker", "worker-heavy", "reviewer", "review-axis", "validator", "code-steward"];
+
+export function span(timeline) {
+  const t = timeline || [];
+  if (!t.length) return null;
+  return {
+    start: t.reduce((a, r) => (r.start < a ? r.start : a), t[0].start), end: t.reduce((a, r) => (r.end > a ? r.end : a), t[0].end),
+    runs: t.length, cost: Math.round(t.reduce((a, r) => a + (r.cost || 0), 0) * 100) / 100,
+    calls: t.reduce((a, r) => a + (r.calls || 0), 0), refused: t.reduce((a, r) => a + (r.refused || []).length, 0),
+  };
+}
+
 export function toContract(snapshot) {
   const cards = inbox(snapshot);
   return {
     contract: CONTRACT_VERSION, ...snapshot,
-    waitingOn: waitingOn(snapshot, cards), inbox: cards,
-    missions: (snapshot.missions || []).map((m) => ({ ...m, phase: phase(m, cards) })),
+    waitingOn: waitingOn(snapshot, cards), inbox: cards, roles: ROLES,
+    missions: (snapshot.missions || []).map((m) => ({ ...m, phase: phase(m, cards), span: span(m.timeline) })),
   };
 }

@@ -135,6 +135,32 @@ function workers(mission) {
   return out.sort((a, b) => a.ageSec - b.ageSec).slice(0, 6);
 }
 
+// D119: the mission's runs by role, from the run archive (archive.sh collect):
+// start, end, model, cost, tool calls and the guard's refusals with their time.
+// Never a transcript: run.json carries the counts, so the snapshot stays cheap
+// at 50 missions.
+const archiveRoot = env.FACTORY_ARCHIVE_DIR || (() => { const g = git(["rev-parse", "--path-format=absolute", "--git-common-dir"]).trim(); return g ? path.join(g, "pi-factory", "archive") : ""; })();
+function timeline(name) {
+  const dir = archiveRoot && path.join(archiveRoot, name);
+  let names = [];
+  try { names = fs.readdirSync(dir); } catch { return []; }
+  const runs = [];
+  for (const d of names) {
+    let j; try { j = JSON.parse(read(path.join(dir, d, "run.json"))); } catch { continue; }
+    if (!j || !j.date) continue;
+    const end = Date.parse(j.date), start = end - (Number(j.durationMs) || 0);
+    if (Number.isNaN(end)) continue;
+    runs.push({
+      run: String(j.run || d).slice(0, 8), role: String(j.agent || "?").replace(/^factory-/, ""), model: j.model || "", ticket: j.ticket || "",
+      start: new Date(start).toISOString(), end: new Date(end).toISOString(), ms: end - start,
+      cost: j.usage?.cost || 0, input: j.usage?.input || 0, output: j.usage?.output || 0,
+      calls: typeof j.calls === "number" ? j.calls : null, result: j.outcome?.result || (j.outcome?.integrated ? "integrated" : ""),
+      refused: (Array.isArray(j.guard) ? j.guard : []).map((g) => ({ at: g.date || "", rule: g.rule || "", tool: g.tool || "", input: String(g.input || "").slice(0, 300) })),
+    });
+  }
+  return runs.sort((a, b) => a.start.localeCompare(b.start)).slice(-200);
+}
+
 function mission(name, lines) {
   const dir = path.join(root, name);
   const spec = read(path.join(dir, "spec.md"));
@@ -190,6 +216,7 @@ function mission(name, lines) {
     runs: tsv(path.join(dir, "runs.tsv")).slice(-12),
     usage: usage.length ? { runs: usage.length, input: sum("input"), output: sum("output"), cacheRead: sum("cache_read"), cost: sum("cost") } : null,
     log: events(name, dir, (git(["rev-parse", "--show-prefix"]).trim())), workers: live, needs,
+    timeline: timeline(name),
   };
 }
 

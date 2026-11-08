@@ -75,6 +75,13 @@ function missionText(dir, acc = []) {     // every text the mission recorded, fo
   return acc;
 }
 
+// Tool calls in a transcript: pi-subagents' tool_start records, else the
+// assistant messages' toolCall parts, else bare tool records (older formats).
+export function toolCalls(text) {
+  const n = (re) => (text.match(re) || []).length;
+  return n(/"recordType":\s*"tool_start"/g) || n(/"type":\s*"toolCall"/g) || n(/"type":\s*"tool"[,}]/g);
+}
+
 const [cmd, ...args] = process.argv.slice(2);
 if (cmd === "collect") {
   const [out, missionDir, head, guardLog = "", ...rootArgs] = args;
@@ -126,6 +133,7 @@ if (cmd === "collect") {
       // Refusals inside the run's time window (end = meta's time, start = end - duration).
       guard: (() => { const end = statSync(meta).mtimeMs, start = end - (j.durationMs || 0) - 1000;
         return refusals.filter((r) => r.t >= start && r.t <= end + 1000).map(({ t, ...r }) => r); })(),
+      calls: toolCalls(read(join(dest, "transcript.jsonl")) || ""),   // D119: the cockpit's timeline never reads transcripts
       files: Object.keys(files).filter((n) => existsSync(join(dest, n))),
     };
     const prev = known ? read(join(dest, "run.json")) : null;
