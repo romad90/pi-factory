@@ -82,7 +82,7 @@ select{background:#12151B;color:var(--ink);border:1px solid var(--line);border-r
 <main id="app"><p class="muted">Loading state.json…</p></main>
 <script>
 "use strict";
-let state = null, sel = 0, lastOk = 0;
+let state = null, sel = 0, lastOk = 0, lastText = "";
 const $ = (s) => document.querySelector(s);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const route = () => { const p = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent); return { m: p[0] === "m" ? p[1] : "", t: p[2] === "t" ? p[3] : "", b: p[0] === "bench" ? (p[1] || "-") : "" }; };
@@ -178,7 +178,7 @@ function logItem(e) {
 function liveAndLog(m) {
   const w = m.workers;
   const workers = w.length ? w.map((x) => `<div style="margin-bottom:12px"><div class="row"><span><span class="dot" style="background:${x.done ? "var(--dim)" : x.quiet ? "var(--amber)" : "var(--green)"}"></span> <b>${esc(x.agent || "agent")}</b> ${esc(x.ticket)}</span><span class="age">${x.done ? "done" : "active"} · ${Math.round(x.ageSec / 60)} min ago</span></div>
-      <pre class="term mono">${esc(x.last.join("\n"))}</pre></div>`).join("")
+      <pre class="term mono" data-key="w:${esc(x.run)}">${esc(x.last.join("\n"))}</pre></div>`).join("")
     : `<p class="empty">No agent run seen for this mission (pi-subagents run logs, best effort).</p>`;
   const runs = m.runs.slice(-4).reverse().map((r) => `<li><span class="when">${esc((r.date || "").slice(5))}</span><span class="t">${esc(r.agent)} <span class="muted">${esc(r.model)}${r.thinking ? " · " + esc(r.thinking) : ""}</span></span></li>`).join("");
   return `<div class="panel"><h2>Active worker</h2>${workers}
@@ -203,7 +203,7 @@ function ticketView(m, t) {
     <div class="panel"><h2>Rounds</h2>${rounds.length ? `<table><tr><th>Round</th><th>Result</th><th>Why</th></tr>${rounds.map((v) => `<tr><td>${v.round ?? "?"}</td><td>${pill(v.result === "PASS" ? "pass" : "fail")}</td><td>${v.brief && v.brief !== "-" ? `<b>${esc(v.brief)}</b> · ` : ""}${esc(v.blocking || "")}<div class="muted mono">${esc(v.commit.slice(0, 8))} ${esc(v.model)}</div></td></tr>`).join("")}</table>` : `<p class="empty">No verdict yet.</p>`}
       ${t.stuck ? `<div class="need"><span class="k">no progress</span> the last round failed like the one before</div>` : ""}
       ${t.staleVerdict ? `<div class="need"><span class="k">stale verdict</span> a verdict on an older commit was set aside (D81)</div>` : ""}</div>
-    <div class="panel"><h2>Journal</h2>${t.journal ? `<pre class="term mono" style="max-height:600px">${esc(t.journal)}</pre>` : `<p class="empty">No journal yet (written after a round, D84).</p>`}</div>
+    <div class="panel"><h2>Journal</h2>${t.journal ? `<pre class="term mono" style="max-height:600px" data-key="journal:${esc(t.name)}">${esc(t.journal)}</pre>` : `<p class="empty">No journal yet (written after a round, D84).</p>`}</div>
   </div>`;
 }
 
@@ -257,7 +257,18 @@ function render() {
   if (m) crumbs.push(`<span>›</span><a href="#/m/${encodeURIComponent(m.name)}">${esc(m.name)}</a>`);
   if (t) crumbs.push(`<span>›</span><span>${esc(t.name)}</span>`);
   $("#crumbs").innerHTML = crumbs.join("");
+  // The page redraws every poll: keep each log box where the person scrolled it.
+  // A box at its bottom follows the run, like a terminal; a new box opens at
+  // its bottom (the latest lines).
+  const kept = {};
+  document.querySelectorAll("pre[data-key]").forEach((el) => {
+    kept[el.dataset.key] = { top: el.scrollTop, bottom: el.scrollHeight - el.scrollTop - el.clientHeight < 8 };
+  });
   $("#app").innerHTML = t ? ticketView(m, t) : m ? missionView(m) : r.m ? `<p class="err">No mission “${esc(r.m)}”.</p>` + leads() : leads();
+  document.querySelectorAll("pre[data-key]").forEach((el) => {
+    const k = kept[el.dataset.key];
+    el.scrollTop = !k || k.bottom ? el.scrollHeight : k.top;
+  });
   document.querySelectorAll("[data-m]").forEach((el) => (el.onclick = () => go(el.dataset.m)));
   document.querySelectorAll("[data-t]").forEach((el) => (el.onclick = () => go(r.m, el.dataset.t)));
 }
@@ -266,7 +277,9 @@ async function poll() {
   try {
     const res = await fetch("state.json?ts=" + Date.now(), { cache: "no-store" });
     if (!res.ok) throw new Error(res.status);
-    state = await res.json(); lastOk = Date.now(); render();
+    const text = await res.text(); lastOk = Date.now();
+    // Same snapshot: no redraw, so a selection or a scroll in progress survives.
+    if (text !== lastText) { lastText = text; state = JSON.parse(text); render(); }
   } catch (e) { if (!state) $("#app").innerHTML = `<p class="err">No state.json yet (${esc(e.message)}). Run scripts/factory/cockpit.sh.</p>`; }
   $("#age").textContent = state ? `snapshot ${ago(state.generated)} ago` : "";
 }
