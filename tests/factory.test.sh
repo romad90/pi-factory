@@ -651,6 +651,17 @@ steward_verdict src/tools/hello.js src/tools/count.js
 bash scripts/factory/collect.sh demo >/dev/null
 grep -q '^\*\*Model:\*\* gw/judge-1 (configured for factory-code-steward)' $m/verdicts/health.md && t "steward verdict recorded with the configured model" || fail "steward model"
 expect_step pr "G5 passed"
+# F7: a mission whose MR is open, or that was closed without one, no longer
+# waits for /pr (the cockpit showed "pr · needs you" on a closed mission).
+lc="$(bash scripts/factory/mr.sh demo --local "private repository" 2>&1)" || true
+grep -q '^local: ' $m/mr.url 2>/dev/null && grep -q 'private repository' $m/mr.url && grep -q 'closed locally' <<<"$lc" \
+  && t "mr.sh --local closes a mission without an MR, and says why (F7)" || fail "mr --local" "$lc"
+expect_step closed "a mission closed locally is done, not waiting for /pr (F7)"
+grep -q '^STEP: closed' <<<"$(bash scripts/factory/next.sh demo)" && ! grep -q ' closed ' <<<"$(sed -n 's/^HUMAN_STEPS=//p' scripts/factory/next.sh scripts/factory/status.sh)" \
+  && t "a closed mission needs nobody" || fail "closed is a human step"
+echo "https://gitlab.example.com/g/p/-/merge_requests/7" > $m/mr.url
+expect_step mr-open "an open MR waits for its merge, not for /pr (F7)"
+rm -f $m/mr.url
 gate_ok "gate passes the whole mission (G1-G5)"
 # The retro: built from the record, saved outside every repository; learn scrubs what it shares.
 pack="$(bash scripts/factory/retro.sh pack demo 2>&1)"

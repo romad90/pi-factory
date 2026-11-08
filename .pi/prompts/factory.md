@@ -30,6 +30,7 @@ Loop:
    - `review`: `scripts/factory/workflow.sh review-wave $1`, pass its `WORKFLOW_FILE` path as above, then `scripts/factory/collect.sh $1`.
    - `collect`: `scripts/factory/collect.sh $1`, then `next.sh` again. A verdict counts only once it is recorded.
    - `pr`: run `scripts/factory/metrics.sh $1`, then stop: the human runs /pr (the body goes to `.scratch/$1/pr.md`), then `scripts/factory/mr.sh $1` to push and open the MR, then `/skill:mission-retro` (built from the whole record, saved outside every repository).
+   - `mr-open`, `closed`: stop. The mission's MR is open, or it was closed without one (`mr.sh $1 --local "<why>"`). Show the NEXT line; there is nothing to run.
 3. Repeat from 1 until a stop.
 
 Rules:
