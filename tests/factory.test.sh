@@ -1206,9 +1206,15 @@ ck=$!; for _ in 1 2 3 4 5 6 7 8 9 10; do curl -s -o /dev/null "http://127.0.0.1:
 c_local="$(curl -s -o /dev/null -w '%{http_code}' -H "Host: 127.0.0.1:$cport" "http://127.0.0.1:$cport/")"
 c_ide="$(curl -s -o /dev/null -w '%{http_code}' -H "Host: 7357--ws.ide.example" "http://127.0.0.1:$cport/")"
 c_evil="$(curl -s -o /dev/null -w '%{http_code}' -H "Host: evil.example" "http://127.0.0.1:$cport/")"
+run_ok="$(curl -s -H "Host: 127.0.0.1:$cport" "http://127.0.0.1:$cport/run.json?m=demo&r=r1abc_factory-worker")"
+run_bad="$(curl -s -o /dev/null -w '%{http_code}' -H "Host: 127.0.0.1:$cport" "http://127.0.0.1:$cport/run.json?m=demo&r=..%2F..%2Fx")"
+run_none="$(curl -s -o /dev/null -w '%{http_code}' -H "Host: 127.0.0.1:$cport" "http://127.0.0.1:$cport/run.json?m=demo&r=nope")"
 kill "$ck" 2>/dev/null; wait "$ck" 2>/dev/null || true
 [ "$c_local" = 200 ] && [ "$c_ide" = 200 ] && [ "$c_evil" = 403 ] && grep -q 'refused Host evil.example' "$work/ck.err" \
   && t "cockpit: answers localhost and the hosts in FACTORY_COCKPIT_HOSTS, refuses (and names) any other Host" || fail "cockpit hosts" "local=$c_local ide=$c_ide evil=$c_evil $(cat "$work/ck.err")"
+node -e 'const d = JSON.parse(process.argv[1]); process.exit(d.contract === 1 && d.role === "worker" && d.ticket === "01-hello" && d.events.length >= 1 ? 0 : 1)' "$run_ok" \
+  && [ "$run_bad" = 400 ] && [ "$run_none" = 404 ] \
+  && t "cockpit: one archived run on demand (run.json), a path outside the archive refused, an unknown run 404 (D121)" || fail "cockpit run" "$run_ok / bad=$run_bad none=$run_none"
 
 # D86: one command opens the MR from /pr's body.
 out="$(FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo --dry-run 2>&1)" && fail "mr.sh must refuse without a PR body"
