@@ -1175,6 +1175,11 @@ node -e '
 const s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); const m = s.missions.find((x) => x.name === "demo");
 process.exit(m && m.step === "decide" && m.needs[0].kind === "decide" && m.needs.some((n) => /start at zero/.test(n.text) || /factory-decide/.test(n.text)) ? 0 : 1);' "$work/all.json" \
   && t "status.sh --all: every mission, an open question shows as needs-you" || fail "status all" "$(head -c 2000 "$work/all.json")"
+node -e '
+const s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); const c = s.inbox.find((x) => x.mission === "demo");
+process.exit(s.contract === 1 && s.waitingOn.who === "you" && c && c.question === "Should the count start at zero?"
+  && c.options[0].command.startsWith("/factory-decide demo ") && s.missions.find((x) => x.name === "demo").phase === "needs-you" ? 0 : 1);' "$work/all.json" \
+  && t "status.sh --all: contract v1, the open question is a Needs-you card with its command, and waitingOn says you (D119)" || fail "status contract" "$(head -c 2000 "$work/all.json")"
 node -e 'const j=require(process.argv[1]); process.exit(j.factory && j.factory.missions>=1 && "costPerMr" in j.factory ? 0 : 1)' "$work/all.json" \
   && t "status.sh --all: the factory's totals across missions, for the factory engineer (D97)" || fail "status factory" "$(head -c 600 "$work/all.json")"
 rm -f $m/state/open-question.md
