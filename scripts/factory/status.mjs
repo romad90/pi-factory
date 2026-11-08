@@ -126,7 +126,7 @@ function workers(mission) {
           ticket: (head.match(/ticket\s+(\d\d[\w-]*)/i) || [])[1] || "",
           ageSec: Math.round((Date.now() - st.mtimeMs) / 1000), done,
           quiet: !done && Date.now() - st.mtimeMs > quietMs,
-          last: lines.slice(-8).map((l) => l.slice(0, 200)),
+          last: lines.slice(-60).map((l) => l.slice(0, 400)),   // the box scrolls; the tail is enough to follow a run
         });
       }
     }
