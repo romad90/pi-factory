@@ -4,6 +4,7 @@
 # self-check costs a whole round; one that fixes it here costs a few turns.
 #
 # Runs, in order, stopping at the first failure:
+#   0. the Node version against the project's engines.node or .nvmrc (D127);
 #   1. the patch guard on the worker's change (frozen paths, silenced checks,
 #      skipped or deleted tests, links, secrets), the hook's links left out;
 #   1b. the new tests against the code before the change (D96);
@@ -55,6 +56,10 @@ if [ ! -f .factory/commands.env ]; then
   fail setup "$tmp/setup.out"
 fi
 if ticket="$(worker_ticket "$feature")"; then draft="$(draft_patch "$feature" "$ticket")"; mkdir -p "$(dirname "$draft")"; fi
+# D127: the checks below prove something only on the Node the project says it
+# runs on (engines.node, else .nvmrc). Projects that name none aren't checked.
+# self-check runs from the project's folder, a monorepo's project included.
+if ! node "$here/node-version.mjs" . > "$tmp/node.out" 2>&1; then cut -f2 "$tmp/node.out" > "$tmp/node.why"; fail node "$tmp/node.why"; fi
 if [ ! -s "$tmp/change.patch" ]; then
   status "FAIL change"; echo "SELF-CHECK: FAIL change"; echo "No change against HEAD: nothing to hand over."; exit 1
 fi
