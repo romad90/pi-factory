@@ -13,6 +13,7 @@
 #   factory measure <job>                         a job's measurements: shape, tests, churn, mutation, risks (D105)
 #   factory verify <mission>                      run the done condition's commands, no model (D106)
 #   factory learn [--raw]                         every project's retros, recurring findings first, scrubbed to share
+#   factory learn-loop <project-dir>...           raw records → events.tsv, and every recorded guard refusal replayed (P26)
 #   factory <script> [args]                       any scripts/factory/<script>.sh or .mjs
 #                                                 (next, status, doctor, integrate, mr, metrics …)
 #
@@ -23,7 +24,7 @@ here="$(cd -P "$(dirname "$0")" && pwd)"
 cmd="${1:-help}"; [ $# -gt 0 ] && shift
 
 case "$cmd" in
-  help|-h|--help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  help|-h|--help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
   version)
     printf 'installed: %s (%s)\n' "$(cat "$here/../../.factory/VERSION")" "$(cd -P "$here/../.." && pwd)"
     if [ -f .factory/VERSION ]; then printf 'project expects: %s\n' "$(cat .factory/VERSION)"; fi

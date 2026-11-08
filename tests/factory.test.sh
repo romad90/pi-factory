@@ -335,6 +335,10 @@ grep -q 'Given a user, when they say hi, then the bot says hello.' <<<"$wb" && !
   && grep -q "don't read .scratch/demo/spec.md" <<<"$wb" && grep -q '^\*\*Size:\*\* S' <<<"$wb" \
   && grep -q 'VAL-HELLO-001: greets' <<<"$rb" && ! grep -q 'VAL-HELLO-002' <<<"$rb" && ! grep -q '{{' <<<"$wb$rb" \
   && t "briefs carry the ticket and only its assertions, not the spec (P20)" || fail "lean briefs" "$wb"
+# Learning loop (E12, F2): the reviewer checks cross-cutting assertions against
+# the mission's base; it once diffed only the ticket's last commit and failed a round.
+grep -q "git diff --name-status $(cd . && bash -c '. scripts/factory/lib.sh; mission_base demo') 01-hello\|git diff --name-status $(bash -c '. scripts/factory/lib.sh; mission_base demo') HEAD" <<<"$rb" \
+  && t "the reviewer's brief names the mission's base commit for cross-cutting assertions" || fail "mission base in review brief" "$(grep -n 'base' <<<"$rb")"
 expect_step approve-tickets "proposed tickets wait for a human"
 bash scripts/factory/human.sh approve demo tickets >/dev/null
 grep -q $'\tapprove-tickets\t' $m/decisions.tsv && t "/factory-approve <f> tickets logs the approval" || fail "approve tickets"
@@ -444,6 +448,11 @@ grep -q '^feat(demo): 01-hello' <<<"$(git log -1 --skip=1 --format=%s)" && t "in
   && [ "$(git log -1 --skip=0 --format=%an HEAD)" = pi-factory ] \
   && t "factory commits are authored by pi-factory and committed by the human (D100)" || fail "factory identity" "$(git log -3 --format='%an / %cn: %s')"
 expect_step review "integrated ticket waits for review"
+# Learning loop (E11): a review's verdict counts only once collect.sh has
+# recorded it as a round; the lead skipped it twice and the round counter froze.
+printf '# Verdict: 01-hello\n**Result:** FAIL\n**Commit:** %s\n\n## Issues\n- [blocking] x\n' "$c1" > $m/verdicts/01-hello-code.md
+expect_step collect "a written but unrecorded verdict waits for collect.sh before anything builds on it"
+rm -f $m/verdicts/01-hello-code.md
 
 # D81: a review of an older commit is stale: kept aside, not a round.
 printf '# Verdict: 01-hello\n**Result:** FAIL\n**Commit:** %s\n\n## Issues\n- [blocking] README only\n' "$(git rev-parse HEAD~3)" > $m/verdicts/01-hello-code.md
@@ -826,6 +835,22 @@ git add -N .scratch/demo/tmp/repro.test.js src/tools/extra.js; git diff --relati
 node scripts/factory/patch-paths.mjs strip-hook "$work/tmp.patch" "$work/tmp.clean" "node_modules .venv" .scratch 2>"$work/strip2.log"
 ! grep -q 'repro.test.js' "$work/tmp.clean" && grep -q 'src/tools/extra.js' "$work/tmp.clean" && grep -q "dropped .scratch/demo/tmp/repro.test.js (a worker's working file" "$work/strip2.log" \
   && t "a worker's files under the mission's tmp/ are dropped from its patch" || fail "strip tmp" "$(cat "$work/strip2.log" "$work/tmp.clean")"
+# P26: the learning loop reads raw records (an agent's transcript, a verdict
+# round) and replays each recorded guard refusal through the current guard.
+lp="$work/learn-project"; mkdir -p "$lp/.git/pi-factory/archive/m1/aa11_factory-reviewer" "$lp/.scratch/m1/verdicts"
+cat > "$lp/.git/pi-factory/archive/m1/aa11_factory-reviewer/transcript.jsonl" <<'JSONL'
+{"recordType":"tool_start","timestamp":"2026-11-08T08:52:41Z","toolCallId":"c1","toolName":"bash","argsPayload":"{\"command\":\"log=.scratch/m1/tmp/t.log; npm test > \\\"$log\\\" 2>&1\"}"}
+{"recordType":"message","timestamp":"2026-11-08T08:52:41Z","toolCallId":"c1","message":{"role":"toolResult","toolCallId":"c1","isError":true,"content":[{"type":"text","text":"writing '' outside .scratch/: blocked by the factory guard"}]}}
+{"recordType":"tool_start","timestamp":"2026-11-08T08:53:00Z","toolCallId":"c2","toolName":"bash","argsPayload":"{\"command\":\"git push origin main\"}"}
+{"recordType":"message","timestamp":"2026-11-08T08:53:00Z","toolCallId":"c2","message":{"role":"toolResult","toolCallId":"c2","isError":true,"content":[{"type":"text","text":"pushing: blocked by the factory guard"}]}}
+JSONL
+printf '# Verdict: 01-x — round 1\n**Result:** FAIL\n**Commit:** abc\n**Brief:** test-on-base\n\n## Issues\n- [blocking] the new tests pass on today'"'"'s code\n' > "$lp/.scratch/m1/verdicts/01-x-code.r1.md"
+ev="$(node scripts/factory/learn-records.mjs events "$lp" "$work/learn-out")"; rp="$(node scripts/factory/learn-records.mjs replay "$work/learn-out")"
+grep -q '2 guard refusals, 1 lost rounds' <<<"$ev" && grep -q 'factory_check: test-on-base' "$work/learn-out/events.tsv" \
+  && grep -q 'replay: 1 of 2 recorded refusals now pass; 1 still refused' <<<"$rp" && grep -q 'still refused (publish\|still refused (git' <<<"$rp" \
+  && t "learn-records: raw records become events; a fixed refusal replays clean, a true block stays blocked (P26)" || fail "learn-records" "$ev
+$rp
+$(cat "$work/learn-out/events.tsv")"
 # D88: a misspelled frozen-paths heading stops the mission.
 cp $m/spec.md "$work/spec.keep"; printf '\n## Frozen path\n- src/\n' >> $m/spec.md
 out="$(bash scripts/factory/next.sh demo)"; cp "$work/spec.keep" $m/spec.md

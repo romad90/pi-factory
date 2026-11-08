@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Generates the exact workflow script for the next wave of a mission (D33)
 # and writes it to a file. The lead passes only the printed path:
-#   subagent({ workflow: "<path>", context: "fresh", async: false })
+#   subagent({ workflow: "<path>", options: { context: "fresh" }, async: false })
 # Nothing is retyped by the lead, and the file stays as an audit record of
 # what actually ran. All data (who runs, with which brief) comes from the
 # mission's files, so the lead relays orchestration instead of improvising it.

@@ -16,7 +16,7 @@ Loop:
    - `approve-strategy`, `job-done`, `verify-failed`, `grill`, `approve`, `decide`, `approve-tickets`, `coverage`, `setup`, `escalate`, `blocked`, `unverified`, `approve-conclusion`, `handoff`, `report`: stop. Show the human the status and the NEXT line. These are human steps.
    - `context-sync`: run `scripts/factory/context.sh sync $1`, go to 1.
    - `investigate`: `scripts/factory/workflow.sh investigate $1`, pass its `WORKFLOW_FILE` path as below, go to 1.
-   - `contract`, `validate`, `behavior-stale`, `steward`: run `scripts/factory/workflow.sh contract|validate|steward $1`. It prints `WORKFLOW_FILE: <path>`. Call `subagent({ workflow: "<path>", context: "fresh", async: false })` with that exact path. Never paste the script inline, and never read the file: it holds every brief, and reading it only spends tokens. After `validate` or `steward`, run `scripts/factory/collect.sh $1`.
+   - `contract`, `validate`, `behavior-stale`, `steward`: run `scripts/factory/workflow.sh contract|validate|steward $1`. It prints `WORKFLOW_FILE: <path>`. Call `subagent({ workflow: "<path>", options: { context: "fresh" }, async: false })` with that exact path. Never paste the script inline, and never read the file: it holds every brief, and reading it only spends tokens. After `validate` or `steward`, run `scripts/factory/collect.sh $1`.
    - `tickets`: `scripts/factory/workflow.sh tickets $1 all`, pass its `WORKFLOW_FILE` as above. `behavior-fix`: same with `fix-behavior`. `health-fix`: same with `fix-health`. The next step is the human's approval.
    - `health`: run `scripts/factory/health.sh check $1` (no model). A non-zero exit is expected when health fails; continue the loop.
    - `verify`: run `scripts/factory/verify.sh $1` (no model: the done condition's commands). A non-zero exit is expected when it fails; continue the loop.
@@ -28,11 +28,12 @@ Loop:
      - The output ends with `DECISION NEEDED: <question>`: run `scripts/factory/human.sh ask $1 <ticket> --stdin <<'FACTORY_TEXT_END'`, then the question verbatim on the following lines, then a line `FACTORY_TEXT_END`. Do not integrate. If it prints `AUTO-ANSWERED`, the question was settled by a rule or an earlier answer: continue the loop. If it prints `ASKED`, stop.
      A failed integration is expected and recorded as a round; continue.
    - `review`: `scripts/factory/workflow.sh review-wave $1`, pass its `WORKFLOW_FILE` path as above, then `scripts/factory/collect.sh $1`.
+   - `collect`: `scripts/factory/collect.sh $1`, then `next.sh` again. A verdict counts only once it is recorded.
    - `pr`: run `scripts/factory/metrics.sh $1`, then stop: the human runs /pr (the body goes to `.scratch/$1/pr.md`), then `scripts/factory/mr.sh $1` to push and open the MR, then `/skill:mission-retro` (built from the whole record, saved outside every repository).
 3. Repeat from 1 until a stop.
 
 Rules:
-- Pass workflows only by their `WORKFLOW_FILE` path, with exactly `{ workflow, context: "fresh", async: false }`. Never name an agent, never paste or retype a script, never write a task, summary or opinion for a subagent. The guard blocks any other subagent call (D71).
+- Pass workflows only by their `WORKFLOW_FILE` path, with exactly `{ workflow, options: { context: "fresh" }, async: false }`. Never name an agent, never paste or retype a script, never write a task, summary or opinion for a subagent. The guard blocks any other subagent call (D71).
 - After a failed subagent call, never read, delete or regenerate files to investigate: stop and show the error.
 - Always `context: "fresh"`. Never fork your conversation into a subagent.
 - The scripts commit mission state themselves. Never commit, amend or revert anything by hand.
