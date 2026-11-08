@@ -233,6 +233,31 @@ r="$(bash scripts/factory/resolve.sh maint 01-doc 'Can I export the helper from 
 [ "${r%%$'\t'*}" = frozen ] && grep -q "changes src/ is refused" <<<"$r" && t "resolver: changing a frozen path is refused by the contract's rule (D70)" || fail "resolver frozen" "$r"
 r="$(bash scripts/factory/resolve.sh maint 01-doc 'The contract says 3 retries but the code does 5. Which one?' || true)"
 [ -z "$r" ] && t "resolver: a contract question always goes to the human" || fail "resolver contract" "$r"
+# D124, the dependency lane (deps-node-22: the worker couldn't install tap 21,
+# the rule answered "never touch package.json", the reviewer failed the ticket
+# because package.json changed in the person's commit, not the worker's).
+mkdir -p .scratch/depsm/issues
+printf '# Depsm\n**Intent:** maintenance\n\n## Scope\n\n`vendor-demo/package.json`, `vendor-demo/package-lock.json`\n\n## Validation contract\n' > .scratch/depsm/spec.md
+printf '# 01 Upgrade the runner\n\nUpgrade tap in vendor-demo/package.json and commit the lockfile.\n\n## Covers\n- enabler\n' > .scratch/depsm/issues/01-up.md
+git add .scratch/depsm; git commit -qm "test: a dependency mission"
+depq='Someone has to run npm install to upgrade tap and write package-lock.json: may I, or will you?'
+r="$(bash scripts/factory/resolve.sh maint 01-doc "$depq" || true)"; r2="$(bash scripts/factory/resolve.sh depsm 01-up "$depq" || true)"
+[ "${r%%$'\t'*}" = dependencies ] && [ -z "$r2" ] && t "resolver: installing goes to the person when the mission's scope names a manifest, else the rule says no (D124)" || fail "resolver deps" "$r / $r2"
+depbase="$(git rev-parse HEAD)"
+if bash scripts/factory/human.sh deps depsm "nothing changed" >"$work/deps.log" 2>&1; then fail "human.sh deps must refuse a commit with no manifest" "$(cat "$work/deps.log")"; fi
+mkdir -p vendor-demo; printf '{"devDependencies":{"tap":"^21.8.1"}}\n' > vendor-demo/package.json; printf '{"lockfileVersion":3}\n' > vendor-demo/package-lock.json
+git add vendor-demo; git commit -qm "chore(deps): tap 21 by hand"; depc="$(git rev-parse --short HEAD)"
+bash scripts/factory/human.sh deps depsm "tap 16 to 21, lockfile committed" > "$work/deps.log" 2>&1
+grep -qF "$(printf 'deps\tDependencies changed by hand (D124)\tcommit %s: vendor-demo/package-lock.json, vendor-demo/package.json — tap 16 to 21' "$depc")" .scratch/depsm/decisions.tsv \
+  && t "human.sh deps records the person's dependency commit and its files (D124)" || fail "human deps" "$(cat "$work/deps.log" .scratch/depsm/decisions.tsv 2>&1)"
+r="$(bash scripts/factory/resolve.sh depsm 01-up 'Should I FAIL the ticket? vendor-demo/package.json is not changed in this commit.' || true)"
+[ "${r%%$'\t'*}" = deliverable-by-hand ] && grep -qF "commit $depc" <<<"$r" && t "resolver: a deliverable changed by hand is delivered, not a missing one (D124)" || fail "resolver by hand" "$r"
+grep -qF "changed by hand, as dependency changes must be (D124), in commit $depc (vendor-demo/package-lock.json, vendor-demo/package.json)" <<<"$(bash scripts/factory/brief.sh reviewer depsm 01-up HEAD)" \
+  && t "the reviewer's brief names the dependency commit made by hand" || fail "brief by hand" "$(bash scripts/factory/brief.sh reviewer depsm 01-up HEAD | grep -n 'Exception' )"
+printf 'diff --git a/tests/dep.test.js b/tests/dep.test.js\nnew file mode 100644\n--- /dev/null\n+++ b/tests/dep.test.js\n@@ -0,0 +1 @@\n+ok\n' > "$work/dep.patch"
+tob="$(bash -c '. scripts/factory/lib.sh; load_commands; test_on_base depsm 01-up "$1" "$2" "$3"' _ "$work/dep.patch" "$work/dep-tob.log" "$depbase")"
+grep -q "^test on base: skipped by a dependency change (commit $depc" <<<"$tob" && t "test on base skips a base older than the dependency change made by hand (D124)" || fail "tob deps" "$tob"
+git rm -rq .scratch/depsm vendor-demo; git commit -qm "test: drop the dependency mission"
 git checkout -q "$cmds0" -- .factory/commands.env; git commit -qm "test: reset commands"
 
 echo "Mission: planning"

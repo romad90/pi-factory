@@ -40,6 +40,18 @@ if [ -f "$dir/decisions.tsv" ]; then
   [ -z "$prev" ] || answer earlier "$prev (the human's earlier answer to the same question)"
 fi
 
+# D124: a deliverable changed by hand (human.sh deps) is delivered: its commit holds it.
+if has '(should|shall|do|must) i (fail|reject)|fail the (review|ticket)' && has 'not (changed|updated|modified|added|touched)|missing|only (modifies|changes|touches)|absent' \
+   && dc="$(deps_commits "$feature")" && [ -n "$dc" ]; then
+  while IFS=$'\t' read -r c files; do
+    for f in ${files//,/ }; do
+      if has "$(printf '%s' "$f" | sed 's/[.[\*^$]/\\&/g')"; then
+        answer deliverable-by-hand "No. $f was changed by hand in commit $c (human.sh deps, D124): it is delivered. Check it with git show $c; judge the ticket's own commit for the rest."
+      fi
+    done
+  done <<<"$dc"
+fi
+
 # 1b. A reviewer asking whether a missing deliverable fails the ticket (D82).
 if has '(should|shall|do|must) i (fail|reject)|fail the (review|ticket)' && has 'not (changed|updated|modified|added|touched)|missing|only (modifies|changes|touches)|absent'; then
   answer deliverable "Yes, FAIL. A file or deliverable the ticket or its assertions name that the commit does not change is a [blocking] issue: list it, and the next round adds it. Reviewers decide this without asking."
@@ -50,7 +62,11 @@ if has 'eslint-disable|ts-ignore|ts-nocheck|ts-expect-error|noqa|nolint|type: ig
   answer silence "No. Checks are never silenced: the patch guard refuses it. Fix the code; your brief lists how to fix common lint errors."
 fi
 
-# 3. Dependencies.
+# 3. Dependencies. In a mission whose scope names a manifest, a person makes
+# the change (D124): the question goes to them, not to the rule below.
+if has 'install|dev ?dependenc|devDependenc|add (a |the )?(package|dependency|library)|package\.json|package-lock|lock ?file|yarn add|pnpm add|npm i( |$)' && deps_in_scope "$feature" "$ticket"; then
+  exit 1
+fi
 if has 'install|dev ?dependenc|devDependenc|add (a |the )?(package|dependency|library)|package\.json|package-lock|lock ?file|yarn add|pnpm add|npm i( |$)'; then
   answer dependencies "No. Dependencies are already installed in your worktree (D65). Never install, add or upgrade one, and never change package.json or a lock file. If a test needs a package that is not installed, stop without a patch and name it."
 fi

@@ -71,6 +71,10 @@ if ! tob="$(test_on_base "$feature" "$ticket" "$patch" "$dir/logs/$ticket-test-o
   exit 1
 fi
 echo "  - $tob"
+case "$tob" in "test on base: skipped by a dependency change ("*)   # D124: recorded once, as the ticket's opt-out
+  grep -qF "$(printf '%s\ttest-on-base' "$ticket")" "$dir/decisions.tsv" 2>/dev/null \
+    || decision_log "$feature" "$ticket" test-on-base "Skip the test-on-base check (D96)?" "Yes: ${tob#test on base: skipped by }" ticket "factory (D124)" ;;
+esac
 case "$tob" in "test on base: skipped by the ticket ("*)   # the opt-out is a decision: recorded once
   why="${tob#test on base: skipped by the ticket (}"; why="${why%)}"
   grep -qF "$(printf '%s\ttest-on-base' "$ticket")" "$dir/decisions.tsv" 2>/dev/null \

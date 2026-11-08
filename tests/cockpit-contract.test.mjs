@@ -140,3 +140,10 @@ test("parseCritique reads the level from the heading or from the finding's first
     ["F2", "non-blocking", "Stop after start, or after results?", ""],
   ]);
 });
+
+test("D124: a worker's question about installing suggests the person's dependency step", () => {
+  const m = mission({ name: "deps-node-22", step: "decide", human: true, question: "**Ticket:** 01-tap\n\nSomeone has to run npm install and write package-lock.json: may I?" });
+  const [c] = inbox({ missions: [m] });
+  assert.equal(c.options[0].command, `/factory-deps deps-node-22 "<what you changed>"`);
+  assert.equal(c.options.find((o) => o.suggested).label, "Change the dependencies yourself, then record it");
+});

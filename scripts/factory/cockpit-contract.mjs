@@ -68,7 +68,12 @@ function ticketCard(m, t, why) {
 // answer does. Anything not listed falls back to next.sh's own sentence.
 const STEPS = {
   decide: (m) => ({ title: "Question from the factory", question: (m.question || "").split("\n").find((l) => l.trim() && !/^(#|\*\*[\w ]+:\*\*)/.test(l.trim()))?.trim() || "The factory has a question.",
-    options: [{ label: "Answer", effect: "Recorded in decisions.tsv; the factory carries on from where it stopped. Irreversible choices never default (D47).", command: `/factory-decide ${m.name} ${q("<your answer, and why>")}`, suggested: true }],
+    options: [
+      // D124: a worker asking to install or change a manifest: a person does it, then records it.
+      ...(/install|dependenc|package\.json|lock ?file|package-lock/i.test(m.question || "") ? [{ label: "Change the dependencies yourself, then record it",
+        effect: "Workers never install (D65). Commit the change (manifest and lockfile), then record it: reviewers count those files as delivered, and test-on-base skips a base that can't run with the new packages.",
+        command: `/factory-deps ${m.name} ${q("<what you changed>")}`, suggested: true }] : []),
+      { label: "Answer", effect: "Recorded in decisions.tsv; the factory carries on from where it stopped. Irreversible choices never default (D47).", command: `/factory-decide ${m.name} ${q("<your answer, and why>")}`, suggested: !/install|dependenc|package\.json|lock ?file|package-lock/i.test(m.question || "") }],
     evidence: [{ label: "open-question.md", text: (m.question || "").slice(0, 600), path: `${m.factoryDir || ".scratch"}/${m.name}/state/open-question.md` }] }),
   approve: (m) => {
     // The critique's findings are the evidence; a blocking one makes Amend the suggestion.

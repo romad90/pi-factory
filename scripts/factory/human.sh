@@ -18,12 +18,13 @@
 # heredoc, so backticks, $ and quotes in a question or answer stay text.
 #   human.sh amend             <feature> <change...>
 #   human.sh accept-unverified <feature> <VAL-…,VAL-…|ALL> <why...>
+#   human.sh deps              <feature> [<commit>] <what you changed...>   D124: record a dependency change made by hand
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib.sh
 . "$here/lib.sh"
 
-cmd="${1:?usage: human.sh <job|approve|ask|decide|amend|accept-unverified> <feature> ...}"
+cmd="${1:?usage: human.sh <job|approve|ask|decide|amend|accept-unverified|deps> <feature> ...}"
 text_arg_early() { if [ "${1:-}" = --stdin ]; then tr '\n' ' ' | sed 's/  */ /g; s/^ //; s/ $//'; else printf '%s' "$*"; fi; }
 feature="${2:?usage: human.sh $cmd <feature> ...}"
 shift 2
@@ -201,6 +202,30 @@ case "$cmd" in
     set_contract_line "Accepted unverified" "$(date +%F) $ids — $*"
     decision_log "$feature" - accept-unverified "Ship with unverified assertions?" "$ids — $*" contract
     echo "Accepted unverified: $ids. The MR shows them as Known limits."
+    ;;
+
+  deps)
+    # D124: workers never install (D65, D100). A person makes the dependency
+    # change in one commit; this records it, so the reviewer counts its files
+    # as delivered, test-on-base skips a base that can't run with the new
+    # packages, and an open question about it closes.
+    commit=HEAD
+    if [ $# -gt 1 ] && git cat-file -e "$1^{commit}" 2>/dev/null; then commit="$1"; shift; fi
+    [ $# -gt 0 ] || die "usage: human.sh deps <feature> [<commit>] <what you changed...>"
+    c="$(git rev-parse --short "$commit")"
+    files="$(git show --name-only --format= "$commit" | grep -E "$DEPS_FILES_RE|(^|/)\.gitignore$" | paste -sd, - | sed 's/,/, /g')"
+    [ -n "$files" ] || die "commit $c changes no dependency manifest or lockfile: make the change, commit it, then run this (or name the commit)"
+    decision_log "$feature" - deps "Dependencies changed by hand (D124)" "commit $c: $files — $*" mission
+    q="$dir/state/open-question.md"
+    if [ -f "$q" ] && grep -qiE 'install|dependenc|package\.json|lock ?file|package-lock' "$q"; then
+      if git ls-files --error-unmatch -- "$q" >/dev/null 2>&1; then git rm -q -- "$q"; else rm -f -- "$q"; fi
+    fi
+    echo "Recorded: dependencies changed by hand in $c ($files). Reviewers count these files as delivered; test-on-base skips a base older than $c."
+    # deps-node-22: npm wrote no lockfile because .npmrc said package-lock=false.
+    if grep -q 'package\.json' <<<"$files" && ! grep -qE 'package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml' <<<"$files" \
+       && [ -z "$(git ls-files package-lock.json npm-shrinkwrap.json yarn.lock pnpm-lock.yaml)" ]; then
+      echo "Note: package.json changed and no lockfile is tracked.$(grep -qs '^package-lock *= *false' .npmrc && echo ' .npmrc has package-lock=false, so npm writes none.')"
+    fi
     ;;
 
   *) die "unknown command: $cmd" ;;
