@@ -5,6 +5,7 @@
 #
 # Usage:
 #   scripts/factory/archive.sh collect <feature>       archive the runs not archived yet
+#   scripts/factory/archive.sh refresh <feature>       fill times, tool calls, refusals of runs archived without them
 #   scripts/factory/archive.sh list <feature>          one line per archived run
 #   scripts/factory/archive.sh export <feature> [file] pack a mission's archive (tar.gz)
 #   scripts/factory/archive.sh import <file>           unpack an export into this checkout's archive
@@ -36,7 +37,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib.sh
 . "$here/lib.sh"
 
-usage="usage: archive.sh collect|list|export|tokens|frictions <feature> [file|--budget N] | import <file>"
+usage="usage: archive.sh collect|refresh|list|export|tokens|frictions <feature> [file|--budget N] | import <file>"
 cmd="${1:?$usage}"; shift
 
 archive_root() {                       # <git-common-dir>/pi-factory/archive
@@ -56,6 +57,12 @@ case "$cmd" in
     while IFS= read -r w; do owned+=("$w"); done < <(git worktree list --porcelain | sed -n 's/^worktree //p')
     find "${existing[@]}" -maxdepth 7 -type f -name '*_meta.json' -newer "$dir/spec.md" 2>/dev/null \
       | node "$here/archive.mjs" collect "$out" "$dir" "$(git rev-parse HEAD 2>/dev/null || echo none)" "$(dirname "$(archive_root)")/guard.log" "${owned[@]}"
+    node "$here/archive.mjs" refresh "$out" "$(dirname "$(archive_root)")/guard.log" >/dev/null
+    ;;
+  refresh)
+    # Fill the times, tool calls and refusals of runs archived without them.
+    feature="${1:?$usage}"
+    node "$here/archive.mjs" refresh "$(archive_root)/$feature" "$(dirname "$(archive_root)")/guard.log"
     ;;
   list)
     feature="${1:?$usage}"

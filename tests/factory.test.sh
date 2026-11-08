@@ -831,6 +831,8 @@ meta="$work/usage/run/r1abc_factory-worker_meta.json"; when="$(node -e 'const fs
 glog="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/guard.log"
 printf '%s\tpush\tbash\t{"command":"git push origin main token=\\"glpat-abcdefghij0123456789\\""}\t%s\n' "$when" "$PWD" >> "$glog"
 printf '%s\tpush\tbash\t{"command":"git push"}\t%s\n' "2001-01-01T00:00:00.000Z" "$PWD" >> "$glog"
+# The run's transcript shows the call (a refusal is the run's only if it made the call, D120).
+printf '{"type":"tool","name":"bash","args":"git push origin main token=\\"[REDACTED]\\""}\n' >> "$arch/transcript.jsonl"
 FACTORY_USAGE_DIRS="$work/usage" bash scripts/factory/archive.sh collect demo >/dev/null
 node -e 'const r=require(process.argv[1]+"/run.json"); process.exit(r.guard.length===1 && r.guard[0].rule==="push" && !/glpat-/.test(r.guard[0].input) ? 0 : 1)' "$arch" \
   && t "archive: the guard's refusals during the run are kept with it, redacted (audit trail)" || fail "archive guard" "$(cat "$arch/run.json")"

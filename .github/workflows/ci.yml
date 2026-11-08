@@ -25,7 +25,7 @@ jobs:
       - name: skills pin (v1.3.1, no shadows)
         run: bash scripts/factory/skills-pin.sh verify
       - name: command guard rules
-        run: node --test tests/guard.test.mjs tests/guard-replay.test.mjs tests/learn-export.test.mjs tests/cockpit-contract.test.mjs tests/run-detail.test.mjs
+        run: node --test tests/guard.test.mjs tests/guard-replay.test.mjs tests/learn-export.test.mjs tests/cockpit-contract.test.mjs tests/run-detail.test.mjs tests/archive.test.mjs
       - name: end-to-end mission without models
         run: bash tests/factory.test.sh
       - name: the same mission as one project of a monorepo
