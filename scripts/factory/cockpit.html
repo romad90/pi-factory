@@ -97,10 +97,21 @@ button.copy{font:inherit;font-size:12.5px;background:#1E232D;color:var(--ink);bo
 .col h2{display:flex;gap:8px}.col .cards{display:grid;gap:12px}
 .col .none{border:1px dashed var(--line);border-radius:12px;padding:14px;color:var(--dim);font-size:13px}
 .tl{width:100%;display:block}.tl text{fill:var(--soft);font-size:11px;font-family:inherit}
-.tl .run{cursor:default}.tl .run:hover{opacity:.8}
+.tl .run{cursor:pointer}.tl .run:hover{opacity:.8}
 .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-top:12px}
 .metrics .v{font-size:19px;font-weight:650}.metrics .k{color:var(--soft);font-size:12px}
 .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--soft);margin-top:8px}
+.evs{max-height:520px;overflow:auto;border:1px solid var(--line);border-radius:8px;background:#0B0D11}
+.evs .e{display:grid;grid-template-columns:72px 78px 1fr;gap:10px;padding:6px 10px;border-bottom:1px solid #1A1E26;font-size:12.5px}
+.evs .e.bad{background:#2b1513}.evs .e .w{color:var(--dim)}.evs .e .x{white-space:pre-wrap;word-break:break-word}
+.evs .e .res{color:var(--soft);margin-top:3px}
+.refusal{border:1px solid #6b2c26;border-radius:10px;overflow:hidden;margin-bottom:12px}
+.refusal .h{background:#2b1513;color:var(--red);padding:8px 12px;font-weight:600;display:flex;gap:10px;flex-wrap:wrap}
+.refusal .b{padding:10px 12px;display:grid;gap:8px}
+.today-allowed{color:var(--green)}.today-refused{color:var(--red)}.today-unknown{color:var(--amber)}
+.tabs{display:flex;gap:6px}.tabs button{font:inherit;font-size:12.5px;background:#1E232D;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px 10px;min-height:32px;cursor:pointer}
+.tabs button.on{border-color:var(--blue);color:var(--blue)}
+details summary{cursor:pointer;color:var(--soft)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
 </style>
 </head>
@@ -119,7 +130,7 @@ button.copy{font:inherit;font-size:12.5px;background:#1E232D;color:var(--ink);bo
 let state = null, sel = 0, lastOk = 0, lastText = "";
 const $ = (s) => document.querySelector(s);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const route = () => { const p = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent); return { m: p[0] === "m" ? p[1] : "", t: p[2] === "t" ? p[3] : "", b: p[0] === "bench" ? (p[1] || "-") : "", list: p[0] === "missions" }; };
+const route = () => { const p = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent); return { m: p[0] === "m" ? p[1] : "", t: p[2] === "t" ? p[3] : "", run: p[2] === "run" ? p[3] : "", b: p[0] === "bench" ? (p[1] || "-") : "", list: p[0] === "missions" }; };
 const go = (m, t) => { location.hash = m ? `#/m/${encodeURIComponent(m)}${t ? `/t/${encodeURIComponent(t)}` : ""}` : "#/missions"; };
 const STATE_LABEL = { pass: "PASS", review: "review", build: "build", escalate: "ESCALATE", blocked: "blocked" };
 const pill = (s) => `<span class="pill s-${esc(s)}">${esc(STATE_LABEL[s] || s)}</span>`;
@@ -180,7 +191,7 @@ function timelineSvg(m, mini) {
   for (const r of runs) {
     const a = Date.parse(r.start), b = Date.parse(r.end), xx = x(a), w = Math.max(x(b) - xx, 2);
     const tip = `${r.role} ${r.run}${r.ticket ? " · ticket " + r.ticket : ""}\n${hhmm(a)}–${hhmm(b)} (${dur(b - a)}) · ${r.model}\n${r.calls ?? "?"} tool calls · ${r.refused.length} refused${r.cost ? ` · $${r.cost.toFixed(2)}` : ""}${r.result ? " · " + r.result : ""}`;
-    out += `<rect class="run" data-run="${esc(r.run)}" x="${xx}" y="${y(r.role)}" width="${w}" height="${bh}" rx="2" fill="${roleColor(r.role)}"><title>${esc(tip)}</title></rect>`;
+    out += `<rect class="run" data-dir="${mini ? "" : esc(r.dir || "")}" x="${xx}" y="${y(r.role)}" width="${w}" height="${bh}" rx="2" fill="${roleColor(r.role)}"><title>${esc(tip)}</title></rect>`;
     r.refused.forEach((g, i) => { const at = Date.parse(g.at); const tx = isNaN(at) || at < a || at > b ? xx + ((i + 1) * w) / (r.refused.length + 1) : x(at);
       out += `<rect x="${tx - 1}" y="${y(r.role) - (mini ? 1 : 3)}" width="2" height="${bh + (mini ? 2 : 6)}" fill="#FF5A4A"><title>${esc(`refused · ${g.rule} · ${g.tool}\n${g.input}`)}</title></rect>`; });
   }
@@ -275,6 +286,50 @@ function metricsRow(m) {
     ${cell("Your decisions", m.interventions.human)}</div>`;
 }
 
+// D121: one run, fetched on demand from cockpit.sh (run.json), never in the snapshot.
+let runCache = { key: "", data: null, err: "" }, evFilter = "all";
+function loadRun(m, dir) {
+  const key = `${m}/${dir}`;
+  if (runCache.key === key) return runCache;
+  runCache = { key, data: null, err: "" };
+  fetch(`run.json?m=${encodeURIComponent(m)}&r=${encodeURIComponent(dir)}`, { cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.status === 404 && location.protocol === "file:" ? "open the cockpit with cockpit.sh" : `HTTP ${r.status}`))))
+    .then((d) => { if (runCache.key === key) { runCache.data = d; render(); } }, (e) => { if (runCache.key === key) { runCache.err = e.message; render(); } });
+  return runCache;
+}
+const TODAY = { refused: "still refused today", allowed: "allowed today: fixed since", unknown: "can't be replayed" };
+function runView(m, dir) {
+  const c = loadRun(m.name, dir);
+  if (c.err) return `<div class="panel"><p class="err">This run can't be read (${esc(c.err)}). Run details come from cockpit.sh and the run archive (archive.sh collect ${esc(m.name)}).</p></div>`;
+  const d = c.data; if (!d) return `<p class="muted">Loading the run…</p>`;
+  const u = d.usage || {}, ms = Date.parse(d.end) - Date.parse(d.start);
+  const ticket = d.ticket && m.tickets.find((t) => t.name === d.ticket || t.name.startsWith(d.ticket));
+  const evs = evFilter === "problems" ? d.events.filter((e) => e.error || e.kind === "refused") : d.events;
+  return `<div class="panel" style="margin-bottom:16px"><div class="row"><div><span class="mono muted">${esc(d.run)}</span>
+      <div class="title">${esc(d.role)}${d.ticket ? ` · ticket ${ticket ? `<a href="#/m/${encodeURIComponent(m.name)}/t/${encodeURIComponent(ticket.name)}" style="color:var(--blue)">${esc(d.ticket)}</a>` : esc(d.ticket)}` : ""}</div></div>
+      ${d.outcome.result ? pill(d.outcome.result === "PASS" ? "pass" : "fail") : d.outcome.integrated ? pill("pass") : ""}</div>
+    <div class="metrics">
+      <div><div class="k">Model</div><div class="v" style="font-size:15px">${esc(d.model)}${d.thinking ? ` · ${esc(d.thinking)}` : ""}</div></div>
+      <div><div class="k">Ran</div><div class="v" style="font-size:15px">${d.start ? hhmm(Date.parse(d.start)) + "–" + hhmm(Date.parse(d.end)) : "?"}</div></div>
+      <div><div class="k">Length</div><div class="v">${isNaN(ms) ? "?" : dur(ms)}</div></div>
+      <div><div class="k">Tool calls</div><div class="v">${d.calls}</div></div>
+      <div><div class="k">Failed calls</div><div class="v"${d.errors ? ` style="color:var(--red)"` : ""}>${d.errors}</div></div>
+      <div><div class="k">Refused</div><div class="v"${d.refused.length ? ` style="color:var(--red)"` : ""}>${d.refused.length}</div></div>
+      <div><div class="k">Cost · tokens</div><div class="v" style="font-size:15px">${u.cost ? "$" + u.cost.toFixed(2) + " · " : ""}${fmtK(u.input || 0)} in · ${fmtK(u.output || 0)} out</div></div>
+    </div></div>
+    ${d.refused.length ? `<div class="panel" style="margin-bottom:16px"><h2>What the guard refused</h2>${d.refused.map((g) => `<div class="refusal"><div class="h"><span>${esc(g.rule)}</span><span class="muted">${esc(g.tool)}${g.at ? " · " + hhmm(Date.parse(g.at)) : ""}</span>
+        <span class="spacer"></span><span class="today-${esc(g.today)}">${esc(TODAY[g.today] || g.today)}</span></div>
+        <div class="b"><pre class="term mono" style="max-height:160px">${esc((() => { try { const j = JSON.parse(g.input); return j.command || JSON.stringify(j, null, 1); } catch { return g.input; } })())}</pre><div class="muted">${esc(g.why || "")}</div>${g.cwd ? `<div class="mono muted" style="font-size:11.5px">in ${esc(g.cwd)}</div>` : ""}</div></div>`).join("")}</div>` : ""}
+    <div class="panel" style="margin-bottom:16px"><div class="row"><h2 style="margin:0">Events <span class="muted" style="text-transform:none;letter-spacing:0">${evs.length}${d.eventsTotal > d.events.length ? ` (last ${d.events.length} of ${d.eventsTotal})` : ""}</span></h2>
+      <div class="tabs"><button type="button" data-evf="all" class="${evFilter === "all" ? "on" : ""}">All</button><button type="button" data-evf="problems" class="${evFilter === "problems" ? "on" : ""}">Failed and refused</button></div></div>
+      <div class="evs" data-key="ev:${esc(d.dir)}" style="margin-top:10px">${evs.length ? evs.map((e) => `<div class="e${e.error || e.kind === "refused" ? " bad" : ""}"><span class="w">${e.at ? hhmm(Date.parse(e.at)) : ""}</span>
+        <span class="${e.kind === "refused" ? "today-refused" : "muted"}">${esc(e.kind === "call" ? e.tool : e.kind === "refused" ? "refused" : e.kind)}</span>
+        <span class="x mono">${e.kind === "refused" ? `<b>${esc(e.tool)}</b> ` : ""}${esc(e.text)}${e.result && (e.error || e.kind === "refused") ? `<div class="res">${esc(e.result)}</div>` : ""}</span></div>`).join("") : `<p class="empty" style="padding:10px">No transcript archived for this run.</p>`}</div></div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(380px,1fr))">
+      <div class="panel"><details${d.output ? " open" : ""}><summary>Final answer (output.md)</summary><pre class="term mono" data-key="out:${esc(d.dir)}" style="max-height:420px">${esc(d.output || "none")}</pre></details></div>
+      <div class="panel"><details><summary>Brief (brief.md)</summary><pre class="term mono" data-key="brief:${esc(d.dir)}" style="max-height:420px">${esc(d.brief || "none")}</pre></details></div></div>`;
+}
+
 function missionView(m) {
   const t = active(m);
   return `<div class="panel" style="margin-bottom:16px"><div class="row"><div><span class="mono muted">${esc(m.name)}</span> ${m.intent ? `<span class="pill">${esc(m.intent)}</span>` : ""} ${m.paused ? `<span class="pill s-human">paused</span>` : ""}
@@ -292,7 +347,9 @@ function ticketView(m, t) {
     <div class="panel"><h2>Rounds</h2>${rounds.length ? `<table><tr><th>Round</th><th>Result</th><th>Why</th></tr>${rounds.map((v) => `<tr><td>${v.round ?? "?"}</td><td>${pill(v.result === "PASS" ? "pass" : "fail")}</td><td>${v.brief && v.brief !== "-" ? `<b>${esc(v.brief)}</b> · ` : ""}${esc(v.blocking || "")}<div class="muted mono">${esc(v.commit.slice(0, 8))} ${esc(v.model)}</div></td></tr>`).join("")}</table>` : `<p class="empty">No verdict yet.</p>`}
       ${t.stuck ? `<div class="need"><span class="k">no progress</span> the last round failed like the one before</div>` : ""}
       ${t.staleVerdict ? `<div class="need"><span class="k">stale verdict</span> a verdict on an older commit was set aside (D81)</div>` : ""}</div>
-    <div class="panel"><h2>Journal</h2>${t.journal ? `<pre class="term mono" style="max-height:600px" data-key="journal:${esc(t.name)}">${esc(t.journal)}</pre>` : `<p class="empty">No journal yet (written after a round, D84).</p>`}</div>
+    <div class="panel"><h2>Runs</h2>${(() => { const rs = (m.timeline || []).filter((r) => r.ticket && (t.name === r.ticket || t.name.startsWith(r.ticket)));
+      return rs.length ? `<ul class="list log">${rs.map((r) => `<li data-dir="${esc(r.dir)}" style="cursor:pointer"><span class="when">${hhmm(Date.parse(r.start))}</span><span class="t">${esc(r.role)} <span class="muted mono">${esc(r.run)}</span></span>${r.refused.length ? `<span style="color:var(--red)">${r.refused.length} refused</span>` : ""}</li>`).join("")}</ul>` : `<p class="empty">No archived run for this ticket.</p>`; })()}
+      <h2 style="margin-top:14px">Journal</h2>${t.journal ? `<pre class="term mono" style="max-height:600px" data-key="journal:${esc(t.name)}">${esc(t.journal)}</pre>` : `<p class="empty">No journal yet (written after a round, D84).</p>`}</div>
   </div>`;
 }
 
@@ -372,20 +429,23 @@ function render() {
   const crumbs = [`<a href="#/">Needs you</a>`, `<span>·</span><a href="#/missions">Missions</a>`];
   if (m) crumbs.push(`<span>›</span><a href="#/m/${encodeURIComponent(m.name)}">${esc(m.name)}</a>`);
   if (t) crumbs.push(`<span>›</span><span>${esc(t.name)}</span>`);
+  if (m && r.run) crumbs.push(`<span>›</span><span>run ${esc(r.run.slice(0, 8))}</span>`);
   $("#crumbs").innerHTML = crumbs.join("");
   // The page redraws every poll: keep each log box where the person scrolled it.
   // A box at its bottom follows the run, like a terminal; a new box opens at
   // its bottom (the latest lines).
   const kept = {};
-  document.querySelectorAll("pre[data-key]").forEach((el) => {
+  document.querySelectorAll("[data-key]").forEach((el) => {
     kept[el.dataset.key] = { top: el.scrollTop, bottom: el.scrollHeight - el.scrollTop - el.clientHeight < 8 };
   });
-  $("#app").innerHTML = t ? ticketView(m, t) : m ? missionView(m) : r.m ? `<p class="err">No mission “${esc(r.m)}”.</p>` + leads() : r.list ? leads() : inboxView();
-  document.querySelectorAll("pre[data-key]").forEach((el) => {
+  $("#app").innerHTML = m && r.run ? runView(m, r.run) : t ? ticketView(m, t) : m ? missionView(m) : r.m ? `<p class="err">No mission “${esc(r.m)}”.</p>` + leads() : r.list ? leads() : inboxView();
+  document.querySelectorAll("[data-key]").forEach((el) => {
     const k = kept[el.dataset.key];
     el.scrollTop = !k || k.bottom ? el.scrollHeight : k.top;
   });
   document.querySelectorAll("[data-m]").forEach((el) => (el.onclick = () => go(el.dataset.m)));
+  document.querySelectorAll("[data-dir]").forEach((el) => { if (el.dataset.dir) el.onclick = () => { location.hash = `#/m/${encodeURIComponent(r.m)}/run/${encodeURIComponent(el.dataset.dir)}`; }; });
+  document.querySelectorAll("button[data-evf]").forEach((el) => (el.onclick = () => { evFilter = el.dataset.evf; render(); }));
   document.querySelectorAll("button[data-copy]").forEach((el) => (el.onclick = () => { navigator.clipboard?.writeText(el.dataset.copy).then(() => { el.textContent = "Copied"; }, () => {}); }));
   document.querySelectorAll("[data-t]").forEach((el) => (el.onclick = () => go(r.m, el.dataset.t)));
 }
@@ -410,7 +470,7 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "n" || e.key === "N") { location.hash = "#/"; }
   else if (e.key === "m" || e.key === "M") { const name = m ? m.name : (state.missions[sel] || state.missions[0])?.name; if (name) go(name); }
   else if ((e.key === "r" || e.key === "R") && m) { const t = r.t ? m.tickets.find((x) => x.name === r.t) : (m.tickets[sel] || active(m)); if (t) go(m.name, t.name); }
-  else if (e.key === "Escape") { if (r.t) go(r.m); else if (r.m) go(""); else if (r.list) location.hash = "#/"; }
+  else if (e.key === "Escape") { if (r.t || r.run) go(r.m); else if (r.m) go(""); else if (r.list) location.hash = "#/"; }
   else if (e.key === "ArrowDown" || e.key === "j") { sel = Math.min(sel + 1, items.length - 1); render(); e.preventDefault(); }
   else if (e.key === "ArrowUp" || e.key === "k") { sel = Math.max(sel - 1, 0); render(); e.preventDefault(); }
   else if (e.key === "Enter") { if (m && !r.t && m.tickets[sel]) go(m.name, m.tickets[sel].name); else if (!m && state.missions[sel]) go(state.missions[sel].name); }

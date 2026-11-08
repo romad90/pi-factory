@@ -151,7 +151,7 @@ function timeline(name) {
     const end = Date.parse(j.date), start = end - (Number(j.durationMs) || 0);
     if (Number.isNaN(end)) continue;
     runs.push({
-      run: String(j.run || d).slice(0, 8), role: String(j.agent || "?").replace(/^factory-/, ""), model: j.model || "", ticket: j.ticket || "",
+      run: String(j.run || d).slice(0, 8), dir: d, role: String(j.agent || "?").replace(/^factory-/, ""), model: j.model || "", ticket: j.ticket || "",
       start: new Date(start).toISOString(), end: new Date(end).toISOString(), ms: end - start,
       cost: j.usage?.cost || 0, input: j.usage?.input || 0, output: j.usage?.output || 0,
       calls: typeof j.calls === "number" ? j.calls : null, result: j.outcome?.result || (j.outcome?.integrated ? "integrated" : ""),
