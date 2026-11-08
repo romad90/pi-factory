@@ -851,6 +851,18 @@ grep -q '2 guard refusals, 1 lost rounds' <<<"$ev" && grep -q 'factory_check: te
   && t "learn-records: raw records become events; a fixed refusal replays clean, a true block stays blocked (P26)" || fail "learn-records" "$ev
 $rp
 $(cat "$work/learn-out/events.tsv")"
+# P27: the same records as a lesson for another machine: only the factory's
+# words; the lesson moved to an inbox is replayed there, and the push that
+# stays blocked comes back as a fixture.
+(cd "$lp" && git init -q . 2>/dev/null || true)
+lx="$(HOME="$work" FACTORY_DATA_DIR="$work/ldata" bash scripts/factory/learn-export.sh --source t "$lp" 2>&1)" || true
+lesson="$(ls "$work"/ldata/outbox/t-*.lesson.json 2>/dev/null | head -1)" || true
+if [ -n "$lesson" ]; then mkdir -p "$work/ldata/inbox"; cp "$lesson" "$work/ldata/inbox/"; fi
+li="$(HOME="$work" FACTORY_DATA_DIR="$work/ldata" bash scripts/factory/learn-loop.sh 2>&1)" || true
+[ -n "$lesson" ] && ! grep -q 'learn-project\|m1' "$lesson" && grep -q 'lessons: 1 read; 2 refused shapes: 1 now pass here, 1 still refused' <<<"$li" \
+  && grep -q '"rule": "git"\|"rule": "publish"' "$work"/ldata/lessons/*/fixtures.json \
+  && t "learn-export: a lesson holds no project or mission name; replayed elsewhere, the fixed refusal passes and the block becomes a fixture (P27)" || fail "learn-export" "$lx
+$li"
 # D88: a misspelled frozen-paths heading stops the mission.
 cp $m/spec.md "$work/spec.keep"; printf '\n## Frozen path\n- src/\n' >> $m/spec.md
 out="$(bash scripts/factory/next.sh demo)"; cp "$work/spec.keep" $m/spec.md

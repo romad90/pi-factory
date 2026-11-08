@@ -108,7 +108,7 @@ if (cmd === "events") {
 } else if (cmd === "replay") {
   const all = JSON.parse(readFileSync(join(a, "calls.json"), "utf8")).filter((x) => REFUSED.test(x.result ?? ""));
   // The contexts calls ran in: a project root, and a worker's worktree.
-  const project = mkdtempSync(join(tmpdir(), "replay-project-")); mkdirSync(join(project, ".git"));
+  const project = mkdtempSync(join(tmpdir(), "replay-project-")); mkdirSync(join(project, ".git")); mkdirSync(join(project, ".factory"));
   const gitdir = mkdtempSync(join(tmpdir(), "replay-gitdir-"));
   writeFileSync(join(gitdir, "HEAD"), "ref: refs/heads/pi-subagents/00-replay-0-s0-t0\n");
   const worker = mkdtempSync(join(tmpdir(), "replay-worker-")); writeFileSync(join(worker, ".git"), `gitdir: ${gitdir}\n`);
