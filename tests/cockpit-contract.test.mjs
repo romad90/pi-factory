@@ -103,3 +103,24 @@ test("health: refusals judged again today (allowed = fixed since), by rule; caus
   assert.deepEqual(h.guard, { total: 3, refused: 2, allowed: 1, unknown: 0, byRule: [{ rule: "strayWrite", total: 2, allowed: 1, refused: 1, unknown: 0 }, { rule: "push", total: 1, allowed: 0, refused: 1, unknown: 0 }] });
   assert.deepEqual(h.causes, { total: 3, byClass: { factory_bug: 2, model_weakness: 1 }, open: 1 });
 });
+
+test("G1: the critique's findings are the evidence, and a blocking one makes Amend the suggestion", () => {
+  const critique = { result: "FINDINGS", at: "t", afterContract: true, findings: [
+    { id: "F8", level: "blocking", title: "VAL-CI-001 passes with combinations excluded", text: "The matrix check reads the lists only.", fix: "Forbid exclude and include." },
+    { id: "F9", level: "non-blocking", title: "Stopping test:watch is ambiguous", text: "When is it stopped?", fix: "" }] };
+  const [c] = inbox({ missions: [mission({ name: "deps-node-22", step: "approve", human: true, contract: { total: 16 }, critique })] });
+  assert.match(c.question, /16 assertions; the critic found 1 blocking and 1 non-blocking problem\./);
+  assert.deepEqual(c.options.map((o) => [o.label, o.suggested]), [["Approve", false], ["Amend", true]]);
+  assert.deepEqual(c.evidence.map((e) => e.label), ["F8 blocking", "F9 non-blocking"]);
+  assert.match(c.evidence[0].text, /lists only\.\nFix: Forbid exclude/);
+  const clean = inbox({ missions: [mission({ step: "approve", human: true, critique: { ...critique, findings: [critique.findings[1]] } })] })[0];
+  assert.equal(clean.options.find((o) => o.suggested).label, "Approve");
+  const stale = inbox({ missions: [mission({ step: "approve", human: true, critique: { ...critique, afterContract: false } })] })[0];
+  assert.equal(stale.evidence[0].label, "stale", "a critique older than the contract says so first");
+});
+
+test("approve-tickets: each ticket is a line of evidence", () => {
+  const [c] = inbox({ missions: [mission({ step: "approve-tickets", human: true, counts: { total: 2 },
+    tickets: [{ name: "01-a", num: "01", title: "Upgrade tap", size: "M", covers: ["VAL-DEPS-001"], blockedBy: [] }, { name: "02-b", num: "02", title: "Lockfile", covers: [], blockedBy: ["01"] }] })] });
+  assert.deepEqual(c.evidence.map((e) => e.text), ["Upgrade tap · size M · covers VAL-DEPS-001", "Lockfile · after 01"]);
+});
