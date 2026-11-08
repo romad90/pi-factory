@@ -3,6 +3,7 @@
 # runs it after /pr: opening the MR stays a human act, the typing goes away.
 #
 # Usage: scripts/factory/mr.sh <feature> [--draft] [--dry-run]
+#        scripts/factory/mr.sh <feature> --local "<why>"   closed without an MR (F7)
 #
 # Body:   .scratch/<feature>/pr.md (what /pr writes), else /tmp/pr-body-<feature>.md
 # Title:  the body's first "# " line (removed from the description), else
@@ -33,11 +34,27 @@ here="$(cd "$(dirname "$0")" && pwd)"
 
 warn() { printf 'factory: %s\n' "$*" >&2; }
 
-case "${1:-}" in ""|-h|--help|help) sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;; -*) die "unknown option $1 (mr.sh --help)" ;; esac
+case "${1:-}" in ""|-h|--help|help) sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;; -*) die "unknown option $1 (mr.sh --help)" ;; esac
 feature="${1}"; shift
-draft=""; dry=""
-for a in "$@"; do case "$a" in --draft) draft=1 ;; --dry-run) dry=1 ;; *) die "unknown option: $a" ;; esac; done
+draft=""; dry=""; local_why=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --draft) draft=1 ;;
+    --dry-run) dry=1 ;;
+    --local) local_why="${2:-}"; [ -n "$local_why" ] && [[ "$local_why" != --* ]] || die "--local needs a reason, e.g. --local \"private repository\""; shift ;;
+    *) die "unknown option: $1" ;;
+  esac
+  shift
+done
 dir="$(mission_dir "$feature")"
+# F7: a mission closed without an MR (a private repository, work merged by
+# hand) says so in mr.url, and next.sh stops asking for /pr.
+if [ -n "$local_why" ]; then
+  [ -d "$dir" ] || die "no mission $feature"
+  printf 'local: %s (closed %s, no MR)\n' "$local_why" "$(date +%F)" > "$dir/mr.url"
+  echo "$feature closed locally: $local_why. next.sh now says closed; save the retro if it isn't (/skill:mission-retro)."
+  exit 0
+fi
 
 conf() { # conf NAME: environment first, then .factory/commands.env
   local v="${!1:-}"

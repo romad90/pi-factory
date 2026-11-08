@@ -319,4 +319,12 @@ if [ -n "$(done_commands "$spec")" ]; then
   fi
 fi
 
+# F7: once the MR is open, or the mission closed without one, /pr is done.
+if [ -s "$dir/mr.url" ]; then
+  mr_line="$(head -1 "$dir/mr.url")"
+  case "$mr_line" in
+    local:*) step closed "nothing left: closed without an MR (${mr_line#local: }). If the retro isn't saved yet: /skill:mission-retro" ;;
+    *) step mr-open "the MR is open: $mr_line. After it merges: scripts/factory/retro.sh close $feature (its review comments join the retro). Edited pr.md? scripts/factory/mr.sh $feature updates the MR" ;;
+  esac
+fi
 step pr "scripts/factory/metrics.sh $feature → /pr (Evidence, written to $dir/pr.md) → scripts/factory/mr.sh $feature opens the MR → /skill:mission-retro (private: retro.sh save)"
