@@ -218,7 +218,7 @@ function missionCard(m, i) {
 }
 
 function leads() {
-  if (!state.missions.length) return `<p class="empty">No mission under ${esc(state.factoryDir)}/ yet.</p>`;
+  if (!state.missions.length) return `<p class="empty">No mission in ${esc(state.project || ".")}/${esc(state.factoryDir)}/. The cockpit reads the folder it was started from: start it from your project.</p>`;
   const idx = new Map(state.missions.map((m, i) => [m.name, i]));
   return factoryLine() + `<div class="board">${COLUMNS.filter(([k]) => k !== "parked" || state.missions.some((m) => m.phase === k)).map(([k, label]) => {
     const ms = state.missions.filter((m) => (m.phase || "lead") === k);
@@ -408,7 +408,7 @@ function card(c) {
       ${c.options.map((o) => `<div class="opt${o.suggested ? " sug" : ""}"><span class="l">${esc(o.label)}</span>${o.suggested ? `<span class="tag">suggested</span>` : ""}
         <div class="e">${esc(o.effect)}</div>${o.command ? `<div class="cmd"><code class="mono">${esc(o.command)}</code><button type="button" class="copy" data-copy="${esc(o.command)}">Copy</button></div>` : ""}</div>`).join("")}
       ${c.factorySays ? `<div class="muted mono" style="font-size:12px">next.sh: ${esc(c.factorySays)}</div>` : ""}</div>
-      <aside><h2>Evidence</h2>${c.evidence?.length ? `<ul class="ev">${c.evidence.map((e) => `<li><span class="lab${/FAIL/.test(e.label) ? " bad" : ""}">${esc(e.label)}</span><span>${esc(e.text || "")}${e.path ? `<div class="muted mono" style="font-size:11.5px">${esc(e.path)}</div>` : ""}</span></li>`).join("")}</ul>` : `<p class="empty">No file to show.</p>`}</aside></div>
+      <aside><h2>Evidence</h2>${c.evidence?.length ? `<ul class="ev">${c.evidence.map((e) => `<li><span class="lab${/FAIL/.test(e.label) || e.level === "blocking" ? " bad" : ""}">${esc(e.label)}</span><span style="white-space:pre-wrap">${esc(e.text || "")}${e.path ? `<div class="muted mono" style="font-size:11.5px">${esc(e.path)}</div>` : ""}</span></li>`).join("")}</ul>` : `<p class="empty">No file to show.</p>`}</aside></div>
   </article>`;
 }
 function inboxView() {
@@ -500,7 +500,7 @@ async function poll() {
     // Same snapshot: no redraw, so a selection or a scroll in progress survives.
     if (text !== lastText) { lastText = text; state = JSON.parse(text); render(); }
   } catch (e) { if (!state) $("#app").innerHTML = `<p class="err">No state.json yet (${esc(e.message)}). Run scripts/factory/cockpit.sh.</p>`; }
-  $("#age").textContent = state ? `snapshot ${ago(state.generated)} ago` : "";
+  $("#age").textContent = state ? `${state.project ? state.project.split("/").pop() + " · " : ""}snapshot ${ago(state.generated)} ago` : "";
 }
 
 document.addEventListener("keydown", (e) => {

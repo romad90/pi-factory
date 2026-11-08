@@ -70,11 +70,22 @@ const STEPS = {
   decide: (m) => ({ title: "Question from the factory", question: (m.question || "").split("\n").find((l) => l.trim() && !/^(#|\*\*[\w ]+:\*\*)/.test(l.trim()))?.trim() || "The factory has a question.",
     options: [{ label: "Answer", effect: "Recorded in decisions.tsv; the factory carries on from where it stopped. Irreversible choices never default (D47).", command: `/factory-decide ${m.name} ${q("<your answer, and why>")}`, suggested: true }],
     evidence: [{ label: "open-question.md", text: (m.question || "").slice(0, 600), path: `${m.factoryDir || ".scratch"}/${m.name}/state/open-question.md` }] }),
-  approve: (m) => ({ title: "Contract (G1)", question: `Approve the contract of ${m.name}? ${m.contract?.total ?? "?"} assertions.`,
-    options: [
-      { label: "Approve", effect: "The tickets are written next; you approve them before any build.", command: `/factory-approve ${m.name}`, suggested: true },
-      { label: "Amend", effect: "The contract author rewrites it with your change; you approve again.", command: `/factory-amend ${m.name} ${q("<the change>")}`, suggested: false }] }),
+  approve: (m) => {
+    // The critique's findings are the evidence; a blocking one makes Amend the suggestion.
+    const c = m.critique, blocking = (c?.findings || []).filter((f) => f.level === "blocking").length;
+    const evidence = (c?.findings || []).map((f) => ({ label: `${f.id} ${f.level}`, level: f.level, text: `${f.title}. ${f.text}${f.fix ? `\nFix: ${f.fix}` : ""}`,
+      path: `${m.factoryDir || ".scratch"}/${m.name}/contract-critique.md` }));
+    if (c && !c.afterContract) evidence.unshift({ label: "stale", level: "blocking", text: "The critique is older than the contract: the critic hasn't judged this version.", path: "" });
+    return { title: "Contract (G1)",
+      question: `Approve the contract of ${m.name}? ${m.contract?.total ?? "?"} assertions; the critic found ${blocking} blocking and ${(c?.findings || []).length - blocking} non-blocking problem${(c?.findings || []).length - blocking === 1 ? "" : "s"}.`,
+      options: [
+        { label: "Approve", effect: "The tickets are written next; you approve them before any build.", command: `/factory-approve ${m.name}`, suggested: !blocking },
+        { label: "Amend", effect: `The contract author rewrites it with your change, the critic reads it again, you approve again.${blocking ? " Answer the blocking findings in your change." : ""}`, command: `/factory-amend ${m.name} ${q("<the change>")}`, suggested: !!blocking }],
+      evidence };
+  },
   "approve-tickets": (m) => ({ title: "Tickets", question: `Approve the ${m.counts?.total ?? ""} tickets of ${m.name}? Edit, split or delete them first if you like.`.replace("  ", " "),
+    evidence: (m.tickets || []).map((t) => ({ label: t.num || t.name, text: `${t.title || t.name}${t.size ? ` · size ${t.size}` : ""}${t.covers?.length ? ` · covers ${t.covers.join(", ")}` : ""}${t.blockedBy?.length ? ` · after ${t.blockedBy.join(", ")}` : ""}`,
+      path: `${m.factoryDir || ".scratch"}/${m.name}/issues/${t.name}.md` })),
     options: [{ label: "Approve", effect: "Workers start on the tickets with no blocker.", command: `/factory-approve ${m.name} tickets`, suggested: true },
       { label: "Edit, then approve", effect: "Change the files under issues/ yourself; the coverage check (G2) runs again.", command: "", suggested: false }] }),
   coverage: (m) => ({ title: "Coverage (G2)", question: "The tickets don't cover every assertion of the contract.",
@@ -100,6 +111,29 @@ function stepCard(m) {
   };
   const evidence = [...(base.evidence || []), ...pathEvidence(m).filter((e) => !(base.evidence || []).some((b) => b.path === e.path))];
   return { id: `${m.name}:step:${m.step}`, mission: m.name, kind: m.step, ticket: "", ...base, evidence, factorySays: m.next, since: lastEvent(m) };
+}
+
+// The contract critic's file (contract-critique.md): its result and each
+// finding with its level, what it says and the suggested fix.
+export function parseCritique(t) {
+  const firstWord = (x) => (x || "").trim().split(/\s+/)[0] || "";
+  const field = (text, name) => (text.match(new RegExp(`^\\*\\*${name}:\\*\\*\\s*(.+)$`, "m")) || [])[1]?.trim() || "";
+  const findings = [];
+  // The critic writes the level in the heading ("### F6 — [blocking] …") or
+  // as the finding's first bullet ("- [blocking] …"): both seen in one mission.
+  const re = /^###\s+(F\d+)\s*[—–-]+\s*(?:\[(blocking|non-blocking)\]\s*)?(.+)$/gm;
+  let m; const at = [];
+  while ((m = re.exec(t))) at.push({ id: m[1], level: m[2] || "", title: m[3].trim(), start: re.lastIndex, head: m.index });
+  at.forEach((a, i) => {
+    let body = t.slice(a.start, i + 1 < at.length ? at[i + 1].head : undefined).split(/\n## /)[0].trim();
+    const tag = body.match(/^\s*[-*]?\s*\[(blocking|non-blocking)\]\s*/m);
+    const level = a.level || (tag ? tag[1] : "unknown");
+    if (tag) body = body.replace(tag[0], "");
+    const paras = body.split(/\n\s*\n/).map((x) => x.replace(/\s+/g, " ").trim()).filter(Boolean);
+    findings.push({ id: a.id, level, title: a.title, text: (paras.find((x) => !/^Suggested fix:/i.test(x)) || "").slice(0, 700),
+      fix: (paras.find((x) => /^Suggested fix:/i.test(x)) || "").replace(/^Suggested fix:\s*/i, "").slice(0, 500) });
+  });
+  return { result: firstWord(field(t, "Critique result")), findings };
 }
 
 export function inbox(snapshot) {

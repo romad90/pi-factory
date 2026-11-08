@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { toContract } from "./cockpit-contract.mjs";
+import { parseCritique, toContract } from "./cockpit-contract.mjs";
 import { replay } from "./run-detail.mjs";
 
 const env = process.env;
@@ -164,6 +164,16 @@ function timeline(name) {
   return runs.sort((a, b) => a.start.localeCompare(b.start)).slice(-200);
 }
 
+// The contract critic's findings (contract-critique.md), so the G1 card shows
+// them instead of a file name, and whether the critique was written after the
+// contract it judges (the lead couldn't tell, deps-node-22).
+function critique(dir) {
+  const f = path.join(dir, "contract-critique.md"), t = read(f);
+  if (!t) return null;
+  const mtime = (p) => { try { return fs.statSync(p).mtimeMs; } catch { return 0; } };
+  return { ...parseCritique(t), at: new Date(mtime(f)).toISOString(), afterContract: mtime(f) >= mtime(path.join(dir, "spec.md")) };
+}
+
 function mission(name, lines) {
   const dir = path.join(root, name);
   const spec = read(path.join(dir, "spec.md"));
@@ -206,7 +216,7 @@ function mission(name, lines) {
   return {
     name, title: heading(spec), intent: firstWord(field(spec, "Intent")), step, next, human: get("H") === "1", otherBranch: get("O"),
     paused: exists(path.join(dir, "state", "PAUSED.md")),
-    question: q.trim(),
+    question: q.trim(), critique: critique(dir),
     mr: read(path.join(dir, "mr.url")).trim().split("\n")[0] || "",   // D119: a mission with mr.url is closed, whatever step it showed
     contract: { total: Object.keys(assertions).length, approved: (() => {   // D101: the line and its human.sh row
       const d = (spec.match(/^\*\*Contract approved:\*\* (\d{4}-\d{2}-\d{2})/m) || [])[1];
@@ -250,4 +260,4 @@ try {
     .filter(Boolean).sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 10);
 } catch {}
 // D119: every view reads one versioned contract, the same here and in a cloud deployment.
-process.stdout.write(JSON.stringify(toContract({ generated: new Date().toISOString(), factoryDir: root, factory, missions, bench, causes }), null, 1) + "\n");
+process.stdout.write(JSON.stringify(toContract({ generated: new Date().toISOString(), factoryDir: root, project: git(["rev-parse", "--show-toplevel"]).trim() || process.cwd(), factory, missions, bench, causes }), null, 1) + "\n");
