@@ -3,6 +3,13 @@
 # gate.sh, workflow.sh, brief.sh, integrate.sh and the others. Formats are defined in docs/agents/*.md.
 # Rationale for each rule: docs/adr/ADR-001-agentic-factory.md.
 
+# The scripts use bash 4.3 (associative arrays, mapfile, declare -g). macOS
+# ships bash 3.2: stop here with the fix, not halfway through a mission.
+if [ "${BASH_VERSINFO[0]:-0}" -lt 4 ] || { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${BASH_VERSINFO[1]}" -lt 3 ]; }; then
+  echo "factory: needs bash 4.3 or newer (this one is ${BASH_VERSION:-unknown}). On macOS: brew install bash, and put Homebrew's bin first in PATH" >&2
+  exit 2
+fi
+
 FACTORY_DIR="${FACTORY_DIR:-.scratch}"            # one path segment, no slash
 # Some workspace images ship without coreutils' head (D102); every
 # "… | head -1" would then stop a script under pipefail. This stand-in covers
@@ -898,6 +905,8 @@ compute_ticket_state() {
     [ -n "${T_PASSED[$num]:-}" ] && continue
     v="$dir/verdicts/${name}-code.md"; marker="$(ticket_marker "$feature" "$name")"
     vc="$(verdict_field "$v" Commit)"; n="${T_ROUND[$name]}"
+    # A stuck ticket escalates even when it waits for review (P25: two review runs without a file).
+    if [ -f "$dir/state/$name.stuck" ]; then T_ESCALATE+=("$name"); continue; fi
     if [ -n "$marker" ] && [ "$vc" != "$marker" ]; then T_REVIEW+=("$name"); continue; fi
     if [ "$n" -ge "$FACTORY_ROUND_LIMIT" ] || [ -f "$dir/state/$name.stuck" ]; then T_ESCALATE+=("$name"); continue; fi
     ready=1

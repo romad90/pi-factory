@@ -22,6 +22,9 @@
 #   silence  added eslint-disable, @ts-ignore, @ts-nocheck, # noqa, //nolint,
 #            # type: ignore, # pragma: no cover, --no-verify
 #   secrets  private keys, cloud and VCS tokens, hard-coded passwords/keys
+#   generated a new file under a tool's output folder (reports/, coverage/,
+#            .stryker-tmp/, .nyc_output/, htmlcov/, mutants.out/;
+#            FACTORY_GENERATED_DIRS_RE replaces the list)
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib.sh
@@ -71,6 +74,11 @@ while IFS=$'\x1f' read -r st old new mode; do
     block "tests: $old deleted; tests are never removed to make a change pass"
   fi
   [ "$mode" != 120000 ] || block "paths: ${new:-$old} is a symbolic link; a link can point at the instrument or outside the project"
+  # P25 (5): a tool's output is not the change. A worker committed a Stryker
+  # report; it would have gone into the MR and dirtied every later run.
+  if [ "$st" = A ] && [[ "$new" =~ ${FACTORY_GENERATED_DIRS_RE:-(^|/)(reports|coverage|\.stryker-tmp|\.nyc_output|htmlcov|mutants\.out)/} ]]; then
+    block "generated: $new is a tool's output (reports, coverage, mutation runs), not part of the change; leave it out of the commit"
+  fi
 done <<<"$touched"
 
 # Added lines only (not the +++ header).

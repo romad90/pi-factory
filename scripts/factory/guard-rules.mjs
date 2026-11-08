@@ -209,6 +209,23 @@ function hidesInstrument(cwd) {
 
 // The command with quoting removed: c''url, "curl", \curl and c$''url are curl;
 // ${IFS} is a space; line continuations join; newlines separate commands.
+// The first file a command writes by redirection or tee outside .scratch/ and
+// the temp folders, or null. File descriptors (2>&1) and /dev/* are not files.
+export function strayWrite(n, cwd, root) {
+  const allowed = (target) => {
+    if (/^&\d|^\/dev\//.test(target)) return true;
+    const abs = resolve(cwd, target.replace(/^~(?=\/)/, homedir()));
+    if (abs.startsWith(join(root, ".scratch") + "/")) return true;
+    if (abs.startsWith(root + "/")) return false;
+    return [tmpdir(), "/tmp", "/var/tmp", process.env.TMPDIR].filter(Boolean).some((t) => abs.startsWith(resolve(t) + "/"));
+  };
+  for (const m of n.matchAll(/(?:^|[^0-9&<>|])\d?(?:>>?|>\|)\s*([^\s;&|()<>]+)|\btee\s+(?:-a\s+)?([^\s;&|()<>-][^\s;&|()<>]*)/g)) {
+    const target = m[1] || m[2];
+    if (target && !allowed(target)) return target;
+  }
+  return null;
+}
+
 export function normalize(cmd) {
   return String(cmd ?? "")
     .replace(/\\\r?\n/g, " ")
@@ -353,6 +370,15 @@ export function check({ tool, input = {}, cwd = process.cwd() }) {
     if (isWorker(cwd)) {
       const w = first(WORKER_BASH_RULES);
       if (w) return w;
+    } else {
+      // P25 (2): the lead and the judges write files only under .scratch/ (or
+      // a temp folder). A judge that saved `git diff > diff.txt` at a project's
+      // root dirtied the tree and blocked the next ticket's worktree.
+      const root = projectRoot(cwd);
+      if (root) {
+        const out = strayWrite(raw.replace(/'[^']*'|"[^"]*"/g, "''"), cwd, root);
+        if (out) return blocked("scratch", `writing ${out} outside .scratch/ (working files go under .scratch/<mission>/tmp/; the factory's scripts write the rest)`);
+      }
     }
     if (hidesInstrument(cwd) && variants.some((v) => /\binstrument\//.test(v))) {
       return { rule: "wall", reason: "the instrument is hidden from workers (D21): blocked by the factory guard" };

@@ -368,3 +368,11 @@ test("D101: the extension keeps the keep list out of project files and logs refu
   }
   rmSync(proj, { recursive: true, force: true });
 });
+
+test("P25: the lead and the judges write files only under .scratch/", () => {
+  mkdirSync(join(main, ".scratch", "m"), { recursive: true });
+  for (const cmd of ["git diff > diff.txt", "npm test 2>&1 | tee out.log", "echo x >> notes.md", "git diff HEAD >src/x.patch"])
+    assert.equal(bash(cmd)?.rule, "scratch", `should block: ${cmd}`);
+  for (const cmd of ["git diff > .scratch/m/tmp/d.txt", "npm test 2>&1 | tail -5", "npm test 2>/dev/null", 'node -e "if (a > b) x"', `ls > ${join(tmpdir(), "x.txt")}`, "cmd 2>&1"])
+    assert.equal(bash(cmd), null, `should allow: ${cmd}`);
+});

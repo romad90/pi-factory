@@ -65,5 +65,6 @@ Rules the check enforces (what a reviewer of this plan would hold it to, written
 - A refactor of a library (shape) protects its public surface: its done condition holds a command that checks the API report (Hyrum's law).
 - A bugfix names its `**Reproduction:**`, the test that fails before the fix.
 - A done command gives Stryker one `--mutate`, the files joined by commas: a repeated `--mutate` keeps only the last.
+- In a project on the installed package, a Stryker done command carries `--ignorePatterns "/.factory,/scripts/factory"`: Stryker's sandbox copy dies on the factory's linked folders.
 
 Then a strategy critic (another model family, fresh context) attacks the plan; a `[blocking]` finding sends it back to the architect with the finding, before any person reads it.

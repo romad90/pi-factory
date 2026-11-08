@@ -28,12 +28,20 @@ require_mission "$feature"; dir="$(mission_dir "$feature")"
 mkdir -p "$dir/state"; p="$dir/state/PAUSED.md"
 # A quota with a time window ("window":"hour", per minute, per day) can't be
 # retried before it resets: say when, so nobody burns a run finding out.
-reason="${*:-not given}"; after=""
-case "$(tr 'A-Z' 'a-z' <<<"$reason")" in
-  *quota*day*|*day*quota*|*daily*) after="$(date -d '+1 day' '+%F 00:05' 2>/dev/null || true)" ;;
-  *quota*hour*|*hour*quota*|*hourly*) after="$(date -d '+1 hour' '+%F %H:%M' 2>/dev/null || true)" ;;
-  *quota*minute*|*minute*quota*) after="$(date -d '+5 minutes' '+%F %H:%M' 2>/dev/null || true)" ;;
-esac
+reason="${*:-not given}"
+# When the provider says when its limit resets ("Limit resets at: 2026-11-06
+# 22:28:15 UTC"), that time; else a window named next to "quota" (minute, hour,
+# day). Node does the date arithmetic: GNU and BSD date differ (macOS).
+after="$(node -e '
+const r = process.argv[1], low = r.toLowerCase(), now = Date.now(), pad = (n) => String(n).padStart(2, "0");
+const fmt = (t) => { const d = new Date(t); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const m = r.match(/resets?\s+at:?\s*(\d{4}-\d\d-\d\d[ T]\d\d:\d\d(?::\d\d)?)\s*(utc|z)?/i);
+if (m) { const t = Date.parse(m[1].replace(" ", "T") + (m[2] ? "Z" : "")); if (!isNaN(t)) { console.log(fmt(t + 60000)); process.exit(0); } }
+const q = /quota|rate.?limit/.test(low);
+if (q && /\bday\b|daily/.test(low)) { const d = new Date(now + 86400000); d.setHours(0, 5, 0, 0); console.log(fmt(d)); }
+else if (q && /\bhour\b|hourly/.test(low)) console.log(fmt(now + 3600000));
+else if (/quota/.test(low) && /\bminute\b/.test(low)) console.log(fmt(now + 300000));
+' "$reason" 2>/dev/null || true)"
 {
   printf '# Paused: %s\n**When:** %s\n**HEAD:** %s\n**Reason:** %s\n' \
     "$feature" "$(date '+%F %H:%M')" "$(git rev-parse --short HEAD)" "$reason"

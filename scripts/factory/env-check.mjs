@@ -45,6 +45,12 @@ if (!has("sha256sum") && !has("shasum")) missing.push("sha256sum or shasum");
 if (missing.length) add("bad", "tools", `missing on this machine: ${missing.join(", ")} (the factory's scripts call them)`);
 else add("ok", "tools", "the commands the factory's scripts call are on the PATH");
 if (!has("head")) add("warn", "tools", "head is missing: the factory uses its own stand-in (lib.sh); your own shell has none");
+// The scripts need bash 4.3+ (macOS ships 3.2: brew install bash).
+try {
+  const v = execFileSync("bash", ["-c", "echo ${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"], { encoding: "utf8" }).trim();
+  const [maj, min] = v.split(".").map(Number);
+  if (maj < 4 || (maj === 4 && min < 3)) add("bad", "tools", `bash ${v} on the PATH: the factory needs 4.3 or newer (macOS: brew install bash, Homebrew's bin first in PATH)`);
+} catch {}
 
 // 2. Models: none missing, none floating.
 const agents = effectiveAgents();
