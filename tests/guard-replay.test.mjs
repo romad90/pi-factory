@@ -5,14 +5,17 @@
 // those fixes must not let through.
 // Run: node --test tests/guard-replay.test.mjs. Lesson fixtures (ids L-…, D115) carry {root}, {home}
 // and {tmp}, filled here.
-import { test } from "node:test";
+import { after, test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { check } from "../scripts/factory/guard-rules.mjs";
 
-const main = mkdtempSync(join(tmpdir(), "replay-main-"));
+// Not under the temp folder: a write to ../x from a project there lands in the
+// temp folder, which the guard allows, and would hide what a real project sees.
+const main = mkdtempSync(join(homedir(), ".factory-replay-main-"));
+after(() => rmSync(main, { recursive: true, force: true }));
 mkdirSync(join(main, ".git")); mkdirSync(join(main, ".factory"));   // a real project has both
 const workerGit = mkdtempSync(join(tmpdir(), "replay-gitdir-"));
 writeFileSync(join(workerGit, "HEAD"), "ref: refs/heads/pi-subagents/01-x-abc123-s0-t0\n");
@@ -51,6 +54,15 @@ test("replay: the fixes let nothing dangerous through", () => {
     "cp x.js node_modules/tap/index.js", "sed -i '' s/a/b/ node_modules/x/index.js",
     "echo ok\nrm -rf node_modules/tap", "printf x > node_modules/a.js",
   ]) assert.ok(bash(cmd, worker), `should block in a worker: ${JSON.stringify(cmd)}`);
+  // A redirect after a cd is read from where the cd went (E33), and only there:
+  // a cd inside parentheses ends with them; a cd to an unknown place proves nothing.
+  for (const cmd of [
+    "cd .scratch/m/tmp && echo x > ../../../notes.md", "cd src && echo x > a.js",
+    "(cd .scratch/m/tmp) && echo x > ../../notes.md", "(cd .scratch/m/tmp && true); echo x > ../notes.md",
+    "cd \"$D\" && echo x > ../notes.md", "cd ~ && echo x > notes.md", "cd .scratch/m/tmp; cd .. ; cd ..; cd ..; echo x > notes.md",
+  ]) assert.ok(bash(cmd), `should block a lead or judge write: ${JSON.stringify(cmd)}`);
+  for (const cmd of ["cd .scratch/m/tmp/a && echo x > ../b.log", "cd .scratch/m && (cd tmp && echo x > y.log)", "cd /tmp && echo x > y.log"])
+    assert.equal(bash(cmd), null, `should allow: ${cmd}`);
   // Subagent launches: only a generated workflow, fresh and blocking; only the
   // review axis directly, fresh, in this project; only read-only actions.
   const wf = "./.scratch/m/workflows/20261108-000000-build-wave.js";

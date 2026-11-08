@@ -257,16 +257,32 @@ export function resolveTargets(cmd) {
 }
 
 export function strayWrite(n, cwd, root) {
-  const allowed = (target) => {
+  const allowed = (target, from = cwd) => {
     if (/^&\d|^\/dev\//.test(target)) return true;
-    const abs = resolve(cwd, target.replace(/^~(?=\/)/, homedir()));
+    const abs = resolve(from, target.replace(/^~(?=\/)/, homedir()));
     if (abs.startsWith(join(root, ".scratch") + "/")) return true;
     if (abs.startsWith(root + "/")) return false;
     return [tmpdir(), "/tmp", "/var/tmp", process.env.TMPDIR].filter(Boolean).some((t) => abs.startsWith(resolve(t) + "/"));
   };
-  for (const m of n.matchAll(/(?:^|[^0-9&<>|=])\d?(?:>>?|>\|)\s*([^\s;&|()<>]+)|\btee\s+(?:-a\s+)?([^\s;&|()<>-][^\s;&|()<>]*)/g)) {
-    const target = m[1] || m[2];
-    if (target && !allowed(target)) return target;
+  // E33: a redirect after `cd <dir>` in the same command lands in <dir>. A cd
+  // inside parentheses ends with them; a cd to a place the command can't name
+  // ($VAR, ~, -) leaves the folder unknown, and the write is judged from cwd.
+  let dir = cwd;
+  const stack = [];
+  for (const seg of n.split(/(\(|\)|&&|\|\||[;\n]|\|)/)) {
+    if (seg === "(") { stack.push(dir); continue; }
+    if (seg === ")") { dir = stack.length ? stack.pop() : cwd; continue; }
+    if (/^(&&|\|\||;|\n|\|)$/.test(seg)) continue;
+    const cd = seg.match(/^\s*(?:cd|pushd)(?:\s+(\S+))?\s*$/) || seg.match(/^\s*(?:cd|pushd)\s+(\S+)\s/);
+    if (cd) {
+      const to = cd[1];
+      dir = to && !/[$~`]/.test(to) && to !== "-" && to !== "''" ? resolve(dir ?? cwd, to) : null;
+      continue;
+    }
+    for (const m of seg.matchAll(/(?:^|[^0-9&<>|=])\d?(?:>>?|>\|)\s*([^\s;&|()<>]+)|\btee\s+(?:-a\s+)?([^\s;&|()<>-][^\s;&|()<>]*)/g)) {
+      const target = m[1] || m[2];
+      if (target && !allowed(target, dir ?? cwd) && (dir === null || !allowed(target, dir))) return target;
+    }
   }
   return null;
 }

@@ -100,7 +100,7 @@
   "context": "worker",
   "tool": "bash",
   "input": {
-   "command": "scripts/factory/journal.sh pin-destroy-during-search <<'FACTORY_TEXT_END'\n## Round 3 \u00b7 2026-11-08 \u00b7 fix round for verdict 01 (round 2, commit c822e2f)\nAddressed the [blocking] deadline finding: on window expiry the body raced the deadline and then still called server.close() while neither the first error nor the client close event had happened.\nREPRO: node .scratch/pin-destroy-during-search/tmp/repro-before.test.js (copy of round-2 test, WINDOW_LIMIT_MS 150, search send delayed 800 ms) printed \"REPRO bodyClosed=true firstError=false clientClose=false\".\nFix: withinWindow() now returns false when the deadline wins, so the body only calls closeServer() when both events arrived. A failed run is cleaned up by t.teardown (client.destroy then closeServer) after the body recorded the failure; a passing run closes the server in the body, after both events.\nAfter the change: repro of the same scenario prints the failure and no body close; 20/20 tap runs pass; self-check PASS (guard, lint, tests; 1 file changed).\nVAL-CROSS-001: the round-2 verdict used a per-commit diff (c822e2f^..c822e2f) and saw \"M\". The decision in decisions.tsv says compare against the mission base: `git diff --name-status 545640d HEAD -- . :!.scratch` prints `A\\ttest/destroy-during-search.test.js`. No action was possible or needed.\nRuled out: leaving the repro files nowhere to delete them \u2014 the guard blocks `rm` under .scratch/, so repro-before.test.js and repro-after.test.js stay in .scratch/pin-destroy-during-search/tmp/ (outside the diff).\nFACTORY_TEXT_END"
+   "command": "scripts/factory/journal.sh pin-destroy-during-search <<'FACTORY_TEXT_END'\n## Round 3 · 2026-11-08 · fix round for verdict 01 (round 2, commit c822e2f)\nAddressed the [blocking] deadline finding: on window expiry the body raced the deadline and then still called server.close() while neither the first error nor the client close event had happened.\nREPRO: node .scratch/pin-destroy-during-search/tmp/repro-before.test.js (copy of round-2 test, WINDOW_LIMIT_MS 150, search send delayed 800 ms) printed \"REPRO bodyClosed=true firstError=false clientClose=false\".\nFix: withinWindow() now returns false when the deadline wins, so the body only calls closeServer() when both events arrived. A failed run is cleaned up by t.teardown (client.destroy then closeServer) after the body recorded the failure; a passing run closes the server in the body, after both events.\nAfter the change: repro of the same scenario prints the failure and no body close; 20/20 tap runs pass; self-check PASS (guard, lint, tests; 1 file changed).\nVAL-CROSS-001: the round-2 verdict used a per-commit diff (c822e2f^..c822e2f) and saw \"M\". The decision in decisions.tsv says compare against the mission base: `git diff --name-status 545640d HEAD -- . :!.scratch` prints `A\\ttest/destroy-during-search.test.js`. No action was possible or needed.\nRuled out: leaving the repro files nowhere to delete them — the guard blocks `rm` under .scratch/, so repro-before.test.js and repro-after.test.js stay in .scratch/pin-destroy-during-search/tmp/ (outside the diff).\nFACTORY_TEXT_END"
   }
  },
  {
@@ -109,6 +109,33 @@
   "tool": "bash",
   "input": {
    "command": "sed -i '' 's/\\${firstError\\.message}/${firstError?.message}/' test/destroy-during-search.test.js && node_modules/.bin/eslint test/destroy-during-search.test.js && echo lint-ok\n# non-vacuity check: mutate a copy so the emitter ends and the error is not a ConnectionError\nsed -e \"s/events.push('client.destroy() called')/events.push('client.destroy() called'); res.emit('end')/\" test/destroy-during-search.test.js > test/_mutant.test.js\nnode_modules/.bin/tap --no-cov -R terse test/_mutant.test.js 2>&1 | tail -6; rm test/_mutant.test.js"
+  }
+ },
+ {
+  "id": "E33",
+  "context": "judge",
+  "tool": "bash",
+  "input": {
+   "command": "cd .scratch/server-survives-bad-input/tmp/review-01-3ada25197b95/commit && node_modules/.bin/tap --no-cov -R terse > ../suite.log 2>&1; result=$?; tail -100 ../suite.log; exit \"$result\"",
+   "timeout": 180
+  }
+ },
+ {
+  "id": "E33",
+  "context": "judge",
+  "tool": "bash",
+  "input": {
+   "command": "cd .scratch/server-survives-bad-input/tmp/review-01-3ada25197b95/commit && node_modules/.bin/eslint . > ../lint.log 2>&1; result=$?; cat ../lint.log; exit \"$result\"",
+   "timeout": 180
+  }
+ },
+ {
+  "id": "E33",
+  "context": "judge",
+  "tool": "bash",
+  "input": {
+   "command": "cd .scratch/server-survives-bad-input/tmp/review-01-3ada25197b95/commit && node_modules/.bin/tap --no-cov -R tap test/server-bad-input.test.js > ../bad-input.log 2>&1; result=$?; cat ../bad-input.log; exit \"$result\"",
+   "timeout": 180
   }
  }
 ]
