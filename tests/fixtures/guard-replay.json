@@ -1,0 +1,114 @@
+[
+ {
+  "id": "E01",
+  "context": "lead",
+  "tool": "subagent",
+  "input": {
+   "workflow": "./.scratch/light/dryrun-087/workflows/20261108-034240-light.js",
+   "async": false,
+   "options": {
+    "context": "fresh"
+   }
+  }
+ },
+ {
+  "id": "E28",
+  "context": "worker",
+  "tool": "bash",
+  "input": {
+   "command": "rm -f .scratch/end-issue-845-tests-on-end/tmp/post-edit-50-run-loop.txt .scratch/end-issue-845-tests-on-end/tmp/post-edit-done-command.txt && ( sh -c 'for i in $(seq 50); do echo \"=== RUN $i ===\"; node_modules/.bin/tap --no-cov -R terse test/issue-845.test.js || { echo \"LOOP FAILED AT RUN $i\"; exit 1; }; done; echo LOOP_ALL_50_PASSED' && echo '=== npm test ===' && npm test; echo \"DONE_COMMAND_EXIT=$?\" ) > .scratch/end-issue-845-tests-on-end/tmp/post-edit-done-command.txt 2>&1; grep -E 'LOOP_ALL_50_PASSED|LOOP FAILED|DONE_COMMAND_EXIT|# (pass|fail|skip)|^# ' .scratch/end-issue-845-tests-on-end/tmp/post-edit-done-command.txt | tail -12"
+  }
+ },
+ {
+  "id": "E22",
+  "context": "judge",
+  "tool": "subagent",
+  "input": {
+   "agent": "factory-review-axis",
+   "task": "Axis: Standards. Review only commit 5b988366ab79a32227861bf7c1713fd0641d4e2e, fixed point 5b988366ab79a32227861bf7c1713fd0641d4e2e^. Diff command: git diff 5b988366ab79a32227861bf7c1713fd0641d4e2e^...",
+   "options": {
+    "context": "fresh"
+   },
+   "cwd": "{root}",
+   "async": true
+  }
+ },
+ {
+  "id": "E22",
+  "context": "judge",
+  "tool": "subagent",
+  "input": {
+   "agent": "factory-review-axis",
+   "task": "Axis: Spec. Review only commit 5b988366ab79a32227861bf7c1713fd0641d4e2e, fixed point 5b988366ab79a32227861bf7c1713fd0641d4e2e^. Diff command: git diff 5b988366ab79a32227861bf7c1713fd0641d4e2e^...5b988",
+   "options": {
+    "context": "fresh"
+   },
+   "cwd": "{root}",
+   "async": true
+  }
+ },
+ {
+  "id": "E09",
+  "context": "judge",
+  "tool": "bash",
+  "input": {
+   "command": "mkdir -p .scratch/pin-destroy-during-search/tmp; log=.scratch/pin-destroy-during-search/tmp/01-review-20-runs.log; : > \"$log\"; for i in $(seq 1 20); do printf '\\n--- run %s ---\\n' \"$i\" >> \"$log\"; node_modules/.bin/tap --no-cov -R terse test/destroy-during-search.test.js >> \"$log\" 2>&1; status=$?; printf 'run %s exit %s\\n' \"$i\" \"$status\"; if [ \"$status\" -ne 0 ]; then tail -n 100 \"$log\"; exit \"$status\"; fi; done; tail -n 35 \"$log\""
+  }
+ },
+ {
+  "id": "E09",
+  "context": "judge",
+  "tool": "bash",
+  "input": {
+   "command": "node_modules/.bin/eslint . > .scratch/pin-destroy-during-search/tmp/01-review-eslint.log 2>&1; status=$?; cat .scratch/pin-destroy-during-search/tmp/01-review-eslint.log; exit \"$status\""
+  }
+ },
+ {
+  "id": "E12",
+  "context": "judge",
+  "tool": "bash",
+  "input": {
+   "command": "mkdir -p .scratch/pin-destroy-during-search/tmp; log=.scratch/pin-destroy-during-search/tmp/review-c822e2f-20-runs.log; : > \"$log\"; for i in $(seq 1 20); do printf '\\n--- Run %s/20 ---\\n' \"$i\" >> \"$log\"; node_modules/.bin/tap --no-cov -R terse test/destroy-during-search.test.js >> \"$log\" 2>&1; result=$?; printf 'run %s: exit %s\\n' \"$i\" \"$result\"; if [ \"$result\" -ne 0 ]; then tail -n 100 \"$log\"; exit \"$result\"; fi; done; tail -n 25 \"$log\""
+  }
+ },
+ {
+  "id": "E12",
+  "context": "judge",
+  "tool": "bash",
+  "input": {
+   "command": "log=.scratch/pin-destroy-during-search/tmp/review-c822e2f-suite.log; mkdir -p .scratch/pin-destroy-during-search/tmp; node_modules/.bin/tap --no-cov -R terse $(find test -name \"*.test.js\" ! -name issue-845.test.js) > \"$log\" 2>&1; result=$?; cat \"$log\"; printf '\\nFULL_SUITE_EXIT=%s\\n' \"$result\"; exit \"$result\""
+  }
+ },
+ {
+  "id": "E12",
+  "context": "judge",
+  "tool": "bash",
+  "input": {
+   "command": "log=.scratch/pin-destroy-during-search/tmp/review-c822e2f-lint.log; mkdir -p .scratch/pin-destroy-during-search/tmp; node_modules/.bin/eslint . > \"$log\" 2>&1; result=$?; cat \"$log\"; printf '\\nESLINT_EXIT=%s\\n' \"$result\"; exit \"$result\""
+  }
+ },
+ {
+  "id": "E15",
+  "context": "worker",
+  "tool": "bash",
+  "input": {
+   "command": "rm -f .scratch/pin-destroy-during-search/tmp/repro-before.test.js .scratch/pin-destroy-during-search/tmp/repro-after.test.js && for i in $(seq 1 20); do node_modules/.bin/tap --no-cov -R terse test/destroy-during-search.test.js || exit 1; done; echo \"20-RUN LOOP EXIT: $?\""
+  }
+ },
+ {
+  "id": "E16",
+  "context": "worker",
+  "tool": "bash",
+  "input": {
+   "command": "scripts/factory/journal.sh pin-destroy-during-search <<'FACTORY_TEXT_END'\n## Round 3 \u00b7 2026-11-08 \u00b7 fix round for verdict 01 (round 2, commit c822e2f)\nAddressed the [blocking] deadline finding: on window expiry the body raced the deadline and then still called server.close() while neither the first error nor the client close event had happened.\nREPRO: node .scratch/pin-destroy-during-search/tmp/repro-before.test.js (copy of round-2 test, WINDOW_LIMIT_MS 150, search send delayed 800 ms) printed \"REPRO bodyClosed=true firstError=false clientClose=false\".\nFix: withinWindow() now returns false when the deadline wins, so the body only calls closeServer() when both events arrived. A failed run is cleaned up by t.teardown (client.destroy then closeServer) after the body recorded the failure; a passing run closes the server in the body, after both events.\nAfter the change: repro of the same scenario prints the failure and no body close; 20/20 tap runs pass; self-check PASS (guard, lint, tests; 1 file changed).\nVAL-CROSS-001: the round-2 verdict used a per-commit diff (c822e2f^..c822e2f) and saw \"M\". The decision in decisions.tsv says compare against the mission base: `git diff --name-status 545640d HEAD -- . :!.scratch` prints `A\\ttest/destroy-during-search.test.js`. No action was possible or needed.\nRuled out: leaving the repro files nowhere to delete them \u2014 the guard blocks `rm` under .scratch/, so repro-before.test.js and repro-after.test.js stay in .scratch/pin-destroy-during-search/tmp/ (outside the diff).\nFACTORY_TEXT_END"
+  }
+ },
+ {
+  "id": "E08",
+  "context": "worker",
+  "tool": "bash",
+  "input": {
+   "command": "sed -i '' 's/\\${firstError\\.message}/${firstError?.message}/' test/destroy-during-search.test.js && node_modules/.bin/eslint test/destroy-during-search.test.js && echo lint-ok\n# non-vacuity check: mutate a copy so the emitter ends and the error is not a ConnectionError\nsed -e \"s/events.push('client.destroy() called')/events.push('client.destroy() called'); res.emit('end')/\" test/destroy-during-search.test.js > test/_mutant.test.js\nnode_modules/.bin/tap --no-cov -R terse test/_mutant.test.js 2>&1 | tail -6; rm test/_mutant.test.js"
+  }
+ }
+]

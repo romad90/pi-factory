@@ -1,7 +1,7 @@
 // The scripted lead's "model" (D91): a Pi extension that registers a provider
 // whose answers are code, not a language model. Its first answer is the one
 // call the lead is allowed to make (D71):
-//   subagent({ workflow: <FACTORY_DRIVE_WORKFLOW>, context: "fresh", async: false })
+//   subagent({ workflow: <FACTORY_DRIVE_WORKFLOW>, options: { context: "fresh" }, async: false })
 // its second ends the turn. No network, no tokens, nothing to improvise.
 // run.sh loads it with:  pi -p --mode json -e scripts/factory/driver.mjs --model factory-driver/script
 import { createFauxCore, fauxAssistantMessage, fauxText, fauxToolCall } from "@earendil-works/pi-ai";
@@ -16,7 +16,7 @@ export default function factoryDriver(pi) {
     const called = (context.messages || []).some((m) => m.role === "toolResult");
     return called
       ? fauxAssistantMessage(fauxText("workflow returned"))
-      : fauxAssistantMessage(fauxToolCall("subagent", { workflow, context: "fresh", async: false }), { stopReason: "toolUse" });
+      : fauxAssistantMessage(fauxToolCall("subagent", { workflow, options: { context: "fresh" }, async: false }), { stopReason: "toolUse" });
   };
   core.setResponses(Array.from({ length: 8 }, () => answer));
   pi.registerProvider("factory-driver", {
