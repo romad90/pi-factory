@@ -819,6 +819,13 @@ node scripts/factory/patch-paths.mjs strip-hook "$work/hook.patch" "$work/hook.c
 ! grep -q node_modules "$work/hook.clean" && grep -q 'src/tools/extra.js' "$work/hook.clean" && grep -q 'dropped node_modules' "$work/strip.log" \
   && bash scripts/factory/patch-guard.sh "$work/hook.clean" >/dev/null && ! bash scripts/factory/patch-guard.sh "$work/hook.patch" >/dev/null \
   && t "a worktree's node_modules link is dropped from the patch before the guard; other links still block (D87)" || fail "strip hook" "$(cat "$work/strip.log" "$work/hook.clean")"
+# A worker's working files under the mission's tmp/ never reach the patch,
+# the test-on-base run or the guard: a repro *.test.js there failed a round.
+mkdir -p .scratch/demo/tmp; echo 'test("repro", () => { throw 1 })' > .scratch/demo/tmp/repro.test.js; echo 'export const extra = 1;' > src/tools/extra.js
+git add -N .scratch/demo/tmp/repro.test.js src/tools/extra.js; git diff --relative > "$work/tmp.patch"; git reset -q .scratch/demo/tmp/repro.test.js src/tools/extra.js; rm -rf .scratch/demo/tmp src/tools/extra.js
+node scripts/factory/patch-paths.mjs strip-hook "$work/tmp.patch" "$work/tmp.clean" "node_modules .venv" .scratch 2>"$work/strip2.log"
+! grep -q 'repro.test.js' "$work/tmp.clean" && grep -q 'src/tools/extra.js' "$work/tmp.clean" && grep -q "dropped .scratch/demo/tmp/repro.test.js (a worker's working file" "$work/strip2.log" \
+  && t "a worker's files under the mission's tmp/ are dropped from its patch" || fail "strip tmp" "$(cat "$work/strip2.log" "$work/tmp.clean")"
 # D88: a misspelled frozen-paths heading stops the mission.
 cp $m/spec.md "$work/spec.keep"; printf '\n## Frozen path\n- src/\n' >> $m/spec.md
 out="$(bash scripts/factory/next.sh demo)"; cp "$work/spec.keep" $m/spec.md
