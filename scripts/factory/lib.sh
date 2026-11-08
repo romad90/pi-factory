@@ -877,7 +877,11 @@ test_on_base() (
   fi
   tmp="$(mktemp -d)"; wt="$tmp/wt"
   cleanup() {
-    if [ -d "$wt" ]; then git worktree remove --force "$wt" >/dev/null 2>&1 || true; fi
+    # Twice --force: an interrupt during `worktree add` leaves the worktree
+    # locked ("initializing"), and one --force refuses a locked worktree (CI, D101).
+    if [ -d "$wt" ] || git worktree list --porcelain | grep -qxF "worktree $wt"; then
+      git worktree remove --force --force "$wt" >/dev/null 2>&1 || true
+    fi
     git worktree prune >/dev/null 2>&1 || true; rm -rf "$tmp"
   }
   trap cleanup EXIT
