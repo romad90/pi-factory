@@ -149,8 +149,10 @@ function timeline(name) {
   for (const d of names) {
     let j; try { j = JSON.parse(read(path.join(dir, d, "run.json"))); } catch { continue; }
     if (!j || !j.date) continue;
-    const end = Date.parse(j.date), start = end - (Number(j.durationMs) || 0);
-    if (Number.isNaN(end)) continue;
+    // archive.mjs writes start (from the transcript); older records only the time first seen.
+    const dur = Number(j.durationMs) || 0;
+    const start = j.start ? Date.parse(j.start) : Date.parse(j.date) - dur, end = j.start ? start + dur : Date.parse(j.date);
+    if (Number.isNaN(end) || Number.isNaN(start)) continue;
     runs.push({
       run: String(j.run || d).slice(0, 8), dir: d, role: String(j.agent || "?").replace(/^factory-/, ""), model: j.model || "", ticket: j.ticket || "",
       start: new Date(start).toISOString(), end: new Date(end).toISOString(), ms: end - start,

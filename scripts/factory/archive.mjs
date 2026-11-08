@@ -5,6 +5,7 @@
 //   node archive.mjs list <out-dir>
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, realpathSync } from "node:fs";
 import { join, dirname, basename, isAbsolute, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 // Redaction is shared with the guard's refusal log (redact.mjs, D101).
 import { redact } from "./redact.mjs";
@@ -77,12 +78,48 @@ function missionText(dir, acc = []) {     // every text the mission recorded, fo
 
 // Tool calls in a transcript: pi-subagents' tool_start records, else the
 // assistant messages' toolCall parts, else bare tool records (older formats).
+// A run's start and end, from its transcript's records (ts in ms, or an ISO
+// timestamp). pi-subagents' meta has no duration: without this every run
+// lasted 0 ms and no refusal fell in its window (found on the gym's records).
+export function transcriptSpan(text) {
+  let start = Infinity, end = -Infinity;
+  for (const line of String(text || "").split("\n")) {
+    if (!line) continue;
+    const m = line.match(/"ts":\s*(\d{12,})/) || line.match(/"timestamp":\s*"([^"]+)"/);
+    if (!m) continue;
+    const t = /^\d+$/.test(m[1]) ? Number(m[1]) : Date.parse(m[1]);
+    if (Number.isNaN(t)) continue;
+    if (t < start) start = t; if (t > end) end = t;
+  }
+  return start <= end ? { start, end } : null;
+}
+
+// The guard's refusals that belong to a run: inside its time window and, when
+// the refused command can be read, found in its transcript. Parallel runs in
+// the same folder (review axes next to the reviewer) share a window; only the
+// one that made the call has it in its transcript.
+export function refusalsFor(text, start, end, refusals) {
+  return refusals.filter((r) => {
+    if (r.t < start - 1000 || r.t > end + 1000) return false;
+    // guard.log keeps the input as JSON text, cut at 300 characters (F10):
+    // take the command's first characters as the transcript spells them.
+    // Both sides are redacted the same way: compare up to the first [REDACTED].
+    const head = (x) => { const i = x.indexOf("[REDACTED"); return (i >= 0 ? x.slice(0, i) : x).slice(0, 60); };
+    let probe;
+    try { const i = JSON.parse(r.input); probe = JSON.stringify(head(String(i.command || i.path || i.task || ""))).slice(1, -1); }
+    catch { probe = head(String(r.input || "").replace(/^\{"(command|path|task)":"/, "")).replace(/\\$/, ""); }
+    return probe.length < 12 || String(text || "").includes(probe);
+  }).map(({ t, ...r }) => r);
+}
+
 export function toolCalls(text) {
   const n = (re) => (text.match(re) || []).length;
   return n(/"recordType":\s*"tool_start"/g) || n(/"type":\s*"toolCall"/g) || n(/"type":\s*"tool"[,}]/g);
 }
 
-const [cmd, ...args] = process.argv.slice(2);
+// Imported (tests, other scripts): the helpers only, no command runs.
+const isMain = !!process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+const [cmd, ...args] = isMain ? process.argv.slice(2) : ["(imported)"];
 if (cmd === "collect") {
   const [out, missionDir, head, guardLog = "", ...rootArgs] = args;
   const roots = [...new Set(rootArgs.filter(Boolean).flatMap((r) => [resolve(r), real(r)]))];
@@ -125,15 +162,17 @@ if (cmd === "collect") {
     const briefId = (brief.match(/^brief-id:\s*(\S+)/m) || [])[1] || "";
     const ticket = (brief.match(/\bticket\s+(\d{2}[\w-]*)/i) || [])[1] || "";
     const u = j.usage || {};
+    const transcript = read(join(dest, "transcript.jsonl")) || "";
+    const ts = transcriptSpan(transcript);
+    const endMs = ts ? ts.end : statSync(meta).mtimeMs, durationMs = j.durationMs || (ts ? ts.end - ts.start : 0);
     const run = {
       run: runId, agent, model: j.model || "", thinking: j.thinking || thinkingOf(missionDir, agent),
-      date: new Date(statSync(meta).mtimeMs).toISOString(), durationMs: j.durationMs || 0,
+      date: new Date(statSync(meta).mtimeMs).toISOString(), start: new Date(endMs - durationMs).toISOString(), durationMs,
       usage: { input: u.input || 0, output: u.output || 0, cacheRead: u.cacheRead || 0, cacheWrite: u.cacheWrite || 0, cost: u.cost || 0, turns: u.turns || 0 },
       briefId, ticket, head, outcome: outcome(missionDir, briefId, ticket),
-      // Refusals inside the run's time window (end = meta's time, start = end - duration).
-      guard: (() => { const end = statSync(meta).mtimeMs, start = end - (j.durationMs || 0) - 1000;
-        return refusals.filter((r) => r.t >= start && r.t <= end + 1000).map(({ t, ...r }) => r); })(),
-      calls: toolCalls(read(join(dest, "transcript.jsonl")) || ""),   // D119: the cockpit's timeline never reads transcripts
+      // Refusals inside the run's window that its transcript shows it made.
+      guard: refusalsFor(transcript, endMs - durationMs, endMs, refusals),
+      calls: toolCalls(transcript),   // D119: the cockpit's timeline never reads transcripts
       files: Object.keys(files).filter((n) => existsSync(join(dest, n))),
     };
     const prev = known ? read(join(dest, "run.json")) : null;
@@ -143,6 +182,30 @@ if (cmd === "collect") {
     if (!known) added++;
   }
   console.log(`archive: ${added} run(s) added to ${out}${redacted ? ` (${redacted} file(s) redacted)` : ""}${foreign ? `; ${foreign} run(s) of another checkout ignored` : ""}`);
+} else if (cmd === "refresh") {
+  // Runs archived before their times, tool calls or refusals were read from
+  // the transcript: fill what's missing from the archived transcript and
+  // guard.log. Only runs lacking a field are read.
+  const [out, guardLog = ""] = args;
+  if (!existsSync(out)) process.exit(0);
+  const refusals = (read(guardLog) || "").split("\n").filter(Boolean).map((l) => l.split("\t"))
+    .map(([date, rule, tool, input, cwd]) => ({ t: Date.parse(date), date, rule, tool, input: redact(input || ""), cwd: cwd || "" }))
+    .filter((r) => !Number.isNaN(r.t));
+  let changed = 0;
+  for (const d of readdirSync(out).sort()) {
+    const f = join(out, d, "run.json"), prev = read(f); if (!prev) continue;
+    const j = JSON.parse(prev);
+    if (j.start && typeof j.calls === "number" && j.durationMs) continue;
+    const transcript = read(join(out, d, "transcript.jsonl")) || "";
+    const ts = transcriptSpan(transcript);
+    if (ts && !j.durationMs) { j.durationMs = ts.end - ts.start; j.start = new Date(ts.start).toISOString(); j.end = new Date(ts.end).toISOString(); }
+    if (!j.start) j.start = new Date(Date.parse(j.date) - (j.durationMs || 0)).toISOString();
+    if (typeof j.calls !== "number") j.calls = toolCalls(transcript);
+    if (ts && !(j.guard || []).length) j.guard = refusalsFor(transcript, ts.start, ts.end, refusals);
+    const next = JSON.stringify(j, null, 2) + "\n";
+    if (next !== prev) { writeFileSync(f, next); changed++; }
+  }
+  console.log(`archive: ${changed} run(s) refreshed in ${out}`);
 } else if (cmd === "list") {
   const [out] = args;
   if (!existsSync(out)) process.exit(0);
@@ -152,6 +215,6 @@ if (cmd === "collect") {
     const o = j.outcome || {};
     console.log([j.run, j.agent, j.model, j.ticket || "-", o.result || (o.integrated ? "integrated" : "-"), j.usage?.cost ?? 0, join(out, d), (j.guard || []).length].join("\t"));
   }
-} else {
-  console.error("usage: archive.mjs collect <out> <mission-dir> <head> | list <out>"); process.exit(2);
+} else if (isMain) {
+  console.error("usage: archive.mjs collect <out> <mission-dir> <head> | refresh <out> [guard.log] | list <out>"); process.exit(2);
 }
