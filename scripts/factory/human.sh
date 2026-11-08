@@ -213,7 +213,7 @@ case "$cmd" in
     if [ $# -gt 1 ] && git cat-file -e "$1^{commit}" 2>/dev/null; then commit="$1"; shift; fi
     [ $# -gt 0 ] || die "usage: human.sh deps <feature> [<commit>] <what you changed...>"
     c="$(git rev-parse --short "$commit")"
-    files="$(git show --name-only --format= "$commit" | grep -E "$DEPS_FILES_RE|(^|/)\.gitignore$" | paste -sd, - | sed 's/,/, /g')"
+    files="$(git show --name-only --relative --format= "$commit" | grep -E "$DEPS_FILES_RE|(^|/)\.gitignore$" | paste -sd, - | sed 's/,/, /g')"
     [ -n "$files" ] || die "commit $c changes no dependency manifest or lockfile: make the change, commit it, then run this (or name the commit)"
     decision_log "$feature" - deps "Dependencies changed by hand (D124)" "commit $c: $files — $*" mission
     q="$dir/state/open-question.md"
