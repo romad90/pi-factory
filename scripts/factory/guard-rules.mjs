@@ -164,6 +164,15 @@ export function inFactoryProject(cwd) {
 // direct call (agent, tasks, chain, an inline script) is the lead improvising.
 const WORKFLOW_FILE = /(^|\/)\.scratch\/.+\.js$/;
 const SUBAGENT_ALLOWED = new Set(["workflow", "context", "async", "action", "id", "runId"]);
+// pi-subagents 0.87 takes a launch's context as options.context. The only
+// options the factory allows are { context: "fresh" }, in either place.
+const freshOptions = (o) => o !== null && typeof o === "object" && !Array.isArray(o)
+  && Object.keys(o).length === 1 && o.context === "fresh";
+const withoutFreshOptions = (i) => {
+  if (!("options" in i) || !freshOptions(i.options)) return i;
+  const { options: _fresh, ...rest } = i;
+  return rest;
+};
 // D75: the one direct call a factory agent needs: a reviewer dispatching a
 // code-review axis to the read-only factory-review-axis agent, fresh.
 const AXIS_ALLOWED = new Set(["agent", "task", "context", "async"]);
@@ -211,6 +220,12 @@ function hidesInstrument(cwd) {
 // ${IFS} is a space; line continuations join; newlines separate commands.
 // The first file a command writes by redirection or tee outside .scratch/ and
 // the temp folders, or null. File descriptors (2>&1) and /dev/* are not files.
+// A heredoc's body is data for the command, not shell: `node <<'JS'` with
+// `(x) => x > 1` inside wrote nothing (dry run on pi-subagents 0.87).
+export function stripHeredocs(cmd) {
+  return String(cmd ?? "").replace(/<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1([^\n]*)\n[\s\S]*?\n\s*\2(?=\s*(\n|$|[;&|)]))/g, "<<''$3");
+}
+
 export function strayWrite(n, cwd, root) {
   const allowed = (target) => {
     if (/^&\d|^\/dev\//.test(target)) return true;
@@ -219,7 +234,7 @@ export function strayWrite(n, cwd, root) {
     if (abs.startsWith(root + "/")) return false;
     return [tmpdir(), "/tmp", "/var/tmp", process.env.TMPDIR].filter(Boolean).some((t) => abs.startsWith(resolve(t) + "/"));
   };
-  for (const m of n.matchAll(/(?:^|[^0-9&<>|])\d?(?:>>?|>\|)\s*([^\s;&|()<>]+)|\btee\s+(?:-a\s+)?([^\s;&|()<>-][^\s;&|()<>]*)/g)) {
+  for (const m of n.matchAll(/(?:^|[^0-9&<>|=])\d?(?:>>?|>\|)\s*([^\s;&|()<>]+)|\btee\s+(?:-a\s+)?([^\s;&|()<>-][^\s;&|()<>]*)/g)) {
     const target = m[1] || m[2];
     if (target && !allowed(target)) return target;
   }
@@ -331,6 +346,7 @@ export function check({ tool, input = {}, cwd = process.cwd() }) {
   }
   if (tool === "subagent") {
     if (input.action !== undefined || !projectRoot(cwd)) return null;   // status, list: harmless
+    input = withoutFreshOptions(input);
     const extra = Object.keys(input).filter((k) => !SUBAGENT_ALLOWED.has(k));
     if (typeof input.workflow === "string" && WORKFLOW_FILE.test(input.workflow) && !extra.length) return null;
     if (isAxisDispatch(input)) return null;
@@ -376,7 +392,7 @@ export function check({ tool, input = {}, cwd = process.cwd() }) {
       // root dirtied the tree and blocked the next ticket's worktree.
       const root = projectRoot(cwd);
       if (root) {
-        const out = strayWrite(raw.replace(/'[^']*'|"[^"]*"/g, "''"), cwd, root);
+        const out = strayWrite(stripHeredocs(raw).replace(/'[^']*'|"[^"]*"/g, "''"), cwd, root);
         if (out) return blocked("scratch", `writing ${out} outside .scratch/ (working files go under .scratch/<mission>/tmp/; the factory's scripts write the rest)`);
       }
     }

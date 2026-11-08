@@ -46,6 +46,9 @@ c.parallel = { ...(c.parallel || {}), concurrency: (c.parallel && c.parallel.con
 // default. A heavy worker with high thinking needs longer; its turn budget
 // (maxTurns in the agent file) is the real cap. Raised, never lowered.
 c.timeoutMs = Math.max(c.timeoutMs || 0, 7200000);
+// pi-subagents 0.87: a launch that names no context follows this, over each
+// agent's defaultContext. Factory agents always start fresh; never "fork".
+c.defaultSubagentContext = "fresh";
 fs.writeFileSync(cfg, JSON.stringify(c, null, 2) + "\n");
-console.log(`Updated ${cfg}: worktreeSetupHook → shim, parallel.concurrency = ${c.parallel.concurrency}, timeoutMs = ${c.timeoutMs} (waves)`);
+console.log(`Updated ${cfg}: worktreeSetupHook → shim, parallel.concurrency = ${c.parallel.concurrency}, timeoutMs = ${c.timeoutMs} (waves), defaultSubagentContext = fresh`);
 NODE
