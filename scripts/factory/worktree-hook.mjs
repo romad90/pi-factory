@@ -80,4 +80,17 @@ for (const rel of linkList.split("\n").map((l) => l.trim()).filter((l) => l && !
   synthetic.push(inProject(rel));
 }
 
+// E37 (F5): the project's commands live in .factory/commands.env, which a
+// project ignoring *.env never commits: the worker had none, and its
+// self-check skipped lint and tests. Linked from the main checkout when git
+// didn't bring it, kept out of the patch.
+{
+  const rel = ".factory/commands.env", from = join(input.repoRoot, prefix, rel), to = join(wt, prefix, rel);
+  if (existsSync(from) && !exists(to)) {
+    mkdirSync(dirname(to), { recursive: true });
+    symlinkSync(from, to);
+    synthetic.push(inProject(rel));
+  }
+}
+
 process.stdout.write(JSON.stringify({ syntheticPaths: synthetic }));

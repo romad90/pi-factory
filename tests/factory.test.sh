@@ -407,6 +407,18 @@ printf '{"repoRoot":"%s","worktreePath":"%s","index":0}' "$(git rev-parse --show
   || fail "dependency link" "$(ls -la "$wt_project"; cat "$work/hook.json")"
 # D66: the worker runs integration's checks itself before handing over.
 sc() { (cd "$wt_project" && bash scripts/factory/self-check.sh demo) > "$work/sc.log" 2>&1; }
+# E37 (F5): a project that ignores *.env never commits .factory/commands.env,
+# so worker worktrees had none, and self-check passed without lint or tests.
+cfp="$(git rev-parse --show-prefix).factory/commands.env"; git -C "$wt" update-index --skip-worktree "$cfp"   # as if git never had it
+mv "$wt_project/.factory/commands.env" "$work/commands.env.bak"
+if sc; then fail "self-check must not pass without the project's commands" "$(cat "$work/sc.log")"; fi
+grep -q '^SELF-CHECK: FAIL setup' "$work/sc.log" && grep -q 'commands.env' "$work/sc.log" \
+  && t "self-check without .factory/commands.env fails on setup, never passes unchecked" || fail "self-check no commands" "$(cat "$work/sc.log")"
+printf '{"repoRoot":"%s","worktreePath":"%s","index":0}' "$(git rev-parse --show-toplevel)" "$wt" \
+  | FACTORY_PROJECT_PREFIX="$(git rev-parse --show-prefix)" FACTORY_HOOK_NO_SPARSE=1 node scripts/factory/worktree-hook.mjs > "$work/hook2.json"
+[ -L "$wt_project/.factory/commands.env" ] && grep -q 'commands.env' "$work/hook2.json" \
+  && t "the worktree hook gives the worker the project's commands.env when git doesn't (E37)" || fail "commands.env link" "$(ls -la "$wt_project/.factory"; cat "$work/hook2.json")"
+rm -f "$wt_project/.factory/commands.env"; mv "$work/commands.env.bak" "$wt_project/.factory/commands.env"; git -C "$wt" update-index --no-skip-worktree "$cfp"
 sc && grep -q '^SELF-CHECK: PASS' "$work/sc.log" && t "self-check passes in the worktree, dependency link left out of the guarded change" \
   || fail "self-check pass" "$(cat "$work/sc.log")"
 git -C "$wt" diff --cached --quiet && t "self-check leaves the worker's index alone" || fail "self-check staged files" "$(git -C "$wt" status --short)"
