@@ -1499,7 +1499,7 @@ Flatten a.js.
 **After:** refactor-tools
 **Max tickets:** 2
 **Scope:** src/tools/call.js
-**Done when:** \`npm test\`
+**Done when:** \`npx stryker run --thresholds.break 70 --mutate src/tools/call.js --mutate src/tools/a.js\`
 
 Add a timeout.
 
@@ -1514,6 +1514,7 @@ grep -q '\*\*Chosen:\*\* A is speculative' <<<"$out" && grep -q 'option B: \*\*S
   && grep -q 'refactor-tools: refactors a library \[.*\] without checking its public surface' <<<"$out" \
   && grep -q 'fix-calls: a bugfix names its \*\*Reproduction:\*\*' <<<"$out" \
   && t "casebook: a speculative choice, options without strength or trade-off, a library refactor that doesn't check its surface (Hyrum), a fix without a reproduction are refused" || fail "casebook 2" "$out"
+grep -q 'fix-calls: \*\*Done when:\*\* repeats --mutate' <<<"$out" && t "casebook: a done command repeating --mutate is refused (Stryker keeps only the last)" || fail "casebook mutate" "$out"
 cat > .scratch/tidy-tools/strategy.md <<ST
 # Strategy: tidy-tools
 
