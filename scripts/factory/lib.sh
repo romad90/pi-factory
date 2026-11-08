@@ -621,6 +621,67 @@ job_switch() {
   echo "factory: mission $m on its own branch $want (from $base)" >&2
 }
 
+# mr_target [<branch>]: the branch a mission's MR goes into. FACTORY_MR_TARGET
+# (environment, then .factory/commands.env), else the remote's default branch,
+# else the branch <branch> was made from (mission_switch records it). Empty
+# when none is known.
+# shellcheck disable=SC2120  # mr.sh passes the branch
+mr_target() {
+  local t="${FACTORY_MR_TARGET:-}"
+  if [ -z "$t" ] && [ -f .factory/commands.env ]; then
+    t="$(sed -n "s/^[[:space:]]*\(export[[:space:]]*\)\{0,1\}FACTORY_MR_TARGET=[\"']\{0,1\}\([^\"']*\).*/\2/p" .factory/commands.env | tail -1)"
+  fi
+  [ -n "$t" ] || t="$(git symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##' || true)"
+  [ -n "$t" ] || [ -z "${1:-}" ] || t="$(git config --get "branch.$1.factory-base" 2>/dev/null || true)"
+  printf '%s' "$t"
+}
+
+# --- every mission on its own branch (D116) ------------------------------------
+# A mission run on the branch its MR goes into moves to mission/<name>, made
+# from HEAD (never from the remote: local commits such as a factory upgrade
+# stay), and the base is recorded for mr.sh. A job's mission run by name gets
+# its job branch (D109). Left alone: a branch a person chose, and a mission
+# already under way where it is (moving it would split its state).
+# FACTORY_MISSION_BRANCHES=0 turns it off. Says what it did on stderr; prints
+# why and returns 1 when it can't.
+mission_started() {                          # <feature> <spec>
+  local dir; dir="$(mission_dir "$1")"
+  grep -q '^## Validation contract' "$2" 2>/dev/null && return 0
+  [ -n "$(git log -1 --format=%h -- "$dir" ":(exclude)$dir/spec.md" 2>/dev/null)" ]
+}
+mission_switch() {                           # <feature> <spec>
+  local feature="$1" spec="$2" job want cur target behind
+  [ "${FACTORY_MISSION_BRANCHES:-1}" != 0 ] || return 0
+  cur="$(git branch --show-current)"; [ -n "$cur" ] || return 0
+  job="$(spec_job "$spec" || true)"
+  if [ -n "$job" ]; then
+    [ "$cur" != "$(job_branch "$job" "$feature")" ] || return 0
+    mission_started "$feature" "$spec" && return 0
+    job_switch "$job" "$feature"; return
+  fi
+  want="mission/$feature"
+  [ "$cur" != "$want" ] || return 0
+  target="$(mr_target)"
+  if [ -z "$target" ]; then case "$cur" in main|master|develop|trunk) target="$cur" ;; esac; fi
+  [ "$cur" = "$target" ] || return 0
+  if git show-ref -q --verify "refs/heads/$want"; then
+    if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+      echo "mission $feature has its branch $want, and the checkout has uncommitted changes: commit or stash them (git status), then run again"; return 1
+    fi
+    git switch -q "$want" 2>/dev/null || { echo "can't switch to $want (git switch $want shows why)"; return 1; }
+    echo "factory: mission $feature continues on its branch $want" >&2; return 0
+  fi
+  mission_started "$feature" "$spec" && return 0
+  git switch -q -c "$want" 2>/dev/null || { echo "can't create $want here (git switch -c $want shows why)"; return 1; }
+  git config "branch.$want.factory-base" "$cur"
+  echo "factory: mission $feature on its own branch $want (from $cur)" >&2
+  if git show-ref -q --verify "refs/remotes/origin/$cur"; then
+    behind="$(git rev-list --count "$cur..origin/$cur" 2>/dev/null || echo 0)"
+    [ "${behind:-0}" = 0 ] || echo "factory: $cur is $behind commit(s) behind origin/$cur at the last fetch: the MR may conflict (git pull on $cur, then git rebase $cur)" >&2
+  fi
+  return 0
+}
+
 # mission_guard <feature>: prints why the factory must not run this mission
 # here and returns 1; silent and 0 when it may. Catches a misspelled name (it
 # would start a new mission) and a checkout switched to another branch (by a

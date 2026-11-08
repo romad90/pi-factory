@@ -6,6 +6,7 @@
 # Usage: bash tests/factory.test.sh        (needs bash, git, node)
 set -euo pipefail
 export FACTORY_COLLECT_WAIT=0   # P25: collect waits for late verdicts; tests write theirs first
+export FACTORY_MISSION_BRANCHES=0   # D116: the demo missions stay on one branch; the D116 checks turn it on
 root="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"; [ -n "${KEEP:-}" ] || trap 'rm -rf "$work"' EXIT
 export FACTORY_NOTIFY=0 GIT_AUTHOR_NAME=test GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=t@t
@@ -1743,6 +1744,58 @@ rm -f .scratch/pin-tools/mr.url .scratch/refactor-tools/mr.url .scratch/refactor
 git switch -q "$jbase" && git branch -qD job/tidy-tools/pin-tools job/tidy-tools/refactor-tools
 git remote remove origin; [ -z "$prev_origin" ] || git remote add origin "$prev_origin"
 git rm -rq .scratch/tidy-tools .scratch/pin-tools .scratch/refactor-tools package.json src/tools/call.js; git commit -qm "test: job done"
+# D116: a mission runs on its own branch, made by the factory from the branch
+# its MR goes into. Both missions of the gym's first job started on master: they
+# were run by name, and only the job's own loop made branches (D109).
+mb_base="$(git branch --show-current)"
+mb_spec() { mkdir -p ".scratch/$1"; printf '# %s\n\n**Intent:** bugfix\n**Max tickets:** 1\n%s\n## Problem\n\nA thing to fix.\n' "$1" "${2:-}" > ".scratch/$1/spec.md"; }
+mb_next() { FACTORY_MISSION_BRANCHES=1 bash scripts/factory/next.sh "$@" 2>&1 || true; }
+mb_spec branchy
+FACTORY_MISSION_BRANCHES=1 FACTORY_MR_TARGET="$mb_base" bash scripts/factory/status.sh --all --json >/dev/null 2>&1 || true
+[ "$(git branch --show-current)" = "$mb_base" ] && ! git show-ref -q --verify refs/heads/mission/branchy \
+  && t "the cockpit's status reads a new mission's step without moving the checkout" || fail "status moved the branch" "$(git branch --show-current)"
+out="$(FACTORY_MR_TARGET="$mb_base" mb_next branchy)"
+[ "$(git branch --show-current)" = mission/branchy ] && grep -q "on its own branch mission/branchy (from $mb_base)" <<<"$out" \
+  && [ -f .scratch/branchy/spec.md ] && [ "$(git rev-parse mission/branchy)" = "$(git rev-parse "$mb_base")" ] \
+  && [ "$(git config branch.mission/branchy.factory-base)" = "$mb_base" ] \
+  && t "a new mission on the branch its MR goes into gets its own branch from there, its spec along (D116)" || fail "mission branch" "$out"
+printf '# Fix a thing\n\nBody.\n' > .scratch/branchy/pr.md
+mb_origin="$(git remote get-url origin 2>/dev/null || true)"; git remote remove origin 2>/dev/null || true
+git init -q --bare "$work/mb-origin.git"; git remote add origin "$work/mb-origin.git"
+out="$(env -u FACTORY_MR_TARGET bash scripts/factory/mr.sh branchy --dry-run 2>&1)"
+grep -q "MR: mission/branchy → $mb_base" <<<"$out" \
+  && t "mr.sh finds the target with no remote default and no setting: the branch the mission came from" || fail "mr target from base" "$out"
+git remote remove origin; [ -z "$mb_origin" ] || git remote add origin "$mb_origin"
+out="$(FACTORY_MR_TARGET="$mb_base" mb_next branchy)"
+[ "$(git branch --show-current)" = mission/branchy ] && t "run again on its branch, the mission stays there" || fail "mission branch again" "$out"
+git switch -q "$mb_base"
+out="$(FACTORY_MR_TARGET="$mb_base" mb_next branchy)"
+[ "$(git branch --show-current)" = mission/branchy ] && grep -q "continues on its branch mission/branchy" <<<"$out" \
+  && t "back on the target, the mission returns to the branch it already has" || fail "mission branch return" "$out"
+git switch -q "$mb_base"; git switch -q -c side-work
+mb_spec branchy-side
+out="$(FACTORY_MR_TARGET="$mb_base" mb_next branchy-side)"
+[ "$(git branch --show-current)" = side-work ] && ! git show-ref -q --verify refs/heads/mission/branchy-side \
+  && t "a mission started on a branch a person chose stays there" || fail "mission on chosen branch" "$out"
+git switch -q "$mb_base"
+mb_spec branchy-started; printf '\n## Validation contract\n\n### VAL-X-001: x\n' >> .scratch/branchy-started/spec.md
+git add .scratch/branchy-started && git commit -qm "test: a mission already under way"
+out="$(FACTORY_MR_TARGET="$mb_base" mb_next branchy-started)"
+[ "$(git branch --show-current)" = "$mb_base" ] && ! git show-ref -q --verify refs/heads/mission/branchy-started \
+  && t "a mission already under way on this branch is not moved: its state would split" || fail "started mission moved" "$out"
+mb_spec branchy-job "**Job:** jx"
+out="$(env -u FACTORY_MR_TARGET FACTORY_MISSION_BRANCHES=1 bash scripts/factory/next.sh branchy-job 2>&1 || true)"
+[ "$(git branch --show-current)" = job/jx/branchy-job ] \
+  && t "a job's mission run by name gets its job branch, as from the job's loop (D109, D116)" || fail "job mission by name" "$out"
+git switch -q -c trunk "$mb_base"
+out="$(env -u FACTORY_MR_TARGET FACTORY_MISSION_BRANCHES=1 bash scripts/factory/next.sh branchy-side 2>&1 || true)"
+[ "$(git branch --show-current)" = mission/branchy-side ] && [ "$(git config branch.mission/branchy-side.factory-base)" = trunk ] \
+  && t "with no target set, main, master, develop or trunk counts as the branch MRs go into" || fail "default target" "$out"
+git switch -q "$mb_base"
+git branch -qD mission/branchy mission/branchy-side side-work trunk job/jx/branchy-job 2>/dev/null || true
+git config --remove-section branch.mission/branchy 2>/dev/null || true; git config --remove-section branch.mission/branchy-side 2>/dev/null || true
+rm -rf .scratch/branchy .scratch/branchy-side .scratch/branchy-job
+git rm -rq .scratch/branchy-started; git commit -qm "test: mission branches done"
 
 # D92: install once per machine (P11). Models per machine, then a project on the package.
 echo "Context repos and investigation (D99)"
