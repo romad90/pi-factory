@@ -780,6 +780,13 @@ node -e 'const r=require(process.argv[1]+"/run.json"); process.exit(r.agent==="f
   && grep -q 'npm test' "$arch/transcript.jsonl" && ! grep -q 'glpat-' "$arch/transcript.jsonl" && grep -q 'REDACTED' "$arch/transcript.jsonl" \
   && [ -z "$(git status --porcelain -- "$m" | grep -v usage.tsv)" ] \
   && t "archive: brief, transcript (secrets redacted), usage and outcome kept outside the repo (D97)" || fail "archive" "$(cat "$arch/run.json" "$arch/transcript.jsonl" 2>&1)"
+FACTORY_STATUS_METRICS=0 bash scripts/factory/status.sh --all --json > "$work/tl.json"
+node -e '
+const r = require(process.argv[1] + "/run.json"); const s = require(process.argv[2]); const m = s.missions.find((x) => x.name === "demo");
+const run = (m.timeline || []).find((x) => x.run === "r1abc");
+process.exit(r.calls === 1 && run && run.role === "worker" && run.calls === 1 && run.ticket === "01-hello" && Date.parse(run.start) <= Date.parse(run.end)
+  && m.span && m.span.runs >= 1 && s.roles.indexOf("worker") > s.roles.indexOf("ticket-writer") ? 0 : 1);' "$arch" "$work/tl.json" \
+  && t "status: the mission's runs by role from the archive, with tool calls counted once at collect (D119)" || fail "timeline" "$(cat "$arch/run.json"; head -c 1500 "$work/tl.json")"
 # P20: request sizes from the child transcript (pi-subagents' records): the
 # a 25k-token test log takes the reviewer's request from 10k to 35k; the next one would be 36.2k.
 ta="$work/tokens-archive/r7rev_factory-reviewer"; mkdir -p "$ta"

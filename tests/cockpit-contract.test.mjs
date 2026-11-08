@@ -78,3 +78,13 @@ test("toContract keeps the snapshot and adds the versioned fields", () => {
   assert.equal(c.inbox.length, 1);
   assert.equal(c.waitingOn.who, "you");
 });
+
+test("span sums the archived runs: wall time, cost, tool calls, refusals", async () => {
+  const { span } = await import("../scripts/factory/cockpit-contract.mjs");
+  assert.equal(span([]), null);
+  const s = span([
+    { start: "2026-11-08T16:13:31Z", end: "2026-11-08T16:20:24Z", cost: 0.1, calls: 53, refused: [{}] },
+    { start: "2026-11-08T16:20:55Z", end: "2026-11-08T16:22:04Z", cost: 0.25, calls: 34, refused: [{}, {}, {}] },
+  ]);
+  assert.deepEqual(s, { start: "2026-11-08T16:13:31Z", end: "2026-11-08T16:22:04Z", runs: 2, cost: 0.35, calls: 87, refused: 4 });
+});
