@@ -87,8 +87,34 @@ for v in "$dir"/verdicts/*-code.md; do
       "$(basename "$v")" "${vc:0:8}" "${marker:0:8}" "$ticket"
     continue
   fi
+  # D117 (E33, E34): a new FAIL that judged no assertion (0 pass, 0 fail, all
+  # unverified: the guard or the environment stopped its checks) is no finding
+  # on the code. Rebuilding would redo working code against nothing. Set aside,
+  # not a round, reviewed again; a second one in a row escalates with the
+  # reviewer's reasons, a factory incident for a person.
+  if [ -n "$marker" ] && [ "$(verdict_field "$v" Result)" = FAIL ] \
+     && { [ "$n" -eq 0 ] || ! cmp -s "$v" "${v%.md}.r$n.md"; }; then
+    read -r vp vf vu < <(verdict_evidence_counts "$v")
+    if [ "$vp" -eq 0 ] && [ "$vf" -eq 0 ] && [ "$vu" -gt 0 ]; then
+      nr="$dir/state/$ticket.not-run"; k=$(( $(cat "$nr" 2>/dev/null || echo 0) + 1 )); echo "$k" > "$nr"
+      mv "$v" "$dir/state/$ticket.not-run-verdict.md"
+      if [ "$n" -gt 0 ]; then cp "${v%.md}.r$n.md" "$v"; fi
+      if [ "$k" -ge 2 ]; then
+        { printf 'two reviews in a row judged no assertion; the reviewer said:\n'
+          sed -n '/^## Assertions/,/^## [^A]/p' "$dir/state/$ticket.not-run-verdict.md" | grep -E '^- ' | head -8
+          grep -E '^- \[(blocking|process)\]' "$dir/state/$ticket.not-run-verdict.md" | head -4; } > "$dir/state/$ticket.stuck"
+        printf '  %-40s judged no assertion again: escalated, see state/%s.stuck\n' "$(basename "$v")" "$ticket"
+      else
+        printf '  %-40s judged no assertion (%s unverified): not a round; next.sh sends it back to review (kept in state/%s.not-run-verdict.md)\n' \
+          "$(basename "$v")" "$vu" "$ticket"
+      fi
+      continue
+    fi
+  fi
   record_verdict "$v" factory-reviewer; summary "$v"
   [[ "$(verdict_field "$v" Result)" =~ ^(PASS|FAIL)$ ]] && rm -f "$sent" "$dir/state/$ticket.invalid-verdict.md" "$dir/state/$ticket.no-verdict"
+  # A review that judged something ends a run of reviews that judged nothing.
+  read -r vp vf _ < <(verdict_evidence_counts "$v"); [ $((vp + vf)) -eq 0 ] || rm -f "$dir/state/$ticket.not-run"
 done
 # D69 for the mission verdicts too: a behavior or health verdict without a
 # PASS/FAIL Result line is a format slip, not a failure. Recorded as-is it read
