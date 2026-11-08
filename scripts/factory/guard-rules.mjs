@@ -226,6 +226,23 @@ export function stripHeredocs(cmd) {
   return String(cmd ?? "").replace(/<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1([^\n]*)\n[\s\S]*?\n\s*\2(?=\s*(\n|$|[;&|)]))/g, "<<''$3");
 }
 
+// A redirect target in quotes, or held in a variable set earlier in the same
+// command, is still a path: the reviewer's `log=.scratch/m/tmp/t.log; npm test
+// > "$log"` was refused as "writing ''". Unquote targets and expand variables the
+// command itself assigns (and TMPDIR, mktemp); anything still unknown stays
+// refused.
+export function resolveTargets(cmd) {
+  const vars = { TMPDIR: tmpdir() };
+  for (const m of String(cmd).matchAll(/(?:^|[;&|\n(]|\s)([A-Za-z_][A-Za-z0-9_]*)=(?:"([^"]*)"|'([^']*)'|([^\s;&|'"()]+))/g)) {
+    vars[m[1]] = m[2] ?? m[3] ?? m[4] ?? "";
+  }
+  const expand = (t) => t.replace(/\$\(mktemp\b[^)]*\)/g, join(tmpdir(), "mktemp"))
+    .replace(/\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?/g, (all, n) => (Object.hasOwn(vars, n) ? vars[n] : all));
+  return String(cmd)
+    .replace(/(\d?(?:>>?|>\|)\s*|\btee\s+(?:-a\s+)?)(["'])([^"'\n]*)\2/g, (all, op, _q, t) => (/\s/.test(t) ? all : op + expand(t)))
+    .replace(/(\d?(?:>>?|>\|)\s*|\btee\s+(?:-a\s+)?)(\$[^\s;&|<>]+)/g, (all, op, t) => op + expand(t));
+}
+
 export function strayWrite(n, cwd, root) {
   const allowed = (target) => {
     if (/^&\d|^\/dev\//.test(target)) return true;
@@ -392,7 +409,7 @@ export function check({ tool, input = {}, cwd = process.cwd() }) {
       // root dirtied the tree and blocked the next ticket's worktree.
       const root = projectRoot(cwd);
       if (root) {
-        const out = strayWrite(stripHeredocs(raw).replace(/'[^']*'|"[^"]*"/g, "''"), cwd, root);
+        const out = strayWrite(resolveTargets(stripHeredocs(raw)).replace(/'[^']*'|"[^"]*"/g, "''"), cwd, root);
         if (out) return blocked("scratch", `writing ${out} outside .scratch/ (working files go under .scratch/<mission>/tmp/; the factory's scripts write the rest)`);
       }
     }
