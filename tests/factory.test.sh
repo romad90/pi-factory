@@ -1144,6 +1144,9 @@ grep -q "title: feat(demo): $(sed -n 's/^# //p' $m/spec.md | head -1)" <<<"$out"
   && t "mr.sh: no heading in the body, the title is the mission's own (intent and spec title), not the last commit" || fail "mr title from spec" "$out"
 cp "$work/pr.keep" $m/pr.md
 bash scripts/factory/mr.sh --help | grep -q '^Usage: scripts/factory/mr.sh' && t "mr.sh --help prints its usage" || fail "mr help" "$(bash scripts/factory/mr.sh --help 2>&1)"
+fh="$(bash scripts/factory/factory.sh help)"
+grep -q '^One entry point' <<<"$fh" && grep -q 'alias factory=' <<<"$fh" && grep -q 'learn-export' <<<"$fh" && ! grep -q 'set -euo' <<<"$fh" \
+  && t "factory help prints its whole header, first line to last, and nothing after" || fail "factory help" "$fh"
 git init -q --bare "$work/origin.git"; git remote remove origin 2>/dev/null || true; git remote add origin "$work/origin.git"
 mkdir -p "$work/bin"; cat > "$work/bin/glab" <<'GLAB'
 #!/usr/bin/env bash

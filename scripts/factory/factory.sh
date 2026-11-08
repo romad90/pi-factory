@@ -25,7 +25,7 @@ here="$(cd -P "$(dirname "$0")" && pwd)"
 cmd="${1:-help}"; [ $# -gt 0 ] && shift
 
 case "$cmd" in
-  help|-h|--help) sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  help|-h|--help) awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$0"; exit 0 ;;
   version)
     printf 'installed: %s (%s)\n' "$(cat "$here/../../.factory/VERSION")" "$(cd -P "$here/../.." && pwd)"
     if [ -f .factory/VERSION ]; then printf 'project expects: %s\n' "$(cat .factory/VERSION)"; fi
