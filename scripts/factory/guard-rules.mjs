@@ -71,7 +71,9 @@ const BASH_RULES = [
   // row from human.sh, and no agent writes either by hand.
   ["approval", /(>>?|\btee\b|\bsed\s+[^;&|]*-i|\b(cp|mv|install|ln|truncate|rm)\b)[^;&|]*decisions\.tsv\b/, "writing decisions.tsv by hand (human.sh logs decisions)"],
   // Mission records: scripts write them, nobody deletes them (D71)
-  ["records", /\brm\b[^;&|]*\.scratch\//, "deleting mission files in .scratch/ (they are the record; the scripts change them)"],
+  // A mission's tmp/ holds working files, not records: deleting there is fine,
+  // unless the path climbs back out (..).
+  ["records", /\brm\b[^;&|]*\.scratch\/(?![^\/\s;&|]+\/tmp\/(?![^\s;&|]*\.\.(\/|\s|$)))/, "deleting mission files in .scratch/ (they are the record; the scripts change them)"],
 ];
 
 // D100: a worker's hands stay off the network. Dependencies are linked into
@@ -175,9 +177,12 @@ const withoutFreshOptions = (i) => {
 };
 // D75: the one direct call a factory agent needs: a reviewer dispatching a
 // code-review axis to the read-only factory-review-axis agent, fresh.
-const AXIS_ALLOWED = new Set(["agent", "task", "context", "async"]);
-const isAxisDispatch = (i) => i.agent === "factory-review-axis" && typeof i.task === "string"
-  && (i.context === undefined || i.context === "fresh") && Object.keys(i).every((k) => AXIS_ALLOWED.has(k));
+const AXIS_ALLOWED = new Set(["agent", "task", "context", "async", "cwd"]);
+const READ_ACTIONS = new Set(["status", "list", "get", "doctor", "interrupt"]);
+// The reviewer may name its own project as cwd (seen on pi-subagents 0.87), never another.
+const isAxisDispatch = (i, cwd = process.cwd()) => i.agent === "factory-review-axis" && typeof i.task === "string"
+  && (i.context === undefined || i.context === "fresh") && Object.keys(i).every((k) => AXIS_ALLOWED.has(k))
+  && (i.cwd === undefined || (typeof i.cwd === "string" && projectRoot(resolve(cwd, i.cwd)) === projectRoot(cwd) && resolve(cwd, i.cwd) === projectRoot(cwd)));
 
 // Paths no agent writes or edits.
 const PROTECTED_WRITE = /^(\.git\/|\.factory\/|scripts\/factory\/|\.pi\/|\.github\/|\.gitlab-ci\.yml$|\.husky\/|\.pre-commit-config\.yaml$|lefthook\.yml$)/;
@@ -222,8 +227,16 @@ function hidesInstrument(cwd) {
 // the temp folders, or null. File descriptors (2>&1) and /dev/* are not files.
 // A heredoc's body is data for the command, not shell: `node <<'JS'` with
 // `(x) => x > 1` inside wrote nothing (dry run on pi-subagents 0.87).
+// A heredoc fed to a shell (bash, sh, zsh, eval, source, xargs...) is commands,
+// not data, so it is kept and checked like the rest.
+const SHELL_FED = /^(?:sudo\s+)?(?:\S*\/)?(?:ba|z|da|k|fi)?sh\b|^(?:eval|source|\.|xargs|exec|env\b.*\b(?:ba|z)?sh)\b/;
 export function stripHeredocs(cmd) {
-  return String(cmd ?? "").replace(/<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1([^\n]*)\n[\s\S]*?\n\s*\2(?=\s*(\n|$|[;&|)]))/g, "<<''$3");
+  const s = String(cmd ?? "");
+  return s.replace(/<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1([^\n]*)\n[\s\S]*?\n\s*\2(?=\s*(\n|$|[;&|)]))/g, (all, _q, _tag, rest, _end, at) => {
+    const before = s.slice(0, at);
+    const seg = before.slice(Math.max(before.lastIndexOf("\n"), before.lastIndexOf(";"), before.lastIndexOf("&"), before.lastIndexOf("|"), before.lastIndexOf("(")) + 1).trim();
+    return SHELL_FED.test(seg) ? all : `<<''${rest}`;
+  });
 }
 
 // A redirect target in quotes, or held in a variable set earlier in the same
@@ -362,18 +375,27 @@ export function check({ tool, input = {}, cwd = process.cwd() }) {
     return { rule: "bench", reason: "no supervisor in a bench run: nobody will reply, so don't ask again. Finish the ticket with what the files settle, or stop and say in your final answer what you needed: blocked by the factory guard" };
   }
   if (tool === "subagent") {
-    if (input.action !== undefined || !projectRoot(cwd)) return null;   // status, list: harmless
+    if (!projectRoot(cwd)) return null;
+    // Read-only actions only: a lead steering or resuming a worker writes it a
+    // brief in its own words (D71); interrupt stops one.
+    if (input.action !== undefined) {
+      return READ_ACTIONS.has(input.action) ? null
+        : { rule: "lead", reason: `subagent action "${input.action}": factory agents get their brief from the factory's files (decisions go through /factory-decide); allowed actions: ${[...READ_ACTIONS].join(", ")}: blocked by the factory guard` };
+    }
     input = withoutFreshOptions(input);
     const extra = Object.keys(input).filter((k) => !SUBAGENT_ALLOWED.has(k));
-    if (typeof input.workflow === "string" && WORKFLOW_FILE.test(input.workflow) && !extra.length) return null;
-    if (isAxisDispatch(input)) return null;
-    return { rule: "lead", reason: `factory agents start only from a generated workflow file: subagent({ workflow: "<the WORKFLOW_FILE path workflow.sh printed>", context: "fresh", async: false })${extra.length ? `, without ${extra.join(", ")}` : ""}: blocked by the factory guard` };
+    if (typeof input.workflow === "string" && WORKFLOW_FILE.test(input.workflow) && !extra.length && input.async !== true) return null;
+    if (isAxisDispatch(input, cwd)) return null;
+    return { rule: "lead", reason: `factory agents start only from a generated workflow file: subagent({ workflow: "<the WORKFLOW_FILE path workflow.sh printed>", options: { context: "fresh" }, async: false })${extra.length ? `, without ${extra.join(", ")}` : ""}: blocked by the factory guard` };
   }
   if (tool === "bash") {
     const raw = String(input.command ?? "");
-    const n = normalize(raw);
+    // Rules read one command per line: a heredoc's data (unless a shell runs
+    // it) and a line break no longer join two commands into one match.
+    const lines = stripHeredocs(raw).replace(/\\\r?\n/g, " ").replace(/\r?\n/g, " ; ");
+    const n = normalize(lines);
     const calls = gitCalls(raw);
-    const variants = [raw, n, calls.map((c) => ["git", c.sub, ...c.args].join(" ")).join(" ; ")];
+    const variants = [lines, n, calls.map((c) => ["git", c.sub, ...c.args].join(" ")).join(" ; ")];
     const blocked = (rule, reason) => ({ rule, reason: `${reason}: blocked by the factory guard` });
     const first = (rules) => {
       for (const [rule, re, reason] of rules) if (variants.some((v) => re.test(v))) return blocked(rule, reason);
