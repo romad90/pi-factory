@@ -1,0 +1,2087 @@
+{
+ "generated": "2026-11-08T20:17:09.192Z",
+ "factoryDir": ".scratch",
+ "factory": {
+  "missions": 3,
+  "tickets": 5,
+  "reviewed": 5,
+  "firstPass": 2,
+  "rounds": 12,
+  "decisions": 18,
+  "handCommits": 33,
+  "runs": 57,
+  "tokensIn": 1894950,
+  "tokensOut": 372151,
+  "cost": 7.06,
+  "scored": 0,
+  "scoreFails": 0,
+  "mrs": 3,
+  "costPerMr": 2.35,
+  "decisionsPerMr": 17
+ },
+ "missions": [
+  {
+   "name": "end-issue-845-tests-on-end",
+   "title": "end-issue-845-tests-on-end",
+   "intent": "bugfix",
+   "step": "health",
+   "next": "[text]",
+   "human": false,
+   "otherBranch": "",
+   "paused": false,
+   "question": "",
+   "mr": "closed",
+   "contract": {
+    "total": 5,
+    "approved": true
+   },
+   "counts": {
+    "total": 1,
+    "pass": 1
+   },
+   "tickets": [
+    {
+     "name": "02-end-scope-tests-on-search-end",
+     "num": "02",
+     "state": "pass",
+     "round": 2,
+     "title": "End the two scope tests on the search `end` event",
+     "size": "S",
+     "blockedBy": [],
+     "covers": [
+      "VAL-TEST-001",
+      "VAL-TEST-002",
+      "VAL-TEST-003",
+      "VAL-TEST-004",
+      "VAL-CROSS-001"
+     ],
+     "assertions": [],
+     "integrated": "integrated",
+     "verdict": {
+      "result": "PASS",
+      "round": 2,
+      "commit": "",
+      "brief": "",
+      "model": "model-a",
+      "blocking": "",
+      "file": "02-end-scope-tests-on-search-end-code.md"
+     },
+     "history": [
+      {
+       "result": "FAIL",
+       "round": 1,
+       "commit": "",
+       "brief": "",
+       "model": "model-a",
+       "blocking": "[text]",
+       "file": "02-end-scope-tests-on-search-end-code.r1.md"
+      },
+      {
+       "result": "PASS",
+       "round": 2,
+       "commit": "",
+       "brief": "",
+       "model": "model-a",
+       "blocking": "",
+       "file": "02-end-scope-tests-on-search-end-code.r2.md"
+      }
+     ],
+     "journal": "",
+     "stuck": false,
+     "staleVerdict": false
+    }
+   ],
+   "behavior": {
+    "result": "PASS",
+    "round": 1,
+    "commit": "",
+    "brief": "",
+    "model": "model-b",
+    "blocking": "",
+    "file": "behavior.md"
+   },
+   "health": {
+    "result": "PASS",
+    "round": 1,
+    "commit": "",
+    "brief": "",
+    "model": "model-c",
+    "blocking": "",
+    "file": "health.md"
+   },
+   "interventions": {
+    "human": 6,
+    "auto": 0,
+    "target": 5
+   },
+   "decisions": [
+    {
+     "date": "2026-11-08",
+     "ticket": "-",
+     "kind": "decide",
+     "question": "[text]",
+     "answer": "[text]",
+     "who": ""
+    },
+    {
+     "date": "2026-11-08",
+     "ticket": "-",
+     "kind": "approve",
+     "question": "[text]",
+     "answer": "[text]",
+     "who": ""
+    },
+    {
+     "date": "2026-11-08",
+     "ticket": "-",
+     "kind": "approve-tickets",
+     "question": "[text]",
+     "answer": "[text]",
+     "who": ""
+    },
+    {
+     "date": "2026-11-08",
+     "ticket": "02-end-scope-tests-on-search-end",
+     "kind": "test-on-base",
+     "question": "[text]",
+     "answer": "[text]",
+     "who": ""
+    },
+    {
+     "date": "2026-11-08",
+     "ticket": "02-end-scope-tests-on-search-end",
+     "kind": "decide",
+     "question": "[text]",
+     "answer": "[text]",
+     "who": ""
+    },
+    {
+     "date": "2026-11-08",
+     "ticket": "02-end-scope-tests-on-search-end",
+     "kind": "decide",
+     "question": "[text]",
+     "answer": "[text]",
+     "who": ""
+    }
+   ],
+   "runs": [],
+   "usage": {
+    "runs": 15,
+    "input": 487020,
+    "output": 104199,
+    "cacheRead": 3850678,
+    "cost": 1.516662755
+   },
+   "log": [
+    {
+     "date": "2026-11-08T11:34:10+01:00",
+     "kind": "gate",
+     "ticket": "",
+     "ok": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T11:30:49+01:00",
+     "kind": "gate",
+     "ticket": "",
+     "ok": null,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T11:30:43+01:00",
+     "kind": "gate",
+     "ticket": "",
+     "ok": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T11:24:19+01:00",
+     "kind": "verdict",
+     "ticket": "02-end-scope-tests-on-search-end",
+     "ok": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T11:21:54+01:00",
+     "kind": "decision",
+     "ticket": "02-end-scope-tests-on-search-end",
+     "ok": null,
+     "human": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T11:20:25+01:00",
+     "kind": "question",
+     "ticket": "",
+     "ok": null,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T11:19:20+01:00",
+     "kind": "decision",
+     "ticket": "02-end-scope-tests-on-search-end",
+     "ok": null,
+     "human": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T11:15:52+01:00",
+     "kind": "question",
+     "ticket": "",
+     "ok": null,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T11:15:52+01:00",
+     "kind": "verdict",
+     "ticket": "01-reproduce-issue-845-flake",
+     "ok": false,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T11:13:29+01:00",
+     "kind": "verdict",
+     "ticket": "02-end-scope-tests-on-search-end",
+     "ok": false,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T11:11:45+01:00",
+     "kind": "decision",
+     "ticket": "02-end-scope-tests-on-search-end",
+     "ok": null,
+     "human": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T11:11:45+01:00",
+     "kind": "integrated",
+     "ticket": "02-end-scope-tests-on-search-end",
+     "ok": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T11:11:39+01:00",
+     "kind": "verdict",
+     "ticket": "01-reproduce-issue-845-flake",
+     "ok": false,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T11:07:54+01:00",
+     "kind": "decision",
+     "ticket": "",
+     "ok": null,
+     "human": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T11:05:55+01:00",
+     "kind": "decision",
+     "ticket": "",
+     "ok": null,
+     "human": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T09:41:19+01:00",
+     "kind": "decision",
+     "ticket": "",
+     "ok": null,
+     "human": true,
+     "text": "[text]"
+    }
+   ],
+   "workers": [],
+   "needs": [],
+   "timeline": [
+    {
+     "run": "041b9596",
+     "dir": "041b9596-edf4-440c-9770-ba4f12ca225c_factory-ticket-writer",
+     "role": "ticket-writer",
+     "model": "model-d",
+     "ticket": "",
+     "start": "2026-11-08T10:06:02.176Z",
+     "end": "2026-11-08T10:06:24.174Z",
+     "ms": 21998,
+     "cost": 0.105162,
+     "input": 38066,
+     "output": 2903,
+     "calls": 9,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "81fd458b",
+     "dir": "81fd458b-5bb6-4c42-8d09-0c96bfc6bc4a_factory-worker",
+     "role": "worker",
+     "model": "model-e",
+     "ticket": "",
+     "start": "2026-11-08T10:07:59.907Z",
+     "end": "2026-11-08T10:10:33.559Z",
+     "ms": 153652,
+     "cost": 0.009407691000000001,
+     "input": 26349,
+     "output": 9580,
+     "calls": 17,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "c301a771",
+     "dir": "c301a771-2761-4752-a0b9-707d49689195_factory-worker",
+     "role": "worker",
+     "model": "model-e",
+     "ticket": "",
+     "start": "2026-11-08T10:07:59.908Z",
+     "end": "2026-11-08T10:11:35.652Z",
+     "ms": 215744,
+     "cost": 0.019561398,
+     "input": 63594,
+     "output": 9126,
+     "calls": 19,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "a5833402",
+     "dir": "a5833402-c224-483d-bf10-3c8fb55023bb_factory-reviewer",
+     "role": "reviewer",
+     "model": "model-f",
+     "ticket": "",
+     "start": "2026-11-08T10:11:51.767Z",
+     "end": "2026-11-08T10:13:27.253Z",
+     "ms": 95486,
+     "cost": 0.1623522,
+     "input": 36,
+     "output": 5592,
+     "calls": 26,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "64bfc71a",
+     "dir": "64bfc71a-a016-4e77-a788-e0eac29f4f94_factory-review-axis",
+     "role": "review-axis",
+     "model": "model-g",
+     "ticket": "",
+     "start": "2026-11-08T10:12:07.781Z",
+     "end": "2026-11-08T10:12:25.462Z",
+     "ms": 17681,
+     "cost": 0.01613085,
+     "input": 12,
+     "output": 1023,
+     "calls": 10,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "d285a17e",
+     "dir": "d285a17e-4542-4bd8-b032-7cf1f462c9e4_factory-review-axis",
+     "role": "review-axis",
+     "model": "model-g",
+     "ticket": "",
+     "start": "2026-11-08T10:12:07.781Z",
+     "end": "2026-11-08T10:12:28.032Z",
+     "ms": 20251,
+     "cost": 0.01714075,
+     "input": 12,
+     "output": 1451,
+     "calls": 12,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "a45dc28b",
+     "dir": "a45dc28b-c676-4079-b871-8275f4f07ec8_factory-worker",
+     "role": "worker",
+     "model": "model-e",
+     "ticket": "",
+     "start": "2026-11-08T10:13:35.775Z",
+     "end": "2026-11-08T10:15:45.399Z",
+     "ms": 129624,
+     "cost": 0.03779268,
+     "input": 69608,
+     "output": 14386,
+     "calls": 33,
+     "result": "",
+     "refused": [
+      {
+       "at": "2026-11-08T10:14:21.966Z",
+       "rule": "records",
+       "tool": "bash",
+       "input": "[text]",
+       "today": "unknown"
+      }
+     ]
+    },
+    {
+     "run": "b8c1b6cf",
+     "dir": "b8c1b6cf-d4ec-4882-b9e2-8d86a592a20c_factory-worker",
+     "role": "worker",
+     "model": "model-e",
+     "ticket": "",
+     "start": "2026-11-08T10:13:35.775Z",
+     "end": "2026-11-08T10:14:59.418Z",
+     "ms": 83643,
+     "cost": 0.034785952,
+     "input": 51917,
+     "output": 16569,
+     "calls": 37,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "81e34dd0",
+     "dir": "81e34dd0-fc8d-4757-8c78-9f312cd88217_factory-worker-heavy",
+     "role": "worker-heavy",
+     "model": "model-d",
+     "ticket": "",
+     "start": "2026-11-08T10:19:29.714Z",
+     "end": "2026-11-08T10:20:05.921Z",
+     "ms": 36207,
+     "cost": 0.10419199999999999,
+     "input": 40331,
+     "output": 2353,
+     "calls": 4,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "ea021607",
+     "dir": "ea021607-be6a-4503-9534-5972ee39c2b8_factory-worker",
+     "role": "worker",
+     "model": "model-e",
+     "ticket": "",
+     "start": "2026-11-08T10:19:29.714Z",
+     "end": "2026-11-08T10:20:20.213Z",
+     "ms": 50499,
+     "cost": 0.005221634,
+     "input": 14443,
+     "output": 6248,
+     "calls": 14,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "4208a1bb",
+     "dir": "4208a1bb-ebd1-46a7-ad54-d70f85cdd7d2_factory-reviewer",
+     "role": "reviewer",
+     "model": "model-f",
+     "ticket": "",
+     "start": "2026-11-08T10:22:49.344Z",
+     "end": "2026-11-08T10:24:16.890Z",
+     "ms": 87546,
+     "cost": 0.1495826,
+     "input": 39,
+     "output": 5160,
+     "calls": 31,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "006150c2",
+     "dir": "006150c2-b25a-4153-a633-5ea9d406b678_factory-review-axis",
+     "role": "review-axis",
+     "model": "model-g",
+     "ticket": "",
+     "start": "2026-11-08T10:23:08.071Z",
+     "end": "2026-11-08T10:23:19.741Z",
+     "ms": 11670,
+     "cost": 0.01338585,
+     "input": 6,
+     "output": 799,
+     "calls": 10,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "b423d89a",
+     "dir": "b423d89a-d969-449a-bef5-2eea37963e5b_factory-review-axis",
+     "role": "review-axis",
+     "model": "model-g",
+     "ticket": "",
+     "start": "2026-11-08T10:23:08.071Z",
+     "end": "2026-11-08T10:23:50.472Z",
+     "ms": 42401,
+     "cost": 0.02768425,
+     "input": 15,
+     "output": 1474,
+     "calls": 13,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "801195c5",
+     "dir": "801195c5-712a-4bae-851f-1a5a9cefef7f_factory-validator",
+     "role": "validator",
+     "model": "model-h",
+     "ticket": "",
+     "start": "2026-11-08T10:24:24.438Z",
+     "end": "2026-11-08T10:30:40.289Z",
+     "ms": 375851,
+     "cost": 0.5441869,
+     "input": 113140,
+     "output": 18948,
+     "calls": 56,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "9c3c1358",
+     "dir": "9c3c1358-ec7e-4163-869e-c5cdd9e67566_factory-code-steward",
+     "role": "code-steward",
+     "model": "model-h",
+     "ticket": "",
+     "start": "2026-11-08T10:30:52.012Z",
+     "end": "2026-11-08T10:34:07.186Z",
+     "ms": 195174,
+     "cost": 0.270076,
+     "input": 69452,
+     "output": 8587,
+     "calls": 29,
+     "result": "",
+     "refused": []
+    }
+   ]
+  },
+  {
+   "name": "pin-destroy-during-search",
+   "title": "pin-destroy-during-search",
+   "intent": "maintenance",
+   "step": "health",
+   "next": "[text]",
+   "human": false,
+   "otherBranch": "",
+   "paused": false,
+   "question": "",
+   "mr": "closed",
+   "contract": {
+    "total": 5,
+    "approved": true
+   },
+   "counts": {
+    "total": 1,
+    "pass": 1
+   },
+   "tickets": [
+    {
+     "name": "01-pin-destroy-during-search",
+     "num": "01",
+     "state": "pass",
+     "round": 4,
+     "title": "Pin what a search emits when the client is destroyed during it",
+     "size": "S",
+     "blockedBy": [],
+     "covers": [
+      "VAL-DESTROY-001",
+      "VAL-DESTROY-002",
+      "VAL-DESTROY-003",
+      "VAL-CROSS-001",
+      "VAL-CROSS-002"
+     ],
+     "assertions": [],
+     "integrated": "integrated",
+     "verdict": {
+      "result": "PASS",
+      "round": 4,
+      "commit": "",
+      "brief": "",
+      "model": "model-a",
+      "blocking": "",
+      "file": "01-pin-destroy-during-search-code.md"
+     },
+     "history": [
+      {
+       "result": "FAIL",
+       "round": 1,
+       "commit": "",
+       "brief": "",
+       "model": "model-a",
+       "blocking": "[text]",
+       "file": "01-pin-destroy-during-search-code.r1.md"
+      },
+      {
+       "result": "FAIL",
+       "round": 2,
+       "commit": "",
+       "brief": "",
+       "model": "model-i",
+       "blocking": "[text]",
+       "file": "01-pin-destroy-during-search-code.r2.md"
+      },
+      {
+       "result": "FAIL",
+       "round": 3,
+       "commit": "",
+       "brief": "",
+       "model": "model-j",
+       "blocking": "[text]",
+       "file": "01-pin-destroy-during-search-code.r3.md"
+      },
+      {
+       "result": "PASS",
+       "round": 4,
+       "commit": "",
+       "brief": "",
+       "model": "model-a",
+       "blocking": "",
+       "file": "01-pin-destroy-during-search-code.r4.md"
+      }
+     ],
+     "journal": "",
+     "stuck": false,
+     "staleVerdict": false
+    }
+   ],
+   "behavior": {
+    "result": "PASS",
+    "round": null,
+    "commit": "",
+    "brief": "",
+    "model": "",
+    "blocking": "",
+    "file": "behavior.md"
+   },
+   "health": {
+    "result": "PASS",
+    "round": null,
+    "commit": "",
+    "brief": "",
+    "model": "",
+    "blocking": "",
+    "file": "health.md"
+   },
+   "interventions": {
+    "human": 5,
+    "auto": 0,
+    "target": 5
+   },
+   "decisions": [
+    {
+     "date": "2026-11-08",
+     "ticket": "-",
+     "kind": "decide",
+     "question": "[text]",
+     "answer": "[text]",
+     "who": ""
+    },
+    {
+     "date": "2026-11-08",
+     "ticket": "-",
+     "kind": "approve",
+     "question": "[text]",
+     "answer": "[text]",
+     "who": ""
+    },
+    {
+     "date": "2026-11-08",
+     "ticket": "-",
+     "kind": "approve-tickets",
+     "question": "[text]",
+     "answer": "[text]",
+     "who": ""
+    },
+    {
+     "date": "2026-11-08",
+     "ticket": "-",
+     "kind": "decide",
+     "question": "[text]",
+     "answer": "[text]",
+     "who": ""
+    },
+    {
+     "date": "2026-11-08",
+     "ticket": "-",
+     "kind": "decide",
+     "question": "[text]",
+     "answer": "[text]",
+     "who": ""
+    }
+   ],
+   "runs": [],
+   "usage": {
+    "runs": 13,
+    "input": 376986,
+    "output": 63805,
+    "cacheRead": 1817423,
+    "cost": 1.315303768
+   },
+   "log": [
+    {
+     "date": "2026-11-08T10:32:18+01:00",
+     "kind": "gate",
+     "ticket": "",
+     "ok": null,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T10:25:15+01:00",
+     "kind": "verdict",
+     "ticket": "01-pin-destroy-during-search",
+     "ok": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T10:23:01+01:00",
+     "kind": "integrated",
+     "ticket": "01-pin-destroy-during-search",
+     "ok": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T10:21:33+01:00",
+     "kind": "decision",
+     "ticket": "",
+     "ok": null,
+     "human": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T10:08:46+01:00",
+     "kind": "verdict",
+     "ticket": "01-pin-destroy-during-search",
+     "ok": false,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T10:07:08+01:00",
+     "kind": "verdict",
+     "ticket": "01-pin-destroy-during-search",
+     "ok": false,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T10:04:11+01:00",
+     "kind": "decision",
+     "ticket": "",
+     "ok": null,
+     "human": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T10:02:28+01:00",
+     "kind": "verdict",
+     "ticket": "01-pin-destroy-during-search",
+     "ok": false,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T09:54:38+01:00",
+     "kind": "integrated",
+     "ticket": "01-pin-destroy-during-search",
+     "ok": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T09:52:11+01:00",
+     "kind": "integrated",
+     "ticket": "01-pin-destroy-during-search",
+     "ok": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T09:50:52+01:00",
+     "kind": "decision",
+     "ticket": "",
+     "ok": null,
+     "human": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T09:49:15+01:00",
+     "kind": "decision",
+     "ticket": "",
+     "ok": null,
+     "human": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T09:41:19+01:00",
+     "kind": "decision",
+     "ticket": "",
+     "ok": null,
+     "human": true,
+     "text": "[text]"
+    }
+   ],
+   "workers": [],
+   "needs": [],
+   "timeline": [
+    {
+     "run": "70c6c20b",
+     "dir": "70c6c20b-ff2f-4c30-956a-ef0e52606d2b_factory-ticket-writer",
+     "role": "ticket-writer",
+     "model": "model-d",
+     "ticket": "",
+     "start": "2026-11-08T08:49:20.649Z",
+     "end": "2026-11-08T08:49:40.497Z",
+     "ms": 19848,
+     "cost": 0.10323399999999999,
+     "input": 39037,
+     "output": 2516,
+     "calls": 9,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "fa86f421",
+     "dir": "fa86f421-854f-43a7-abb1-0542c4cf8745_factory-worker",
+     "role": "worker",
+     "model": "model-e",
+     "ticket": "",
+     "start": "2026-11-08T08:51:00.597Z",
+     "end": "2026-11-08T08:51:57.089Z",
+     "ms": 56492,
+     "cost": 0.008632912,
+     "input": 16174,
+     "output": 9355,
+     "calls": 24,
+     "result": "",
+     "refused": [
+      {
+       "at": "2026-11-08T08:51:34.408Z",
+       "rule": "deps",
+       "tool": "bash",
+       "input": "[text]",
+       "today": "unknown"
+      }
+     ]
+    },
+    {
+     "run": "3b312884",
+     "dir": "3b312884-3619-4acb-b1a7-712e0943b6bc_factory-reviewer",
+     "role": "reviewer",
+     "model": "model-f",
+     "ticket": "",
+     "start": "2026-11-08T08:52:19.455Z",
+     "end": "2026-11-08T08:53:19.787Z",
+     "ms": 60332,
+     "cost": 0.105877,
+     "input": 27,
+     "output": 4257,
+     "calls": 26,
+     "result": "",
+     "refused": [
+      {
+       "at": "2026-11-08T08:52:41.846Z",
+       "rule": "scratch",
+       "tool": "bash",
+       "input": "[text]",
+       "today": "unknown"
+      }
+     ]
+    },
+    {
+     "run": "7733e3f2",
+     "dir": "7733e3f2-c03d-4758-8527-135a1d442ff1_factory-review-axis",
+     "role": "review-axis",
+     "model": "model-g",
+     "ticket": "",
+     "start": "2026-11-08T08:52:38.683Z",
+     "end": "2026-11-08T08:52:54.537Z",
+     "ms": 15854,
+     "cost": 0.015332599999999998,
+     "input": 6,
+     "output": 948,
+     "calls": 11,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "c30e506c",
+     "dir": "c30e506c-ba6f-497a-a264-dc4a17d6ef0e_factory-review-axis",
+     "role": "review-axis",
+     "model": "model-g",
+     "ticket": "",
+     "start": "2026-11-08T08:52:38.702Z",
+     "end": "2026-11-08T08:52:59.863Z",
+     "ms": 21161,
+     "cost": 0.03203135,
+     "input": 9,
+     "output": 1377,
+     "calls": 14,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "51cd542b",
+     "dir": "51cd542b-d654-43cb-8d00-e2e33bc26379_factory-worker",
+     "role": "worker",
+     "model": "model-e",
+     "ticket": "",
+     "start": "2026-11-08T08:53:29.251Z",
+     "end": "2026-11-08T08:54:29.292Z",
+     "ms": 60041,
+     "cost": 0.014593164,
+     "input": 40524,
+     "output": 7970,
+     "calls": 21,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "8f3b9606",
+     "dir": "8f3b9606-a24e-4d55-b2f8-bf5b5ae57fcd_factory-reviewer",
+     "role": "reviewer",
+     "model": "model-f",
+     "ticket": "",
+     "start": "2026-11-08T08:54:44.841Z",
+     "end": "2026-11-08T08:56:18.181Z",
+     "ms": 93340,
+     "cost": 0.2099706,
+     "input": 51,
+     "output": 6482,
+     "calls": 37,
+     "result": "",
+     "refused": [
+      {
+       "at": "2026-11-08T08:55:13.807Z",
+       "rule": "scratch",
+       "tool": "bash",
+       "input": "[text]",
+       "today": "unknown"
+      },
+      {
+       "at": "2026-11-08T08:55:13.813Z",
+       "rule": "scratch",
+       "tool": "bash",
+       "input": "[text]",
+       "today": "unknown"
+      },
+      {
+       "at": "2026-11-08T08:55:13.817Z",
+       "rule": "scratch",
+       "tool": "bash",
+       "input": "[text]",
+       "today": "allowed"
+      }
+     ]
+    },
+    {
+     "run": "14bbb36f",
+     "dir": "14bbb36f-667d-4b96-877c-37fccc5add09_factory-review-axis",
+     "role": "review-axis",
+     "model": "model-g",
+     "ticket": "",
+     "start": "2026-11-08T08:55:08.972Z",
+     "end": "2026-11-08T08:55:25.904Z",
+     "ms": 16932,
+     "cost": 0.0170131,
+     "input": 9,
+     "output": 1086,
+     "calls": 12,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "e6e4b0cd",
+     "dir": "e6e4b0cd-328c-47dc-abba-6e510ac21dc5_factory-review-axis",
+     "role": "review-axis",
+     "model": "model-g",
+     "ticket": "",
+     "start": "2026-11-08T08:55:08.972Z",
+     "end": "2026-11-08T08:55:38.660Z",
+     "ms": 29688,
+     "cost": 0.03513085,
+     "input": 15,
+     "output": 1892,
+     "calls": 14,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "f98d4897",
+     "dir": "f98d4897-8022-49bb-b8f5-2bb6c9383118_factory-worker",
+     "role": "worker",
+     "model": "model-e",
+     "ticket": "",
+     "start": "2026-11-08T09:04:21.376Z",
+     "end": "2026-11-08T09:07:00.071Z",
+     "ms": 158695,
+     "cost": 0.015934392,
+     "input": 18165,
+     "output": 14349,
+     "calls": 29,
+     "result": "",
+     "refused": [
+      {
+       "at": "2026-11-08T09:05:27.393Z",
+       "rule": "records",
+       "tool": "bash",
+       "input": "[text]",
+       "today": "unknown"
+      },
+      {
+       "at": "2026-11-08T09:06:51.665Z",
+       "rule": "records",
+       "tool": "bash",
+       "input": "[text]",
+       "today": "unknown"
+      }
+     ]
+    },
+    {
+     "run": "6d6912ae",
+     "dir": "6d6912ae-4ac0-4851-b48b-306a2dde3002_factory-worker-heavy",
+     "role": "worker-heavy",
+     "model": "model-d",
+     "ticket": "",
+     "start": "2026-11-08T09:07:43.438Z",
+     "end": "2026-11-08T09:08:37.168Z",
+     "ms": 53730,
+     "cost": 0.19399199999999997,
+     "input": 79806,
+     "output": 3438,
+     "calls": 5,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "2d945b55",
+     "dir": "2d945b55-2dfd-4602-92ba-565d54b6319c_factory-worker-heavy",
+     "role": "worker-heavy",
+     "model": "model-d",
+     "ticket": "",
+     "start": "2026-11-08T09:22:06.467Z",
+     "end": "2026-11-08T09:22:51.173Z",
+     "ms": 44706,
+     "cost": 0.40846000000000005,
+     "input": 183130,
+     "output": 4220,
+     "calls": 9,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "2a8b5cdf",
+     "dir": "2a8b5cdf-2027-4fa8-bdce-c9e539c2997e_factory-reviewer",
+     "role": "reviewer",
+     "model": "model-f",
+     "ticket": "",
+     "start": "2026-11-08T09:23:07.913Z",
+     "end": "2026-11-08T09:25:11.368Z",
+     "ms": 123455,
+     "cost": 0.15510179999999998,
+     "input": 33,
+     "output": 5915,
+     "calls": 29,
+     "result": "",
+     "refused": [
+      {
+       "at": "2026-11-08T09:23:24.826Z",
+       "rule": "lead",
+       "tool": "subagent",
+       "input": "[text]",
+       "today": "unknown"
+      },
+      {
+       "at": "2026-11-08T09:23:28.240Z",
+       "rule": "lead",
+       "tool": "subagent",
+       "input": "[text]",
+       "today": "unknown"
+      }
+     ]
+    },
+    {
+     "run": "193ff569",
+     "dir": "193ff569-c0eb-4f68-a5ff-bba6d1ec1ed9_factory-validator",
+     "role": "validator",
+     "model": "model-h",
+     "ticket": "",
+     "start": "2026-11-08T09:25:21.814Z",
+     "end": "2026-11-08T09:32:03.571Z",
+     "ms": 401757,
+     "cost": 0.34807069999999996,
+     "input": 88974,
+     "output": 11165,
+     "calls": 34,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "0be77f36",
+     "dir": "0be77f36-5a34-47be-a859-85fe590d9f85_factory-code-steward",
+     "role": "code-steward",
+     "model": "model-h",
+     "ticket": "",
+     "start": "2026-11-08T09:32:23.864Z",
+     "end": "2026-11-08T09:36:18.068Z",
+     "ms": 234204,
+     "cost": 0.25601969999999996,
+     "input": 62899,
+     "output": 9772,
+     "calls": 24,
+     "result": "",
+     "refused": []
+    }
+   ]
+  },
+  {
+   "name": "server-survives-bad-input",
+   "title": "server-survives-bad-input",
+   "intent": "bugfix",
+   "step": "closed",
+   "next": "[text]",
+   "human": false,
+   "otherBranch": "",
+   "paused": false,
+   "question": "",
+   "mr": "closed",
+   "contract": {
+    "total": 8,
+    "approved": true
+   },
+   "counts": {
+    "total": 3,
+    "pass": 3
+   },
+   "tickets": [
+    {
+     "name": "01-unknown-operation-closes-one-connection",
+     "num": "01",
+     "state": "pass",
+     "round": 1,
+     "title": "Unknown operation closes only that connection",
+     "size": "M",
+     "blockedBy": [],
+     "covers": [
+      "VAL-CRASH-001",
+      "VAL-CRASH-002",
+      "VAL-CRASH-003"
+     ],
+     "assertions": [],
+     "integrated": "integrated",
+     "verdict": {
+      "result": "PASS",
+      "round": 1,
+      "commit": "",
+      "brief": "",
+      "model": "model-a",
+      "blocking": "",
+      "file": "01-unknown-operation-closes-one-connection-code.md"
+     },
+     "history": [
+      {
+       "result": "PASS",
+       "round": 1,
+       "commit": "",
+       "brief": "",
+       "model": "model-a",
+       "blocking": "",
+       "file": "01-unknown-operation-closes-one-connection-code.r1.md"
+      }
+     ],
+     "journal": "",
+     "stuck": false,
+     "staleVerdict": false
+    },
+    {
+     "name": "02-non-ldap-bytes-close-connection",
+     "num": "02",
+     "state": "pass",
+     "round": 1,
+     "title": "Bytes that are not an LDAP message close the connection",
+     "size": "M",
+     "blockedBy": [
+      "01"
+     ],
+     "covers": [
+      "VAL-HANG-001",
+      "VAL-HANG-002",
+      "VAL-CROSS-001",
+      "VAL-CROSS-002",
+      "VAL-CROSS-003"
+     ],
+     "assertions": [],
+     "integrated": "integrated",
+     "verdict": {
+      "result": "PASS",
+      "round": 1,
+      "commit": "",
+      "brief": "",
+      "model": "model-a",
+      "blocking": "",
+      "file": "02-non-ldap-bytes-close-connection-code.md"
+     },
+     "history": [
+      {
+       "result": "PASS",
+       "round": 1,
+       "commit": "",
+       "brief": "",
+       "model": "model-a",
+       "blocking": "",
+       "file": "02-non-ldap-bytes-close-connection-code.r1.md"
+      }
+     ],
+     "journal": "",
+     "stuck": false,
+     "staleVerdict": false
+    },
+    {
+     "name": "03-fix-parser-error-handler-nesting",
+     "num": "03",
+     "state": "pass",
+     "round": 4,
+     "title": "Fix: the parser error handler adds deeply nested lines to the server",
+     "size": "S",
+     "blockedBy": [],
+     "covers": [
+      "enabler"
+     ],
+     "assertions": [],
+     "integrated": "integrated",
+     "verdict": {
+      "result": "PASS",
+      "round": 4,
+      "commit": "",
+      "brief": "",
+      "model": "model-a",
+      "blocking": "",
+      "file": "03-fix-parser-error-handler-nesting-code.md"
+     },
+     "history": [
+      {
+       "result": "FAIL",
+       "round": 1,
+       "commit": "",
+       "brief": "",
+       "model": "model-a",
+       "blocking": "[text]",
+       "file": "03-fix-parser-error-handler-nesting-code.r1.md"
+      },
+      {
+       "result": "FAIL",
+       "round": 2,
+       "commit": "",
+       "brief": "",
+       "model": "model-k",
+       "blocking": "[text]",
+       "file": "03-fix-parser-error-handler-nesting-code.r2.md"
+      },
+      {
+       "result": "FAIL",
+       "round": 3,
+       "commit": "",
+       "brief": "",
+       "model": "model-k",
+       "blocking": "[text]",
+       "file": "03-fix-parser-error-handler-nesting-code.r3.md"
+      },
+      {
+       "result": "PASS",
+       "round": 4,
+       "commit": "",
+       "brief": "",
+       "model": "model-a",
+       "blocking": "",
+       "file": "03-fix-parser-error-handler-nesting-code.r4.md"
+      }
+     ],
+     "journal": "",
+     "stuck": false,
+     "staleVerdict": false
+    }
+   ],
+   "behavior": {
+    "result": "PASS",
+    "round": 1,
+    "commit": "",
+    "brief": "",
+    "model": "model-b",
+    "blocking": "",
+    "file": "behavior.md"
+   },
+   "health": {
+    "result": "PASS",
+    "round": 1,
+    "commit": "",
+    "brief": "",
+    "model": "model-c",
+    "blocking": "",
+    "file": "health.md"
+   },
+   "interventions": {
+    "human": 7,
+    "auto": 0,
+    "target": 5
+   },
+   "decisions": [
+    {
+     "date": "2026-11-08",
+     "ticket": "contract",
+     "kind": "decide",
+     "question": "[text]",
+     "answer": "[text]",
+     "who": ""
+    },
+    {
+     "date": "2026-11-08",
+     "ticket": "-",
+     "kind": "amend",
+     "question": "[text]",
+     "answer": "[text]",
+     "who": ""
+    },
+    {
+     "date": "2026-11-08",
+     "ticket": "-",
+     "kind": "approve",
+     "question": "[text]",
+     "answer": "[text]",
+     "who": ""
+    },
+    {
+     "date": "2026-11-08",
+     "ticket": "-",
+     "kind": "approve-tickets",
+     "question": "[text]",
+     "answer": "[text]",
+     "who": ""
+    },
+    {
+     "date": "2026-11-08",
+     "ticket": "02-non-ldap-bytes-close-connection",
+     "kind": "decide",
+     "question": "[text]",
+     "answer": "[text]",
+     "who": ""
+    },
+    {
+     "date": "2026-11-08",
+     "ticket": "02-non-ldap-bytes-close-connection",
+     "kind": "decide",
+     "question": "[text]",
+     "answer": "[text]",
+     "who": ""
+    },
+    {
+     "date": "2026-11-08",
+     "ticket": "-",
+     "kind": "approve-tickets",
+     "question": "[text]",
+     "answer": "[text]",
+     "who": ""
+    }
+   ],
+   "runs": [],
+   "usage": {
+    "runs": 29,
+    "input": 1030944,
+    "output": 204147,
+    "cacheRead": 8760905,
+    "cost": 4.2177977021999995
+   },
+   "log": [
+    {
+     "date": "2026-11-08T19:16:18+01:00",
+     "kind": "gate",
+     "ticket": "",
+     "ok": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T19:12:41+01:00",
+     "kind": "verdict",
+     "ticket": "03-fix-parser-error-handler-nesting",
+     "ok": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T18:57:05+01:00",
+     "kind": "verdict",
+     "ticket": "03-fix-parser-error-handler-nesting",
+     "ok": false,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T18:50:21+01:00",
+     "kind": "verdict",
+     "ticket": "03-fix-parser-error-handler-nesting",
+     "ok": false,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T18:49:34+01:00",
+     "kind": "verdict",
+     "ticket": "03-fix-parser-error-handler-nesting",
+     "ok": false,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T18:47:51+01:00",
+     "kind": "integrated",
+     "ticket": "03-fix-parser-error-handler-nesting",
+     "ok": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T18:24:29+01:00",
+     "kind": "decision",
+     "ticket": "",
+     "ok": null,
+     "human": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T18:21:03+01:00",
+     "kind": "gate",
+     "ticket": "",
+     "ok": null,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T18:20:58+01:00",
+     "kind": "gate",
+     "ticket": "",
+     "ok": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T18:08:57+01:00",
+     "kind": "verdict",
+     "ticket": "02-non-ldap-bytes-close-connection",
+     "ok": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T18:06:51+01:00",
+     "kind": "decision",
+     "ticket": "02-non-ldap-bytes-close-connection",
+     "ok": null,
+     "human": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T18:04:42+01:00",
+     "kind": "question",
+     "ticket": "",
+     "ok": null,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T18:03:56+01:00",
+     "kind": "decision",
+     "ticket": "02-non-ldap-bytes-close-connection",
+     "ok": null,
+     "human": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T17:50:52+01:00",
+     "kind": "question",
+     "ticket": "",
+     "ok": null,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T17:48:29+01:00",
+     "kind": "verdict",
+     "ticket": "02-non-ldap-bytes-close-connection",
+     "ok": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T17:46:30+01:00",
+     "kind": "integrated",
+     "ticket": "02-non-ldap-bytes-close-connection",
+     "ok": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T17:42:46+01:00",
+     "kind": "verdict",
+     "ticket": "01-unknown-operation-closes-one-connection",
+     "ok": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T17:22:13+01:00",
+     "kind": "verdict",
+     "ticket": "01-unknown-operation-closes-one-connection",
+     "ok": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T17:20:49+01:00",
+     "kind": "integrated",
+     "ticket": "01-unknown-operation-closes-one-connection",
+     "ok": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T17:13:25+01:00",
+     "kind": "decision",
+     "ticket": "",
+     "ok": null,
+     "human": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T17:10:40+01:00",
+     "kind": "decision",
+     "ticket": "",
+     "ok": null,
+     "human": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T17:00:04+01:00",
+     "kind": "decision",
+     "ticket": "",
+     "ok": null,
+     "human": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T16:53:38+01:00",
+     "kind": "decision",
+     "ticket": "contract",
+     "ok": null,
+     "human": true,
+     "text": "[text]"
+    },
+    {
+     "date": "2026-11-08T16:48:46+01:00",
+     "kind": "question",
+     "ticket": "",
+     "ok": null,
+     "text": "[text]"
+    }
+   ],
+   "workers": [],
+   "needs": [],
+   "timeline": [
+    {
+     "run": "1c47413e",
+     "dir": "1c47413e-c8db-441b-acac-e2b84be56f69_factory-ticket-writer",
+     "role": "ticket-writer",
+     "model": "model-d",
+     "ticket": "",
+     "start": "2026-11-08T16:10:45.907Z",
+     "end": "2026-11-08T16:11:22.649Z",
+     "ms": 36742,
+     "cost": 0.187332,
+     "input": 69046,
+     "output": 4924,
+     "calls": 13,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "f6807fb1",
+     "dir": "f6807fb1-c6ae-4d77-a41f-683f50a94f4c_factory-worker",
+     "role": "worker",
+     "model": "model-e",
+     "ticket": "",
+     "start": "2026-11-08T16:13:31.995Z",
+     "end": "2026-11-08T16:20:36.133Z",
+     "ms": 424138,
+     "cost": 0.027455197999999993,
+     "input": 28453,
+     "output": 22941,
+     "calls": 53,
+     "result": "",
+     "refused": [
+      {
+       "at": "2026-11-08T16:20:03.340Z",
+       "rule": "records",
+       "tool": "bash",
+       "input": "[text]",
+       "today": "refused"
+      }
+     ]
+    },
+    {
+     "run": "8779b383",
+     "dir": "8779b383-4cf1-461f-8f30-09e1011c25d3_factory-reviewer",
+     "role": "reviewer",
+     "model": "model-f",
+     "ticket": "",
+     "start": "2026-11-08T16:20:55.244Z",
+     "end": "2026-11-08T16:22:08.886Z",
+     "ms": 73642,
+     "cost": 0.2014395,
+     "input": 48,
+     "output": 5214,
+     "calls": 34,
+     "result": "",
+     "refused": [
+      {
+       "at": "2026-11-08T16:21:31.538Z",
+       "rule": "scratch",
+       "tool": "bash",
+       "input": "[text]",
+       "today": "allowed"
+      },
+      {
+       "at": "2026-11-08T16:21:31.548Z",
+       "rule": "scratch",
+       "tool": "bash",
+       "input": "[text]",
+       "today": "allowed"
+      },
+      {
+       "at": "2026-11-08T16:21:31.557Z",
+       "rule": "scratch",
+       "tool": "bash",
+       "input": "[text]",
+       "today": "allowed"
+      }
+     ]
+    },
+    {
+     "run": "1c0691eb",
+     "dir": "1c0691eb-8a58-4d06-abd8-9da9a5973134_factory-review-axis",
+     "role": "review-axis",
+     "model": "model-g",
+     "ticket": "",
+     "start": "2026-11-08T16:21:13.134Z",
+     "end": "2026-11-08T16:21:28.301Z",
+     "ms": 15167,
+     "cost": 0.01926865,
+     "input": 9,
+     "output": 971,
+     "calls": 9,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "f5cc22b8",
+     "dir": "f5cc22b8-44f7-4ef3-ab58-237bcf3d23db_factory-review-axis",
+     "role": "review-axis",
+     "model": "model-g",
+     "ticket": "",
+     "start": "2026-11-08T16:21:17.165Z",
+     "end": "2026-11-08T16:21:41.629Z",
+     "ms": 24464,
+     "cost": 0.028605850000000002,
+     "input": 15,
+     "output": 1504,
+     "calls": 14,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "e302987a",
+     "dir": "e302987a-c09b-4813-aece-029d3f1b4a01_factory-reviewer",
+     "role": "reviewer",
+     "model": "model-f",
+     "ticket": "",
+     "start": "2026-11-08T16:40:46.758Z",
+     "end": "2026-11-08T16:42:44.131Z",
+     "ms": 117373,
+     "cost": 0.2697855,
+     "input": 45,
+     "output": 8111,
+     "calls": 30,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "34c16d1d",
+     "dir": "34c16d1d-fae2-4227-8988-92e315c1bba2_factory-review-axis",
+     "role": "review-axis",
+     "model": "model-g",
+     "ticket": "",
+     "start": "2026-11-08T16:41:04.110Z",
+     "end": "2026-11-08T16:41:23.709Z",
+     "ms": 19599,
+     "cost": 0.0219436,
+     "input": 12,
+     "output": 1296,
+     "calls": 11,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "be473f5e",
+     "dir": "be473f5e-2c2b-4f19-ae2f-5a98b5707304_factory-review-axis",
+     "role": "review-axis",
+     "model": "model-g",
+     "ticket": "",
+     "start": "2026-11-08T16:41:04.110Z",
+     "end": "2026-11-08T16:41:24.249Z",
+     "ms": 20139,
+     "cost": 0.0230554,
+     "input": 12,
+     "output": 1350,
+     "calls": 12,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "d7fb08a6",
+     "dir": "d7fb08a6-edbc-43f0-8c23-cfec655866e0_factory-worker",
+     "role": "worker",
+     "model": "model-e",
+     "ticket": "",
+     "start": "2026-11-08T16:42:51.935Z",
+     "end": "2026-11-08T16:45:47.360Z",
+     "ms": 175425,
+     "cost": 0.03138339000000001,
+     "input": 49374,
+     "output": 24760,
+     "calls": 43,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "7c4d38ec",
+     "dir": "7c4d38ec-72aa-4b90-9fd1-d7b018975656_factory-reviewer",
+     "role": "reviewer",
+     "model": "model-f",
+     "ticket": "",
+     "start": "2026-11-08T16:46:35.516Z",
+     "end": "2026-11-08T16:48:26.195Z",
+     "ms": 110679,
+     "cost": 0.28228129999999996,
+     "input": 45,
+     "output": 7513,
+     "calls": 35,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "dc80b88e",
+     "dir": "dc80b88e-47e8-464d-a0dc-bfcc92978b94_factory-review-axis",
+     "role": "review-axis",
+     "model": "model-g",
+     "ticket": "",
+     "start": "2026-11-08T16:46:47.899Z",
+     "end": "2026-11-08T16:47:06.006Z",
+     "ms": 18107,
+     "cost": 0.033728350000000004,
+     "input": 9,
+     "output": 1247,
+     "calls": 14,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "23eac0e1",
+     "dir": "23eac0e1-0c83-4fe1-8f63-2be9b112261c_factory-review-axis",
+     "role": "review-axis",
+     "model": "model-g",
+     "ticket": "",
+     "start": "2026-11-08T16:46:51.902Z",
+     "end": "2026-11-08T16:47:19.557Z",
+     "ms": 27655,
+     "cost": 0.038628249999999996,
+     "input": 15,
+     "output": 1706,
+     "calls": 16,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "36bc68e0",
+     "dir": "36bc68e0-805e-424f-9f01-b3ec246e6bfa_factory-worker",
+     "role": "worker",
+     "model": "model-e",
+     "ticket": "",
+     "start": "2026-11-08T16:48:34.143Z",
+     "end": "2026-11-08T16:50:48.094Z",
+     "ms": 133951,
+     "cost": 0.024336184199999993,
+     "input": 71082,
+     "output": 21722,
+     "calls": 33,
+     "result": "",
+     "refused": [
+      {
+       "at": "2026-11-08T16:49:30.826Z",
+       "rule": "paths",
+       "tool": "bash",
+       "input": "[text]",
+       "today": "unknown"
+      }
+     ]
+    },
+    {
+     "run": "0d4c2dc6",
+     "dir": "0d4c2dc6-f784-4d3c-8021-9ce684bae067_factory-worker",
+     "role": "worker",
+     "model": "model-e",
+     "ticket": "",
+     "start": "2026-11-08T17:04:02.758Z",
+     "end": "2026-11-08T17:04:38.639Z",
+     "ms": 35881,
+     "cost": 0.009143171999999998,
+     "input": 16749,
+     "output": 6710,
+     "calls": 16,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "6dc04bef",
+     "dir": "6dc04bef-c523-46b5-ad48-3a4f93f7733c_factory-reviewer",
+     "role": "reviewer",
+     "model": "model-f",
+     "ticket": "",
+     "start": "2026-11-08T17:06:56.776Z",
+     "end": "2026-11-08T17:08:54.487Z",
+     "ms": 117711,
+     "cost": 0.2821837,
+     "input": 54,
+     "output": 7633,
+     "calls": 38,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "d97aaf46",
+     "dir": "d97aaf46-804d-4b05-9b26-4112c766b25e_factory-review-axis",
+     "role": "review-axis",
+     "model": "model-g",
+     "ticket": "",
+     "start": "2026-11-08T17:07:14.644Z",
+     "end": "2026-11-08T17:07:29.118Z",
+     "ms": 14474,
+     "cost": 0.030813250000000004,
+     "input": 9,
+     "output": 947,
+     "calls": 12,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "939193ee",
+     "dir": "939193ee-ecf1-40bb-981e-0efc6eafa943_factory-review-axis",
+     "role": "review-axis",
+     "model": "model-g",
+     "ticket": "",
+     "start": "2026-11-08T17:07:18.301Z",
+     "end": "2026-11-08T17:07:39.480Z",
+     "ms": 21179,
+     "cost": 0.035881750000000004,
+     "input": 12,
+     "output": 1436,
+     "calls": 7,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "59ff8b31",
+     "dir": "59ff8b31-7366-4961-bd42-29b5652ecab7_factory-validator",
+     "role": "validator",
+     "model": "model-h",
+     "ticket": "",
+     "start": "2026-11-08T17:09:02.858Z",
+     "end": "2026-11-08T17:20:55.449Z",
+     "ms": 712591,
+     "cost": 0.4157256,
+     "input": 85598,
+     "output": 18455,
+     "calls": 43,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "07ea7c8d",
+     "dir": "07ea7c8d-a792-4f48-b32b-620f76674f61_factory-ticket-writer",
+     "role": "ticket-writer",
+     "model": "model-d",
+     "ticket": "",
+     "start": "2026-11-08T17:21:06.599Z",
+     "end": "2026-11-08T17:23:16.766Z",
+     "ms": 130167,
+     "cost": 1.170178,
+     "input": 511269,
+     "output": 14764,
+     "calls": 38,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "c95ddc6a",
+     "dir": "c95ddc6a-002f-4bf1-9ea3-3f1122f4809c_factory-worker",
+     "role": "worker",
+     "model": "model-e",
+     "ticket": "",
+     "start": "2026-11-08T17:46:45.378Z",
+     "end": "2026-11-08T17:47:42.844Z",
+     "ms": 57466,
+     "cost": 0.026411748000000006,
+     "input": 72468,
+     "output": 12642,
+     "calls": 39,
+     "result": "",
+     "refused": [
+      {
+       "at": "2026-11-08T17:47:24.494Z",
+       "rule": "secrets",
+       "tool": "bash",
+       "input": "[text]",
+       "today": "unknown"
+      },
+      {
+       "at": "2026-11-08T17:47:30.905Z",
+       "rule": "records",
+       "tool": "bash",
+       "input": "[text]",
+       "today": "unknown"
+      }
+     ]
+    },
+    {
+     "run": "06bd1e36",
+     "dir": "06bd1e36-d4bd-490f-8366-473ece6baab4_factory-reviewer",
+     "role": "reviewer",
+     "model": "model-f",
+     "ticket": "",
+     "start": "2026-11-08T17:47:57.402Z",
+     "end": "2026-11-08T17:49:31.258Z",
+     "ms": 93856,
+     "cost": 0.193412,
+     "input": 51,
+     "output": 5656,
+     "calls": 36,
+     "result": "",
+     "refused": [
+      {
+       "at": "2026-11-08T17:48:28.850Z",
+       "rule": "scratch",
+       "tool": "bash",
+       "input": "[text]",
+       "today": "unknown"
+      }
+     ]
+    },
+    {
+     "run": "65d109f9",
+     "dir": "65d109f9-8616-4b05-b9fe-bb90586dc60f_factory-review-axis",
+     "role": "review-axis",
+     "model": "model-g",
+     "ticket": "",
+     "start": "2026-11-08T17:48:16.798Z",
+     "end": "2026-11-08T17:48:32.290Z",
+     "ms": 15492,
+     "cost": 0.01710175,
+     "input": 9,
+     "output": 984,
+     "calls": 10,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "ef0644b3",
+     "dir": "ef0644b3-36a6-41e4-8112-1d7bb5382f58_factory-review-axis",
+     "role": "review-axis",
+     "model": "model-g",
+     "ticket": "",
+     "start": "2026-11-08T17:48:20.584Z",
+     "end": "2026-11-08T17:48:47.033Z",
+     "ms": 26449,
+     "cost": 0.043317999999999995,
+     "input": 15,
+     "output": 1450,
+     "calls": 8,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "859f00d3",
+     "dir": "859f00d3-fa26-4d6d-aaea-f92821dd3ec2_factory-worker",
+     "role": "worker",
+     "model": "model-e",
+     "ticket": "",
+     "start": "2026-11-08T17:49:39.674Z",
+     "end": "2026-11-08T17:50:17.228Z",
+     "ms": 37554,
+     "cost": 0.00503596,
+     "input": 14290,
+     "output": 5919,
+     "calls": 20,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "0ce52da1",
+     "dir": "0ce52da1-b9fe-4371-b7b1-d207541ff857_factory-worker-heavy",
+     "role": "worker-heavy",
+     "model": "model-d",
+     "ticket": "",
+     "start": "2026-11-08T17:56:42.678Z",
+     "end": "2026-11-08T17:57:02.503Z",
+     "ms": 19825,
+     "cost": 0.14534200000000003,
+     "input": 61271,
+     "output": 2280,
+     "calls": 4,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "a64f39d8",
+     "dir": "a64f39d8-2455-4f6b-bf2b-fc39971e73fa_factory-reviewer",
+     "role": "reviewer",
+     "model": "model-f",
+     "ticket": "",
+     "start": "2026-11-08T18:10:08.186Z",
+     "end": "2026-11-08T18:12:37.894Z",
+     "ms": 149708,
+     "cost": 0.36094410000000005,
+     "input": 63,
+     "output": 10689,
+     "calls": 49,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "c4a1f80a",
+     "dir": "c4a1f80a-74c4-4063-b50a-7a8bb5aafac5_factory-review-axis",
+     "role": "review-axis",
+     "model": "model-g",
+     "ticket": "",
+     "start": "2026-11-08T18:10:28.016Z",
+     "end": "2026-11-08T18:10:57.047Z",
+     "ms": 29031,
+     "cost": 0.0413254,
+     "input": 15,
+     "output": 1316,
+     "calls": 18,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "f70da998",
+     "dir": "f70da998-ea7d-4c6b-99c7-67c275c0dcf3_factory-review-axis",
+     "role": "review-axis",
+     "model": "model-g",
+     "ticket": "",
+     "start": "2026-11-08T18:10:28.016Z",
+     "end": "2026-11-08T18:10:40.647Z",
+     "ms": 12631,
+     "cost": 0.024129499999999998,
+     "input": 6,
+     "output": 927,
+     "calls": 11,
+     "result": "",
+     "refused": []
+    },
+    {
+     "run": "3b7a70aa",
+     "dir": "3b7a70aa-7852-4f7b-afc1-384f31a44b51_factory-code-steward",
+     "role": "code-steward",
+     "model": "model-h",
+     "ticket": "",
+     "start": "2026-11-08T18:12:48.815Z",
+     "end": "2026-11-08T18:16:15.630Z",
+     "ms": 206815,
+     "cost": 0.22760860000000002,
+     "input": 50900,
+     "output": 9080,
+     "calls": 28,
+     "result": "",
+     "refused": []
+    }
+   ]
+  }
+ ],
+ "bench": [],
+ "causes": []
+}
