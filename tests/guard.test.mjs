@@ -376,3 +376,28 @@ test("P25: the lead and the judges write files only under .scratch/", () => {
   for (const cmd of ["git diff > .scratch/m/tmp/d.txt", "npm test 2>&1 | tail -5", "npm test 2>/dev/null", 'node -e "if (a > b) x"', `ls > ${join(tmpdir(), "x.txt")}`, "cmd 2>&1"])
     assert.equal(bash(cmd), null, `should allow: ${cmd}`);
 });
+
+test("pi-subagents 0.87: options.context fresh is the same call, nothing else in options", () => {
+  const sub = (input) => check({ tool: "subagent", input, cwd: main });
+  const wf = "./.scratch/light/dryrun-087/workflows/20261108-034723-light.js";
+  assert.equal(sub({ workflow: wf, async: false, options: { context: "fresh" } }), null, "the lead's call as 0.87 documents it");
+  assert.equal(sub({ agent: "factory-review-axis", task: "Standards axis", options: { context: "fresh" } }), null, "the reviewer's axis dispatch, same shape");
+  for (const input of [
+    { workflow: wf, async: false, options: { context: "fork" } },
+    { workflow: wf, async: false, options: { context: "fresh", worktree: true } },
+    { workflow: wf, async: false, options: { script: "await runs.run('x', {})" } },
+    { workflow: wf, async: false, options: null },
+    { agent: "factory-review-axis", task: "x", options: { context: "fork" } },
+    { agent: "factory-worker", task: "x", options: { context: "fresh" } },
+  ]) assert.equal(sub(input)?.rule, "lead", `should block: ${JSON.stringify(input)}`);
+});
+
+test("a heredoc's body is not a redirection (dry run on 0.87)", () => {
+  const p = main;
+  const node = "git diff --exit-code a HEAD -- . ':!.scratch'; node <<'NODE'\nconst ok = [1, 2].every((x) => x > 0)\nif (ok) console.log('fine')\nNODE";
+  assert.equal(bash(node, p), null, "arrow functions and comparisons inside a heredoc write nothing");
+  assert.equal(bash("python3 - <<EOF\nprint(2 > 1)\nEOF", p), null, "unquoted delimiter too");
+  assert.equal(bash("node -e 'const f = (a) => a'", p), null, "an arrow function is not a redirection");
+  for (const cmd of ["node <<'JS' > out.txt\nconsole.log(1)\nJS", "cat <<EOF\nx\nEOF\necho y > notes.md", "node <<'JS'\nconsole.log(1)\nJS\n git diff > diff.txt"])
+    assert.equal(bash(cmd, p)?.rule, "scratch", `still a write outside .scratch/: ${JSON.stringify(cmd)}`);
+});

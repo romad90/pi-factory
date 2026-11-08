@@ -75,7 +75,7 @@ The audit report is input for the spec, not a replacement for it: the contract a
 ## 3. Once per laptop
 
 ```bash
-pi install npm:pi-subagents@0.76.1       # remove @tintinweb/pi-subagents if present
+pi install npm:pi-subagents@0.87.0       # remove @tintinweb/pi-subagents if present
 scripts/factory/install-pi-config.sh     # worktree hook (hides instrument/), concurrency
 ```
 
@@ -91,7 +91,7 @@ After any model change, probe the gateway once: `doctor.sh` (full) runs `models-
 | `.pi/settings.json` | `subagents.modelScope.allow: ["<your-provider>/*"]` |
 | `.factory/model-families.json` | a `{ "match": "*name*", "family": "x" }` line per model you use |
 
-`node scripts/factory/models-lint.mjs` must print `MODELS: PASS`. It enforces: critic ≠ author family; reviewer, review-axis, validator and code steward ≠ worker families; no `fallbackModels` line (removed upstream, stops the agent from launching). It reads the model each agent really runs: its frontmatter, then `subagents.agentOverrides` in your user settings, then in the project's (D92; pi-subagents 0.76.1 applies them to `factory-*` agents).
+`node scripts/factory/models-lint.mjs` must print `MODELS: PASS`. It enforces: critic ≠ author family; reviewer, review-axis, validator and code steward ≠ worker families; no `fallbackModels` line (removed upstream, stops the agent from launching). It reads the model each agent really runs: its frontmatter, then `subagents.agentOverrides` in your user settings, then in the project's (D92; pi-subagents 0.87.0 applies them to `factory-*` agents).
 
 **Set them once, reuse them everywhere.** In a repo where `MODELS: PASS`, run `node scripts/factory/models-profile.mjs capture`: it saves the models, thinking levels, scope and families to `~/.pi-factory/models.json` (outside every repo; `PI_FACTORY_MODELS` overrides the path). From then on, `install-into.sh` applies the profile to each new repo. To refresh a repo after changing the profile: `node scripts/factory/models-profile.mjs apply`, then the lint.
 

@@ -167,14 +167,14 @@ The lead (your main Pi session) never implements, reviews or briefs in its own w
 
 ## Quick start
 
-Prerequisites: Pi 1.0+, [pi-subagents](https://github.com/nicobailon/pi-subagents) **0.76.1**, Node 18+, git, a model gateway with at least two model families.
+Prerequisites: Pi 1.0+, [pi-subagents](https://github.com/nicobailon/pi-subagents) **0.87.0**, Node 18+, git, a model gateway with at least two model families.
 
 The factory is installed **once per machine**, as a Pi package; a project keeps only its own files (D92).
 
 ```bash
 # 1. Once per machine
 git clone <this repo or your mirror> ~/pi-factory
-pi install npm:pi-subagents@0.76.1
+pi install npm:pi-subagents@0.87.0
 pi install ~/pi-factory
 alias factory="$HOME/pi-factory/scripts/factory/factory.sh"   # in your shell profile
 scripts/factory/install-pi-config.sh          # worktree hook that hides instrument/, concurrency
