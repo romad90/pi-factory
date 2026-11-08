@@ -214,6 +214,19 @@ if [ -z "$FACTORY_TEST_CMD" ] && [ "${FACTORY_ALLOW_NO_TESTS:-0}" != "1" ]; then
   step setup "human: factory setup --write (finds and rehearses the test and lint commands, D102), or set FACTORY_TEST_CMD in .factory/commands.env yourself; then commit it. The factory never integrates without tests (D44)."
 fi
 
+# A review's verdict counts only once collect.sh records it (round, model,
+# D38): before that, nothing builds on it. A lead that skipped collect froze the
+# round counter, so escalation never came (learning loop E11).
+unrecorded=()
+for v in "$dir"/verdicts/*-code.md; do
+  [ -f "$v" ] || continue
+  head -1 "$v" | grep -Eq '— round [0-9]+' || unrecorded+=("$(basename "$v")")
+done
+if [ ${#unrecorded[@]} -gt 0 ]; then
+  STATUS="Written, not recorded yet: ${unrecorded[*]}"$'\n'
+  step collect "scripts/factory/collect.sh $feature (records each verdict as a round; then next.sh again)"
+fi
+
 compute_ticket_state "$feature"
 in_list() { local x="$1"; shift; local y; for y in "$@"; do [ "$x" = "$y" ] && return 0; done; return 1; }
 STATUS="Tickets"$'\n'

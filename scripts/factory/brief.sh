@@ -60,6 +60,8 @@ case "$role" in ticket-writer) shown_ticket="$task" ;; explorer|investigator) sh
 text="$(sed -e "s|{{FEATURE}}|$feature|g" -e "s|{{TICKET}}|$shown_ticket|g" \
     -e "s|{{COMMIT}}|$commit|g"   -e "s|{{BASE}}|$base|g" \
     -e "s|{{BRIEF_ID}}|$id|g" "$template")"
+# The mission's base (D49): cross-cutting assertions compare against it (learning loop E12).
+[[ "$text" == *"{{MISSION_BASE}}"* ]] && text="${text//"{{MISSION_BASE}}"/"$(mission_base "$feature")"}"
 # A question's text may hold | or &: plain bash replacement, quoted (D99).
 case "$role" in explorer|investigator) text="${text//"{{TICKET}}"/"$task"}" ;; esac
 # The commands integration runs and the frozen paths (D61, D62). Commands may
