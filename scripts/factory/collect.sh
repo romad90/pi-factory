@@ -36,9 +36,32 @@ fi
 
 feature="${1:?usage: collect.sh <feature> | --light <slug>}"
 dir="$(mission_dir "$feature")"
-[ -d "$dir/verdicts" ] || die "no verdicts in $dir yet"
+mkdir -p "$dir/verdicts" "$dir/state"
 echo "Verdicts: $feature"
 shopt -s nullglob
+# P25 (1): a verdict is a file, or nothing. A review run can return before its
+# file lands (asynchronous runs): wait a little for each reviewed ticket's file,
+# then send a ticket that still has none back to review, once; a second run
+# without a file escalates it instead of looping.
+compute_ticket_state "$feature"
+waiting=("${T_REVIEW[@]}")
+deadline=$(( $(date +%s) + ${FACTORY_COLLECT_WAIT:-60} ))
+while [ ${#waiting[@]} -gt 0 ] && [ "$(date +%s)" -lt "$deadline" ]; do
+  left=()
+  for t in "${waiting[@]}"; do [ "$(verdict_field "$dir/verdicts/$t-code.md" Commit)" = "$(ticket_marker "$feature" "$t")" ] || left+=("$t"); done
+  waiting=("${left[@]}"); [ ${#waiting[@]} -eq 0 ] || sleep 5
+done
+absdir="$(cd "$dir" && pwd)"
+for t in "${waiting[@]}"; do
+  [ ! -f "$dir/verdicts/$t-code.md" ] || continue      # an older verdict: the stale check below sends it back
+  c="$dir/state/$t.no-verdict"; k=$(( $(cat "$c" 2>/dev/null || echo 0) + 1 )); echo "$k" > "$c"
+  if [ "$k" -ge 2 ]; then
+    printf 'two review runs left no verdict file at %s\n' "$absdir/verdicts/$t-code.md" > "$dir/state/$t.stuck"
+    printf '  %-40s no verdict file again (%s): escalated, see state/%s.stuck\n' "$t-code.md" "$absdir/verdicts/$t-code.md" "$t"
+  else
+    printf '  %-40s no verdict file at %s: the review run left none; next.sh sends it back to review\n' "$t-code.md" "$absdir/verdicts/$t-code.md"
+  fi
+done
 for v in "$dir"/verdicts/*-code.md; do
   # D69: a new verdict without a PASS/FAIL Result line is the reviewer's
   # format slip, not a finding. Sent back to review once instead of counting
@@ -65,7 +88,7 @@ for v in "$dir"/verdicts/*-code.md; do
     continue
   fi
   record_verdict "$v" factory-reviewer; summary "$v"
-  [[ "$(verdict_field "$v" Result)" =~ ^(PASS|FAIL)$ ]] && rm -f "$sent" "$dir/state/$ticket.invalid-verdict.md"
+  [[ "$(verdict_field "$v" Result)" =~ ^(PASS|FAIL)$ ]] && rm -f "$sent" "$dir/state/$ticket.invalid-verdict.md" "$dir/state/$ticket.no-verdict"
 done
 # D69 for the mission verdicts too: a behavior or health verdict without a
 # PASS/FAIL Result line is a format slip, not a failure. Recorded as-is it read

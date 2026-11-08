@@ -1,6 +1,6 @@
 # P25. What the first real job found
 
-Status: queued, to build when the job ends (no factory change during a mission). Order: the trust metric and the rehearsal first (they prove the rest), then shorter instructions, then what cost a verdict or blocked the loop.
+Status: must-fixes 1–6 built (D113); the rest queued, to build when the job ends (no factory change during a mission). Order: the trust metric and the rehearsal first (they prove the rest), then shorter instructions, then what cost a verdict or blocked the loop.
 
 The job: a one-line refactor job on a TypeScript library inside a monorepo, run on the installed package (D105–D112). The architect step, the strategy critic, stacked job branches and the quota pause all ran for real. What broke, each with its fix:
 

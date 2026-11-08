@@ -64,6 +64,11 @@ function check() {
       p.push(`${at}: a mission with this name already exists`);
     if (!INTENTS.includes(m.intent)) p.push(`${at}: **Intent:** must be one of ${INTENTS.join(", ")}`);
     if (!/`[^`]+`/.test(m.done)) p.push(`${at}: **Done when:** needs a command in backticks`);
+    // P25 (4): on the installed package the factory's folders are symlinks, and
+    // Stryker's sandbox copy dies on a symlink to a folder (EISDIR).
+    if (existsSync(".factory/package-sha")) for (const c of m.done.match(/`[^`]+`/g) || [])
+      if (/stryker/.test(c) && !/--ignorePatterns\s+"?[^"\s]*\.factory[^"\s]*scripts\/factory|--ignorePatterns\s+"?[^"\s]*scripts\/factory[^"\s]*\.factory/.test(c))
+        p.push(`${at}: **Done when:** runs Stryker in a project on the installed package: add --ignorePatterns "/.factory,/scripts/factory" (its sandbox copy dies on the factory's linked folders)`);
     // Stryker keeps only the last --mutate: a repeated one checks one file and fails on the others ("not in report").
     for (const c of m.done.match(/`[^`]+`/g) || []) if (/stryker/.test(c) && (c.match(/(^|\s)(--mutate|-m)(\s|=)/g) || []).length > 1)
       p.push(`${at}: **Done when:** repeats --mutate, and Stryker keeps only the last one: give one --mutate with the files joined by commas`);

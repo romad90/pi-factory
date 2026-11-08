@@ -5,6 +5,7 @@
 #
 # Usage: bash tests/factory.test.sh        (needs bash, git, node)
 set -euo pipefail
+export FACTORY_COLLECT_WAIT=0   # P25: collect waits for late verdicts; tests write theirs first
 root="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"; [ -n "${KEEP:-}" ] || trap 'rm -rf "$work"' EXIT
 export FACTORY_NOTIFY=0 GIT_AUTHOR_NAME=test GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=t@t
@@ -46,6 +47,10 @@ grep -q '^Read: docs/agents/factory.md' <<<"$brief_out" && ! grep -q 'AGENTS.md'
 grep -q 'as docs/agents/writing.md says' <<<"$brief_out" && [ -f docs/agents/writing.md ] && ! grep -q 'terms of this project as GLOSSARY.md' <<<"$brief_out" \
   && t "every brief points at the plain-writing rules (D111)" || fail "brief writing" "$(tail -6 <<<"$brief_out")"
 echo '# Glossary' > GLOSSARY.md
+rb="$(bash scripts/factory/brief.sh reviewer probe 01 HEAD)"
+grep -q "Paths in this brief are relative to the project at $PWD\." <<<"$rb" && grep -q "go under $PWD/.scratch/probe/tmp/" <<<"$rb" \
+  && ! grep -q 'Paths in this brief are relative' <<<"$brief_out" \
+  && t "judges' briefs carry the project's absolute path and their tmp folder; workers' don't (P25)" || fail "brief paths" "$(tail -4 <<<"$rb")"
 grep -q 'terms of this project as GLOSSARY.md defines them' <<<"$(bash scripts/factory/brief.sh worker probe 01 HEAD)" \
   && t "a project with a GLOSSARY.md gets its terms named in every brief" || fail "brief glossary"
 rm GLOSSARY.md
@@ -163,6 +168,8 @@ pg_blocks "patch guard: a quoted (non-ASCII) instrument path" 'diff --git "a/ins
 pg_blocks "patch guard: a rename out of the instrument" 'diff --git a/instrument/s.txt b/src/leak.txt\nsimilarity index 100%%\nrename from instrument/s.txt\nrename to src/leak.txt\n'
 pg_blocks "patch guard: a test renamed away" 'diff --git a/tests/a.test.js b/src/a.js\nsimilarity index 100%%\nrename from tests/a.test.js\nrename to src/a.js\n'
 pg_blocks "patch guard: a new symbolic link" 'diff --git a/src/l b/src/l\nnew file mode 120000\n--- /dev/null\n+++ b/src/l\n@@ -0,0 +1 @@\n+../instrument\n\\ No newline at end of file\n'
+pg_blocks "patch guard: a new file in a tool's output folder (P25)" 'diff --git a/reports/mutation/mutation.json b/reports/mutation/mutation.json\nnew file mode 100644\n--- /dev/null\n+++ b/reports/mutation/mutation.json\n@@ -0,0 +1 @@\n+{}\n'
+grep -q '^BLOCKED generated: reports/mutation/mutation.json' "$work/pg.log" || fail "generated reason" "$(cat "$work/pg.log")"
 printf 'diff --git a/tests/a.test.js b/tests/b.test.js\nsimilarity index 100%%\nrename from tests/a.test.js\nrename to tests/b.test.js\n' > "$work/pg.patch"
 bash scripts/factory/patch-guard.sh "$work/pg.patch" >/dev/null && t "patch guard: moving a test file is fine" || fail "test move" "$(bash scripts/factory/patch-guard.sh "$work/pg.patch")"
 
@@ -449,6 +456,14 @@ printf '# Verdict: 01-hello\n**Commit:** %s\n\nLooks fine to me.\n' "$c1" > $m/v
 bash scripts/factory/collect.sh demo > "$work/collect.log"
 grep -q 'sent back to review' "$work/collect.log" && [ ! -f $m/verdicts/01-hello-code.md ] && [ ! -f $m/verdicts/01-hello-code.r3.md ] \
   && t "a verdict without a Result line is sent back to review, not counted as a round" || fail "invalid verdict" "$(cat "$work/collect.log"; ls $m/verdicts)"
+# P25 (1): a review run that leaves no file is not a verdict: back to review once, then escalated.
+out="$(bash scripts/factory/collect.sh demo)"
+grep -q '01-hello-code.md .*no verdict file at /.*/verdicts/01-hello-code.md: the review run left none' <<<"$out" && [ ! -f $m/state/01-hello.stuck ] \
+  && t "collect: a reviewed ticket with no verdict file goes back to review, and says where it looked" || fail "no verdict once" "$out"
+out="$(bash scripts/factory/collect.sh demo)"
+grep -q 'no verdict file again' <<<"$out" && [ -f $m/state/01-hello.stuck ] && [ "$(bash scripts/factory/next.sh demo 2>&1 | head -1)" = "STEP: escalate" ] \
+  && t "collect: a second review run without a file escalates the ticket instead of looping" || fail "no verdict twice" "$out $(bash scripts/factory/next.sh demo 2>&1 | head -3)"
+rm -f $m/state/01-hello.stuck $m/state/01-hello.no-verdict
 expect_step review "the slipped verdict's ticket is reviewed again"
 bid="$(brief reviewer demo 01-hello "$c1")"
 cat > $m/verdicts/01-hello-code.md <<V
@@ -860,6 +875,11 @@ grep -q '^\*\*Resume after:\*\* ' .scratch/demo/state/PAUSED.md && grep -q 'unti
   && t "an hourly quota pauses until it resets: next.sh says when, and resume refuses before" || fail "quota pause" "$out $(cat .scratch/demo/state/PAUSED.md)"
 FACTORY_RESUME_NOW=1 bash scripts/factory/pause.sh resume demo >/dev/null
 expect_step behavior-stale "FACTORY_RESUME_NOW=1 resumes a quota pause anyway"
+bash scripts/factory/pause.sh demo 'provider error: 429 {"message":"Rate limit exceeded for model_per_key: Limit resets at: 2099-01-01 10:00:00 UTC"}' >/dev/null
+ra="$(sed -n 's/^\*\*Resume after:\*\* //p' .scratch/demo/state/PAUSED.md)"
+[ "$ra" = "$(node -e 'const d=new Date(Date.parse("2099-01-01T10:01:00Z"));const p=n=>String(n).padStart(2,"0");console.log(`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`)')" ] \
+  && t "a provider's own reset time (Limit resets at: … UTC) is the resume time, in local time" || fail "resets at" "$(cat .scratch/demo/state/PAUSED.md)"
+FACTORY_RESUME_NOW=1 bash scripts/factory/pause.sh resume demo >/dev/null
 
 echo "Fix lane"
 bash scripts/factory/fix.sh start helm-name "rename app to kebab case" --mission demo >/dev/null
@@ -1515,6 +1535,11 @@ grep -q '\*\*Chosen:\*\* A is speculative' <<<"$out" && grep -q 'option B: \*\*S
   && grep -q 'fix-calls: a bugfix names its \*\*Reproduction:\*\*' <<<"$out" \
   && t "casebook: a speculative choice, options without strength or trade-off, a library refactor that doesn't check its surface (Hyrum), a fix without a reproduction are refused" || fail "casebook 2" "$out"
 grep -q 'fix-calls: \*\*Done when:\*\* repeats --mutate' <<<"$out" && t "casebook: a done command repeating --mutate is refused (Stryker keeps only the last)" || fail "casebook mutate" "$out"
+touch .factory/package-sha
+out="$(node scripts/factory/strategy.mjs check .scratch/tidy-tools .scratch tidy-tools 2>&1)" || true
+rm .factory/package-sha
+grep -q 'fix-calls: \*\*Done when:\*\* runs Stryker in a project on the installed package: add --ignorePatterns' <<<"$out" \
+  && t "casebook: on the installed package, a Stryker done command must ignore the factory's linked folders (P25)" || fail "casebook stryker links" "$out"
 cat > .scratch/tidy-tools/strategy.md <<ST
 # Strategy: tidy-tools
 
@@ -1614,6 +1639,11 @@ out="$(bash scripts/factory/next.sh tidy-tools 2>&1 || true)"
   && t "the job hands the lead its next mission, with every mission's state" || fail "job mission step" "$out"
 [ "$(git branch --show-current)" = job/tidy-tools/pin-tools ] && grep -q "on its own branch job/tidy-tools/pin-tools (from $jbase)" <<<"$out" \
   && t "a job's first mission gets its own branch, from the branch the job started on (D109)" || fail "job branch" "$out"
+# P25 (6): a decision on one mission checkpoints the job's other missions too (a person edits a sibling's spec).
+echo "<!-- edited by the person -->" >> .scratch/refactor-tools/spec.md
+bash scripts/factory/human.sh decide pin-tools "use the same done condition in refactor-tools" >/dev/null
+[ -z "$(git status --porcelain -- .scratch/refactor-tools/spec.md)" ] \
+  && t "a decision commits the edits a person made to the job's other missions" || fail "sibling checkpoint" "$(git status --short)"
 [ "$(astep pin-tools)" = "STEP: contract" ] && t "a mission from a strategy starts at its contract: no grilling" || fail "mission contract" "$(bash scripts/factory/next.sh pin-tools 2>&1)"
 # The done condition is run by a script (P23): a command that fails is FAIL, a command the guard refuses is never run.
 if bash scripts/factory/verify.sh refactor-tools >/dev/null 2>&1; then fail "verify must fail when a done command fails"; fi

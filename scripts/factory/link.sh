@@ -38,6 +38,10 @@ while IFS= read -r rel; do
   line="/${prefix}${rel}"
   grep -qxF "$line" "$exclude" || printf '%s\n' "$line" >> "$exclude"
 done < "$here/package-links.txt"
+# P25 (5): the tools a done condition runs write here; their output stays out of git status.
+[ "$mode" = --check ] || for out in reports/ coverage/ .stryker-tmp/; do
+  line="/${prefix}${out}"; grep -qxF "$line" "$exclude" || printf '%s\n' "$line" >> "$exclude"
+done
 
 if [ "$mode" = --check ]; then
   [ "$bad" -eq 0 ] && echo "  ✓ links to the factory package ($FACTORY_PACKAGE_ROOT)"

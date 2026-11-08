@@ -206,3 +206,10 @@ case "$cmd" in
   *) die "unknown command: $cmd" ;;
 esac
 checkpoint >/dev/null
+# P25 (6): a person deciding for one mission of a job often edits a sibling's
+# spec too (the same done condition); left uncommitted, it blocked the next wave.
+if [ -z "$light" ] && [ -f "$spec" ] && sib_job="$(spec_job "$spec" 2>/dev/null)" && [ -n "$sib_job" ] && [ -d "$(mission_dir "$sib_job")" ]; then
+  while IFS=$'\t' read -r m _ _; do
+    [ "$m" = "$feature" ] || bash "$here/checkpoint.sh" "$m" >/dev/null 2>&1 || true
+  done < <(node "$here/strategy.mjs" list "$(mission_dir "$sib_job")" 2>/dev/null)
+fi
