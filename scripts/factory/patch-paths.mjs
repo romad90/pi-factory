@@ -12,10 +12,11 @@
 //   node patch-paths.mjs keep <in> <out> <paths-file>
 //       keeps only the file blocks whose old or new path is listed (one per
 //       line); the test-on-base check applies a patch's tests alone (D96)
-//   node patch-paths.mjs strip-hook <in> <out> "<names>"
+//   node patch-paths.mjs strip-hook <in> <out> "<names>" [factory dir]
 //       drops what the worktree hook added (D87): new symbolic links named
 //       like a dependency link (node_modules .venv ...) and .env.factory, at
-//       any depth; prints each dropped path on stderr
+//       any depth; and new files under <factory dir>/<mission>/tmp/, the
+//       worker's own working files; prints each dropped path on stderr
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
@@ -122,18 +123,23 @@ function project(inp, out, prefix, top, dir) {
   return 0;
 }
 
-function stripHook(inp, out, names) {
+function stripHook(inp, out, names, factoryDir = ".scratch") {
   const keep = new Set(names.split(/\s+/).filter(Boolean));
   const { lines, files } = parse(readFileSync(inp, "utf8"));
   const base = (p) => (p || "").split("/").pop();
-  const drop = files.filter((f) => f.status === "A" && ((f.mode === "120000" && keep.has(base(f.new))) || base(f.new) === ".env.factory"));
+  // A worker's working files under <factory dir>/<mission>/tmp/ (repro scripts,
+  // logs) are not its change: a repro *.test.js there ran in test-on-base.
+  const fd = (factoryDir || ".scratch").replace(/^\.\//, "").replace(/\/+$/, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const scratchTmp = new RegExp(`(^|/)${fd}/[^/]+/tmp/`);
+  const why = (f) => (scratchTmp.test(f.new ?? "") ? "a worker's working file under the mission's tmp/" : "added by the worktree hook, D65");
+  const drop = files.filter((f) => f.status === "A" && ((f.mode === "120000" && keep.has(base(f.new))) || base(f.new) === ".env.factory" || scratchTmp.test(f.new ?? "")));
   if (!drop.length) { writeFileSync(out, lines.join("\n")); return 0; }
   const starts = files.map((f) => f.header[0]);
   const gone = new Set();
   for (const f of drop) {
     const i = files.indexOf(f), from = starts[i], to = i + 1 < starts.length ? starts[i + 1] : lines.length;
     for (let k = from; k < to; k++) gone.add(k);
-    process.stderr.write(`dropped ${f.new} (added by the worktree hook, D65)\n`);
+    process.stderr.write(`dropped ${f.new} (${why(f)})\n`);
   }
   writeFileSync(out, lines.filter((_, k) => !gone.has(k)).join("\n"));
   return 0;
