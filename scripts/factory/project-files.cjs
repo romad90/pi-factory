@@ -70,7 +70,7 @@ if (cmd === "ci") {
   // In a monorepo the project is this folder, not the git root (D56).
   if (prefix) cur.subagents.projectRootResolution = "nearest";
   const ov = cur.subagents.agentOverrides || {};
-  // Kept: pi-subagents 0.76.1 applies agentOverrides to factory-* agents (D92 spike).
+  // Kept: pi-subagents 0.87.0 applies agentOverrides to factory-* agents (D92 spike).
   if (cur.subagents.agentOverrides && !Object.keys(ov).length) delete cur.subagents.agentOverrides;
   fs.mkdirSync(require("path").dirname(dstFile), { recursive: true });
   fs.writeFileSync(dstFile, JSON.stringify(cur, null, 2) + "\n");

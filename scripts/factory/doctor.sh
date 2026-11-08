@@ -8,7 +8,7 @@
 #                                             with a mission, also its name and branch (D67)
 set -uo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
-want_pkg="pi-subagents@0.76.1"
+want_pkg="pi-subagents@0.87.0"
 fail=0
 ok()  { printf '  ✓ %s\n' "$*"; }
 bad() { printf '  ✗ %s\n' "$*"; fail=1; }
@@ -85,7 +85,7 @@ if command -v pi >/dev/null; then
   if grep -qE '(^|[^/])pi-subagents' <<<"$pkgs"; then ok "pi-subagents installed"
   else bad "install $want_pkg (D29)"; fi
   grep -q "@tintinweb/pi-subagents" <<<"$pkgs" && bad "@tintinweb/pi-subagents still installed: two orchestration tools confuse the lead"
-  grep -q "0.76.1" <<<"$pkgs" || printf '  ! pinned version is %s; check "pi list" (D29)\n' "$want_pkg"
+  grep -q "0.87.0" <<<"$pkgs" || printf '  ! pinned version is %s; check "pi list" (D29)\n' "$want_pkg"
 fi
 
 echo "pi-subagents config (user level)"
