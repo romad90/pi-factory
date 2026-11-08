@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // The model and thinking level each factory agent really runs with (D92), as
-// pi-subagents 0.76.1 resolves them: the agent file's frontmatter, then the
+// pi-subagents 0.87.0 resolves them: the agent file's frontmatter, then the
 // user's `subagents.agentOverrides.<name>` (~/.pi/agent/settings.json, or
 // $PI_CODING_AGENT_DIR/settings.json), then the project's (.pi/settings.json).
 // A project with the factory copied in has its agents in .pi/agents/factory;
