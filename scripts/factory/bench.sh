@@ -256,7 +256,7 @@ one_case() {
   rm -f "$md/verdicts/$ticket-code"*.md "$md/journal/$ticket.md" "$md/state/$ticket".*
   # Today's commands and baselines decide, as integration would today.
   mkdir -p "$wd/.factory"
-  for f in .factory/commands.env "$FACTORY_LINT_BASELINE"; do [ -f "$f" ] && cp "$f" "$wd/$f"; done
+  for f in .factory/commands.env "$FACTORY_LINT_BASELINE"; do [ -f "$f" ] && { rm -f "$wd/$f"; cp "$f" "$wd/$f"; }; done   # the hook may have linked it (E37): a real copy, so the case keeps today's commands
   # Today's briefs, unless the run compares factory versions on purpose.
   local briefs; briefs="$(cd "$(factory_res "$FACTORY_BRIEFS_DIR")" && pwd)"
   ( cd "$wd" && FACTORY_BRIEFS_DIR="$briefs" bash "$here/brief.sh" "$role" "$mission" "$ticket" "$base" ) > "$out/brief.md"

@@ -46,6 +46,14 @@ idx="$tmp/index"; cp "$(git rev-parse --git-path index)" "$idx"   # keeps sparse
 GIT_INDEX_FILE="$idx" git add -A -- . "${skip[@]}" ":(exclude)${FACTORY_DIR}"
 GIT_INDEX_FILE="$idx" git diff --cached --binary --relative HEAD -- . > "$tmp/change.patch"
 draft=""
+# E37 (F5): without the project's commands there is no lint and no test to
+# run, and a PASS would say they ran. A project that ignores *.env never
+# commits commands.env; the worktree hook links it (D65), so a missing file
+# here is a setup fault to report, never a pass.
+if [ ! -f .factory/commands.env ]; then
+  printf 'no .factory/commands.env in %s: lint, tests and the extra check would not run. The worktree hook links it from the main checkout; check that it exists there (factory setup --write).\n' "$PWD" > "$tmp/setup.out"
+  fail setup "$tmp/setup.out"
+fi
 if ticket="$(worker_ticket "$feature")"; then draft="$(draft_patch "$feature" "$ticket")"; mkdir -p "$(dirname "$draft")"; fi
 if [ ! -s "$tmp/change.patch" ]; then
   status "FAIL change"; echo "SELF-CHECK: FAIL change"; echo "No change against HEAD: nothing to hand over."; exit 1
