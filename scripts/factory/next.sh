@@ -183,6 +183,13 @@ fi
 if ! contract_approved "$spec"; then
   hint=""
   grep -q '\[blocking\]' "$critique" && hint=" The critique has [blocking] findings: rerun 'workflow.sh contract' to amend, then re-read."
+  # D126: from the third round on, say which blocking findings name a wrong
+  # change that would pass (deps-node-22: 6 critiques, 5 amendments, 63 min).
+  shopt -s nullglob; am=("$(dirname "$spec")"/amendments/*.md); shopt -u nullglob
+  if [ ${#am[@]} -ge 2 ] && grep -q '\[blocking\]' "$critique"; then
+    nb="$(grep -cE '^(### .*|(- )?)\[blocking\]' "$critique" || true)"; np="$(grep -cE '^(- )?Passes wrongly:' "$critique" || true)"
+    hint="$hint Contract round $(( ${#am[@]} + 1 )): $np of $nb blocking finding(s) name a wrong change that would pass. Approving accepts the others; it is recorded."
+  fi
   approval_unrecorded "$spec" Contract approve && hint="$hint $UNRECORDED"
   who="$(verdict_field "$spec" Reviewer)"
   step approve "G1, human${who:+ (and $who, who will review the MR)}: read the contract and $critique, then /factory-approve $feature (or /factory-amend $feature \"<change>\").$hint"
