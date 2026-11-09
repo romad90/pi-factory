@@ -20,6 +20,10 @@ jobs:
           node-version: 22
       - name: shellcheck
         run: shellcheck -S warning scripts/factory/*.sh scripts/dev/*.sh tests/*.sh
+      - name: every script is executable (reset-ticket.sh wasn't, and /factory-rereview failed)
+        run: |
+          bad="$(git ls-files -s 'scripts/*.sh' 'scripts/**/*.sh' | awk '$1 != "100755" { print $4 }')"
+          [ -z "$bad" ] || { echo "not executable in git: $bad (git update-index --chmod=+x <file>)"; exit 1; }
       - name: node syntax
         run: for f in scripts/factory/*.mjs; do node --check "$f"; done
       - name: skills pin (v1.3.1, no shadows)
