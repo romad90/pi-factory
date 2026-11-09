@@ -96,6 +96,13 @@ if [[ "$text" == *"{{TICKET_TEXT}}"* || "$text" == *"{{ASSERTIONS}}"* ]]; then
   text="${text//"{{TICKET_TEXT}}"/"$ttext"}"
   text="${text//"{{ASSERTIONS}}"/"$atext"}"
 fi
+# D124: dependency changes a person made (human.sh deps) are delivered in their
+# own commit; the reviewer checks them there instead of failing the ticket.
+if [[ "$text" == *"{{BY_HAND}}"* ]]; then
+  bh="$(deps_commits "$feature" | while IFS=$'\t' read -r c files; do printf ' commit %s (%s);' "$c" "$files"; done)"
+  [ -z "$bh" ] || bh="Exception: these files were changed by hand, as dependency changes must be (D124), in${bh%;}. They are delivered: check them with git show <commit>, never FAIL them as missing from the reviewed commit."
+  text="${text//"{{BY_HAND}}"/"$bh"}"
+fi
 if [[ "$text" == *"{{TEST_FILES_CMD}}"* ]]; then
   load_commands
   text="${text//"{{TEST_FILES_CMD}}"/"\`${FACTORY_TEST_FILES_CMD:-${FACTORY_TEST_CMD:-none configured}}\`"}"

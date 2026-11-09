@@ -774,6 +774,30 @@ run_lint() {
 # decision_log <feature> <ticket|-> <kind> <question> <answer> [scope] [who]
 # One row per human decision in .scratch/<feature>/decisions.tsv. Status
 # starts "unreviewed": only a human promotes a row into the spec or an ADR.
+# D124: the dependency lane. Workers never install or touch a manifest (D65,
+# D100); a mission whose scope names one gets its dependency changes from a
+# person, recorded with `human.sh deps` (kind "deps", "commit <hash>: <files>").
+# shellcheck disable=SC2034  # used by human.sh
+DEPS_FILES_RE='(^|/)(package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|\.npmrc|requirements[^/]*\.txt|pyproject\.toml|poetry\.lock|uv\.lock|Pipfile(\.lock)?|go\.(mod|sum)|Cargo\.(toml|lock)|Gemfile(\.lock)?)$'
+deps_in_scope() {                              # <feature> <ticket|->: the ticket or the spec's ## Scope names a manifest
+  local d t text; d="$(mission_dir "$1")"; t="$d/issues/${2%.md}.md"
+  # Read first, then grep: grep -q quits on a match, and under pipefail the
+  # writer's SIGPIPE would make a match read as false.
+  text="$( { [ ! -f "$t" ] || cat "$t"; sed -n '/^## Scope/,/^## /p' "$d/spec.md" 2>/dev/null; } )"
+  grep -qE '(package\.json|package-lock\.json|yarn\.lock|pnpm-lock\.yaml|requirements[^ ]*\.txt|pyproject\.toml|poetry\.lock|go\.mod|Cargo\.toml|Gemfile)' <<<"$text"
+}
+deps_commits() {                               # <feature> [<base>]: "<hash>\t<files>" per recorded change, after <base> when given
+  local f c files; f="$(mission_dir "$1")/decisions.tsv"
+  [ -f "$f" ] || return 0
+  awk -F'\t' 'NR > 1 && $3 == "deps" { print $5 }' "$f" | while IFS= read -r a; do
+    c="$(sed -n 's/^commit \([0-9a-f]\{7,40\}\):.*/\1/p' <<<"$a")"; [ -n "$c" ] || continue
+    git cat-file -e "$c^{commit}" 2>/dev/null || continue
+    if [ -n "${2:-}" ]; then git merge-base --is-ancestor "$2" "$c" 2>/dev/null && [ "$(git rev-parse "$2")" != "$(git rev-parse "$c")" ] || continue; fi
+    files="${a#*: }"; files="${files%% — *}"
+    printf '%s\t%s\n' "$c" "$files"
+  done
+}
+
 decision_log() {
   local f t who
   f="$(mission_dir "$1")/decisions.tsv"; mkdir -p "$(dirname "$f")"
@@ -874,6 +898,11 @@ test_on_base() (
   if [ -f "$issue" ] && opt="$(grep -m1 -iE '^## Test on base: *skip' "$issue")"; then
     why="$(printf '%s' "$opt" | sed -E 's/^## [Tt]est on base: *[Ss]kip *(—|-|:)? *//')"
     echo "test on base: skipped by the ticket (${why:-no reason given})"; exit 0
+  fi
+  # D124: the packages installed now were changed by hand after the base: the
+  # base's tests can't run with them (deps-node-22: tap 21 rejects tap 16 options).
+  if dc="$(deps_commits "$feature" "$base" | head -1)" && [ -n "$dc" ]; then
+    echo "test on base: skipped by a dependency change (commit ${dc%%$'\t'*}, changed by hand after the base: the base can't run with today's packages)"; exit 0
   fi
   tmp="$(mktemp -d)"; wt="$tmp/wt"
   cleanup() {
