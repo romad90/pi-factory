@@ -28,6 +28,22 @@ for t in "${tickets[@]}"; do
   name="$(ticket_name "$t")"
   covers="$(ticket_covers "$t")"
 
+  # P3: a path the ticket names exists here, or the ticket says the change
+  # creates it (new, create, add, rename on its line). deps-node-22's writer
+  # stated a test file under lib/ that never existed.
+  while IFS= read -r line; do
+    while IFS= read -r p; do
+      [ -n "$p" ] || continue
+      p="${p#./}"
+      [ -e "$p" ] && continue
+      case "$p" in "$FACTORY_DIR"/*) continue ;; esac              # mission records, written as the mission runs
+      git check-ignore -q -- "$p" 2>/dev/null && continue          # outputs (coverage/, .tap/): generated, never committed
+      grep -qiwE '(new|creates?|created|creating|adds?|added|renames?|renamed|generates?|generated|writes?|written)' <<<"$line" && continue
+      echo "VIOLATION  $name: names \`$p\`, which does not exist here; check it, or say the change creates it"
+      violations=$((violations + 1))
+    done < <(grep -oE '`[A-Za-z0-9_.][A-Za-z0-9_./-]*/[A-Za-z0-9_.-]+\.[A-Za-z0-9]+`' <<<"$line" | tr -d '`')
+  done < <(sed '/^## Covers/,$d' "$t")
+
   if [ -z "$covers" ]; then
     echo "VIOLATION  $name: no '## Covers' section, or it lists no assertion"
     violations=$((violations + 1)); continue
