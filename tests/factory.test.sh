@@ -456,6 +456,12 @@ rm -f "$wt_project/.factory/commands.env"; mv "$work/commands.env.bak" "$wt_proj
 sc && grep -q '^SELF-CHECK: PASS' "$work/sc.log" && t "self-check passes in the worktree, dependency link left out of the guarded change" \
   || fail "self-check pass" "$(cat "$work/sc.log")"
 git -C "$wt" diff --cached --quiet && t "self-check leaves the worker's index alone" || fail "self-check staged files" "$(git -C "$wt" status --short)"
+# D127: checks on another Node than the project's prove nothing (deps-node-22 ran on 26).
+echo 1 > "$wt_project/.nvmrc"
+if sc; then fail "self-check must refuse a Node the project doesn't run on" "$(cat "$work/sc.log")"; fi
+grep -q '^SELF-CHECK: FAIL node' "$work/sc.log" && grep -q "doesn't match .nvmrc \"1\"" "$work/sc.log" \
+  && t "self-check fails on a Node that doesn't match the project's .nvmrc or engines (D127)" || fail "self-check node" "$(cat "$work/sc.log")"
+rm -f "$wt_project/.nvmrc"
 cp "$wt_project/src/tools/hello.js" "$work/hello.bak"; echo '// eslint-disable-next-line no-console' >> "$wt_project/src/tools/hello.js"
 if sc; then fail "self-check must refuse a silenced check" "$(cat "$work/sc.log")"; fi
 grep -q '^SELF-CHECK: FAIL guard' "$work/sc.log" && grep -q 'silence' "$work/sc.log" && t "self-check runs the patch guard: a silenced check fails before handover" \
