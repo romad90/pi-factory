@@ -55,7 +55,23 @@ case "$cmd" in
     [ ${#existing[@]} -gt 0 ] || { echo "archive: nothing to collect"; exit 0; }
     owned=("$(git rev-parse --show-toplevel)" "$(git rev-parse --path-format=absolute --git-common-dir)" "$PWD")
     while IFS= read -r w; do owned+=("$w"); done < <(git worktree list --porcelain | sed -n 's/^worktree //p')
-    find "${existing[@]}" -maxdepth 7 -type f -name '*_meta.json' -newer "$dir/spec.md" 2>/dev/null \
+    # Runs since the mission began (its first commit, less an hour), not since
+    # spec.md last changed: every amendment rewrites spec.md, and the contract
+    # and critic runs before it were never archived (F10).
+    newer=(-newer "$dir/spec.md")
+    # The mission began at its first commit on any branch (its records may
+    # live on the mission branch, D116) or its oldest file, whichever is older.
+    first="$(git log --all --reverse --format=%ct -- "$dir" 2>/dev/null | head -1 || true)"
+    since="$(node -e 'const fs = require("fs"), path = require("path");
+      let t = Number(process.argv[2]) * 1000 || Infinity;
+      const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name);
+        if (e.isDirectory()) walk(p); else t = Math.min(t, fs.statSync(p).mtimeMs); } };
+      try { walk(process.argv[1]); } catch {}
+      if (!Number.isFinite(t)) process.exit(1);
+      const d = new Date(t - 3600e3), p = (n) => String(n).padStart(2, "0");
+      console.log(`${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`)' "$dir" "${first:-0}")" \
+      && newer=(-newermt "$since")
+    find "${existing[@]}" -maxdepth 7 -type f -name '*_meta.json' "${newer[@]}" 2>/dev/null \
       | node "$here/archive.mjs" collect "$out" "$dir" "$(git rev-parse HEAD 2>/dev/null || echo none)" "$(dirname "$(archive_root)")/guard.log" "${owned[@]}"
     node "$here/archive.mjs" refresh "$out" "$(dirname "$(archive_root)")/guard.log" >/dev/null
     ;;

@@ -206,6 +206,9 @@ case "$cmd" in
   *) die "unknown command: $cmd" ;;
 esac
 checkpoint >/dev/null
+# F10: the contract wave ends at a person's approve or amend; archive its runs
+# now, while pi-subagents still has their files (nothing else collects them).
+case "$cmd" in approve|amend) bash "$here/archive.sh" collect "$feature" >/dev/null 2>&1 || true ;; esac
 # P25 (6): a person deciding for one mission of a job often edits a sibling's
 # spec too (the same done condition); left uncommitted, it blocked the next wave.
 if [ -z "$light" ] && [ -f "$spec" ] && sib_job="$(spec_job "$spec" 2>/dev/null)" && [ -n "$sib_job" ] && [ -d "$(mission_dir "$sib_job")" ]; then
