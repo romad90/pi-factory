@@ -590,6 +590,26 @@ grep -q "detached HEAD" <<<"$out" && grep -q "git switch" <<<"$out" && t "a deta
 out="$(bash scripts/factory/next.sh demo 2>&1 || true)"
 [ "$(head -1 <<<"$out")" = "STEP: blocked" ] && grep -q "detached HEAD" <<<"$out" && t "next.sh blocks on a detached HEAD" || fail "next detached" "$out"
 git switch -q "$orig"
+# B0 (deps-node-22): a reviewer's copy of the project under tmp/ (git archive, npm ci,
+# its npm cache) was committed by the checkpoint: 4,880 files, Windows CI failed at checkout.
+# The copy, any node_modules and any npm cache stay out; the evidence goes in.
+cp_dir="$m/tmp/review-01-r2"; mkdir -p "$cp_dir/src" "$cp_dir/node_modules/dep" "$cp_dir/.npm-cache/_cacache/index-v5" "$m/tmp/validator-1" "$m/tmp/stray/node_modules/x" "$m/tmp/cache/_cacache/x"
+echo '{"name":"copy"}' > "$cp_dir/package.json"; echo 'x' > "$cp_dir/src/a.js"; echo 'x' > "$cp_dir/node_modules/dep/index.js"; echo 'x' > "$cp_dir/.npm-cache/_cacache/index-v5/k"
+echo 'x' > "$m/tmp/stray/node_modules/x/i.js"; echo 'x' > "$m/tmp/cache/_cacache/x/k"
+echo '# notes' > "$m/tmp/review-notes.md"; echo 'TAP version 13' > "$m/tmp/run.tap"; echo '{}' > "$m/tmp/facts.json"; echo 'd' > "$m/tmp/t.diff"; echo 'TN:' > "$m/tmp/validator-1/lcov.info"
+bash scripts/factory/checkpoint.sh demo > "$work/ck.log" 2>&1 || fail "checkpoint with a project copy" "$(cat "$work/ck.log")"
+tracked="$(git ls-files -- "$m/tmp")"
+! grep -q 'review-01-r2/\|node_modules/\|_cacache/' <<<"$tracked" \
+  && grep -q 'tmp/review-notes.md' <<<"$tracked" && grep -q 'tmp/run.tap' <<<"$tracked" && grep -q 'tmp/facts.json' <<<"$tracked" \
+  && grep -q 'tmp/t.diff' <<<"$tracked" && grep -q 'tmp/validator-1/lcov.info' <<<"$tracked" \
+  && t "a checkpoint never commits a copy of the project, a node_modules or an npm cache; evidence files go in" || fail "checkpoint copies" "$tracked"
+git add -f -- "$cp_dir/package.json" && git commit -q -m "chore: an older checkpoint" -- "$cp_dir/package.json"
+bash scripts/factory/checkpoint.sh demo > "$work/ck.log" 2>&1
+[ -z "$(git ls-files -- "$cp_dir")" ] && [ -f "$cp_dir/package.json" ] && t "a copy an older checkpoint committed leaves the index, never the disk" || fail "checkpoint untracks copies" "$(git ls-files -- "$cp_dir")"
+grep -q 'left out' "$work/ck.log" && grep -q 'review-01-r2' "$work/ck.log" && t "the checkpoint names what it left out" || fail "checkpoint note" "$(cat "$work/ck.log")"
+rm -rf "$cp_dir" "$m/tmp/stray" "$m/tmp/cache"
+grep -q 'tmp/copies/' <<<"$(bash scripts/factory/brief.sh reviewer demo 01-hello HEAD)" && grep -qxF '.scratch/*/tmp/copies/' .gitignore \
+  && t "judges are told where a copy of the project goes, and the install ignores it" || fail "copies place" "$(grep scratch .gitignore)"
 
 # Ticket 02 asks a decision.
 bash scripts/factory/human.sh ask demo 02-count --stdin >/dev/null <<'Q'

@@ -89,7 +89,7 @@ touch .gitignore
 # A last line without its newline would swallow the first appended line
 # ("coverageinstrument/results/"), breaking both, and the next run appends again.
 [ -n "$(tail -c1 .gitignore)" ] && printf '\n' >> .gitignore
-for line in "instrument/results/" ".env.factory" ".pi-subagents/"; do
+for line in "instrument/results/" ".env.factory" ".pi-subagents/" ".scratch/*/tmp/copies/"; do
   grep -qxF "$line" .gitignore || { printf '%s\n' "$line" >> .gitignore; note ".gitignore += $line"; }
 done
 touch AGENTS.md
