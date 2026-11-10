@@ -145,5 +145,61 @@
   "input": {
    "command": "mkdir -p .scratch/server-survives-bad-input/tmp/review-03-3ff8390; export TMPDIR=\"$PWD/.scratch/server-survives-bad-input/tmp/review-03-3ff8390\"; node_modules/.bin/tap --no-cov -R terse test/server-bad-input.test.js > \"$TMPDIR/targeted.log\" 2>&1 && npm test > \"$TMPDIR/npm-test.log\" 2>&1"
   }
+ },
+ {
+  "id": "E40",
+  "context": "judge",
+  "tool": "subagent",
+  "input": {
+   "agent": "factory-review-axis",
+   "task": "Standards axis. Review commit 6b580dcf0d6ed338573375e1688187794730a61d; fixed point 6b580dcf0d6ed338573375e1688187794730a61d^ (77b47e6014f23bebcee50489954e6db0bcb37d3e). Diff command: git diff 6b580dcf0d6ed338573375e1688187794730a61d^...6b580dcf0d6ed338573375e1688187794730a61d. Commit list command: git log --oneline 6b580dcf0d6ed338573375e1688187794730a61d^..6b580dcf0d6ed338573375e1688187794730a61d. Changed file paths: .gitignore, .taprc, .taprc.yml (deleted), package-lock.json, package.json, test/client.test.js, test/issue-890.test.js, test/server.test.js. Standards sources: AGENTS.md, docs/agents/factory.md, docs/agents/writing.md, GLOSSARY.md, {home}/pi-factory/.pi/skills/code-review/SKILL.md (includes full Fowler smell baseline). Read .scratch/deps-m/decisions.tsv for mission decisions. Report documented-standard breaches and labelled heuristic smells separately, with file/hunk citations; repo rules override baseline; skip tooling-enforced rules. Under 400 words. Read no spec.md or .scratch/deps-m/workflows/. Do not edit files.",
+   "options": {
+    "context": "fresh"
+   },
+   "output": false
+  }
+ },
+ {
+  "id": "E40",
+  "context": "judge",
+  "tool": "subagent",
+  "input": {
+   "agent": "factory-review-axis",
+   "task": "Spec axis. Review commit 6b580dcf0d6ed338573375e1688187794730a61d against .scratch/deps-m/issues/01-ticket.md and .scratch/deps-m/decisions.tsv. Approved design path .scratch/deps-m/design.md applies only if present. Diff command: git diff 6b580dcf0d6ed338573375e1688187794730a61d^...6b580dcf0d6ed338573375e1688187794730a61d. Commit list command: git log --oneline 6b580dcf0d6ed338573375e1688187794730a61d^..6b580dcf0d6ed338573375e1688187794730a61d. Mission cross-cutting diff command: git diff --name-status 2078d36566849f065a7dc3c8f61a65fd80a8d787 6b580dcf0d6ed338573375e1688187794730a61d -- . ':(exclude).scratch' ':(exclude).factory'. Test restriction diff command: git diff 887d2bf 6b580dcf0d6ed338573375e1688187794730a61d -- test/. File paths: .gitignore, .taprc, .taprc.yml (deleted), package-lock.json, package.json, test/client.test.js, test/issue-890.test.js, test/server.test.js. Standards sources: AGENTS.md, docs/agents/factory.md, docs/agents/writing.md, GLOSSARY.md. Report missing or partial requirements, unrequested scope, and incorrect implementations, citing requirement and file/hunk. Under 400 words. Do not read spec.md or .scratch/deps-m/workflows/. Do not edit files.",
+   "options": {
+    "context": "fresh"
+   },
+   "output": false
+  }
+ },
+ {
+  "id": "E40",
+  "context": "judge",
+  "tool": "subagent",
+  "input": {
+   "agent": "factory-review-axis",
+   "task": "Review the Standards axis only. Fixed point: 83128d102df954c4b595ced547aa429b6004eb1e^. Commit: 83128d102df954c4b595ced547aa429b6004eb1e. Diff command: git diff 83128d102df954c4b595ced547aa429b6004eb1e^...83128d102df954c4b595ced547aa429b6004eb1e. Commit list command: git log 83128d102df954c4b595ced547aa429b6004eb1e^..83128d102df954c4b595ced547aa429b6004eb1e --oneline. Changed file path: test/client.test.js. Standards sources: AGENTS.md, docs/agents/factory.md, docs/agents/writing.md, GLOSSARY.md, {home}/pi-factory/.pi/skills/code-review/SKILL.md (contains the full mandatory smell baseline). Other review paths: .scratch/deps-m/decisions.tsv and .scratch/deps-m/design.md if present. Report documented standard violations with file and rule citations, separately from heuristic code-smell judgements. Skip tooling-enforced issues. Under 400 words. Do not read spec.md or .scratch/deps-m/workflows/. Report only; do not write files.",
+   "options": {
+    "context": "fresh"
+   },
+   "async": true,
+   "cwd": "{root}",
+   "output": false
+  }
+ },
+ {
+  "id": "E40",
+  "context": "judge",
+  "tool": "subagent",
+  "input": {
+   "agent": "factory-review-axis",
+   "task": "Review the Spec axis only. Fixed point: 83128d102df954c4b595ced547aa429b6004eb1e^. Commit: 83128d102df954c4b595ced547aa429b6004eb1e. Diff command: git diff 83128d102df954c4b595ced547aa429b6004eb1e^...83128d102df954c4b595ced547aa429b6004eb1e. Commit list command: git log 83128d102df954c4b595ced547aa429b6004eb1e^..83128d102df954c4b595ced547aa429b6004eb1e --oneline. Review paths: test/client.test.js, package.json, package-lock.json, test/issue-890.test.js, test/server.test.js, .scratch/deps-m/issues/01-ticket.md, .scratch/deps-m/decisions.tsv, .scratch/deps-m/design.md if present. Standards sources: AGENTS.md, docs/agents/factory.md, docs/agents/writing.md, GLOSSARY.md, docs/agents/verdict-format.md. Mission diff command: git diff --name-status 2078d36566849f065a7dc3c8f61a65fd80a8d787 83128d102df954c4b595ced547aa429b6004eb1e -- . ':(exclude).scratch' ':(exclude).factory'. Test assertion diff: git diff 887d2bf 83128d102df954c4b595ced547aa429b6004eb1e -- test/. Report missing or partial requirements, scope creep, and incorrect implementations; cite ticket requirements. Under 400 words. Do not read spec.md or .scratch/deps-m/workflows/. Report only; do not write files.",
+   "options": {
+    "context": "fresh"
+   },
+   "async": true,
+   "cwd": "{root}",
+   "output": false
+  }
  }
 ]

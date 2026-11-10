@@ -77,6 +77,7 @@ test("replay: the fixes let nothing dangerous through", () => {
     { agent: "factory-review-axis", task: "x", options: { context: "fresh" }, cwd: "/etc" },
     { agent: "factory-review-axis", task: "x", options: { context: "fork" }, cwd: main },
     { agent: "factory-review-axis", task: "x", cwd: main, model: "x/y" },
+    { agent: "factory-review-axis", task: "x", options: { context: "fresh" }, output: "../notes.md" },
     { agent: "factory-worker", task: "x", options: { context: "fresh" }, cwd: main },
     { action: "steer", id: "abc", message: "do it this way" },
     { action: "resume", id: "abc", message: "go on" },

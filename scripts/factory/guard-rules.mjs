@@ -180,8 +180,10 @@ const withoutFreshOptions = (i) => {
 const AXIS_ALLOWED = new Set(["agent", "task", "context", "async", "cwd"]);
 const READ_ACTIONS = new Set(["status", "list", "get", "doctor", "interrupt"]);
 // The reviewer may name its own project as cwd (seen on pi-subagents 0.87), never another.
+// output: false (E40) asks for no output file; a path or true would write one.
 const isAxisDispatch = (i, cwd = process.cwd()) => i.agent === "factory-review-axis" && typeof i.task === "string"
-  && (i.context === undefined || i.context === "fresh") && Object.keys(i).every((k) => AXIS_ALLOWED.has(k))
+  && (i.context === undefined || i.context === "fresh") && (i.output === undefined || i.output === false)
+  && Object.keys(i).every((k) => AXIS_ALLOWED.has(k) || k === "output")
   && (i.cwd === undefined || (typeof i.cwd === "string" && projectRoot(resolve(cwd, i.cwd)) === projectRoot(cwd) && resolve(cwd, i.cwd) === projectRoot(cwd)));
 
 // Paths no agent writes or edits.
