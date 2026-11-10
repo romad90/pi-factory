@@ -1274,6 +1274,16 @@ const ok = m.name === "demo" && m.step === process.env.STEP_NOW && m.counts.tota
   && m.log.some((e) => e.kind === "integrated" && e.ticket === "01-hello") && m.log.some((e) => e.kind === "verdict" && e.ticket === "02-count")
   && m.log.some((e) => e.kind === "decision") && !m.log.some((e) => /state$/.test(e.text));
 process.exit(ok ? 0 : 1);' "$work/status.json" && t "status.sh --json: the step next.sh gives, tickets with preconditions and expected behavior, interventions, a log of events without checkpoints (D90)" || fail "status json" "$(head -c 3000 "$work/status.json")"
+# D130: a run whose log ends with its report is finished, shown as a report, and
+# never a "quiet" card (eslint-10: two for runs done 87 minutes earlier).
+rd="$work/runs/r-done"; mkdir -p "$rd"
+printf 'Mission demo\nfactory-contract-critic\n[tool] read spec.md\nWrote the critique.\n```json\n{"reviewFindings": ["blocking: a"], "manualNotes": "n"}\n```\n' > "$rd/output-1.log"
+touch -d '-90 minutes' "$rd/output-1.log" 2>/dev/null || touch -t "$(date -v-90M +%Y%m%d%H%M 2>/dev/null)" "$rd/output-1.log"
+FACTORY_RUN_DIRS="$work/runs" bash scripts/factory/status.sh demo --json > "$work/status2.json" || fail "status.sh runs" "$(cat "$work/status2.json")"
+node -e '
+const m = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).missions[0]; const w = m.workers[0] || {};
+process.exit(w.done === true && w.quiet === false && w.report && w.report.fields.reviewFindings[0] === "blocking: a" ? 0 : 1);' "$work/status2.json" \
+  && t "status.sh: a run that wrote its report is done, with the report's fields, not quiet (D130)" || fail "status report" "$(head -c 2000 "$work/status2.json")"
 printf '**Ticket:** 02-count\n\nShould the count start at zero?\n' > $m/state/open-question.md
 bash scripts/factory/status.sh --all --json > "$work/all.json"
 node -e '

@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
-import { toContract, parseCritique } from "../scripts/factory/cockpit-contract.mjs";
+import { toContract, parseCritique, parseReport } from "../scripts/factory/cockpit-contract.mjs";
 import { gateDoc } from "../scripts/factory/gate-doc.mjs";
 
 const require = createRequire(import.meta.url);
@@ -185,4 +185,26 @@ test("the Markdown renderer escapes HTML and never links to javascript:", { skip
   assert.match(html, /<b>b<\/b>/);
   assert.match(html, /<code>&lt;i&gt;<\/code>/);
   assert.match(html, /href="https:\/\/example.org"/);
+});
+
+test("\"what did the critic say?\": a finished agent's report reads as a report, the raw log one click away (0 clicks)", { skip }, async () => {
+  const s = atG1(), m = s.missions[0];
+  const report = parseReport("Wrote the critique.\n```json\n" + JSON.stringify({
+    reviewFindings: ["blocking: Unsampled source files can use no-shadow warning severity.", "non-blocking: Target-tool commands remain unchecked."],
+    manualNotes: "Reviewed the required documents. No implementation edits." }, null, 2) + "\n```\n");
+  m.workers = [{ run: "r1", agent: "factory-contract-critic", ticket: "", ageSec: 5220, done: true, quiet: false,
+    last: ["{", "  \"reviewFindings\": [", "    \"blocking: Unsampled …\""], report: { fields: report.fields, after: report.after } }];
+  const page = await open(s, "#/m/eslint-10");
+  const panel = page.locator(".panel", { has: page.locator("h2", { hasText: "Active worker" }) });
+  await panel.locator(".report").waitFor();
+  assert.equal(await panel.locator(".report .rl li.bad").count(), 1);
+  assert.equal(await panel.locator(".report .rl li.warn").count(), 1);
+  assert.equal(await panel.locator("pre.term").isVisible(), false, "the raw lines are folded");
+  assert.match(await panel.locator(".report").textContent(), /No implementation edits/);
+});
+
+test("the page reads a report exactly as the snapshot does (one parser in two places)", { skip }, async () => {
+  const text = readFileSync(new URL("./fixtures/reports/worker-heavy.md", import.meta.url), "utf8");
+  const page = await open(gym);
+  assert.deepEqual(await page.evaluate((t) => parseReportClient(t), text), parseReport(text));
 });
