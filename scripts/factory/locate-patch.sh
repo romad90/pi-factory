@@ -19,6 +19,11 @@ here="$(cd "$(dirname "$0")" && pwd)"
 feature="${1:?usage: locate-patch.sh <feature> <ticket>}"
 require_mission "$feature"
 ticket="${2:?usage: locate-patch.sh <feature> <ticket>}"
+# B1: the worker's self-check this round found no change against HEAD: any
+# patch still lying around is from an earlier round, never this one's.
+if [[ "$(cat "$(draft_patch "$feature" "$ticket").status" 2>/dev/null || true)" == "FAIL change"* ]]; then
+  echo "no patch for $ticket: the worker's self-check found nothing to change this round (record-no-patch.sh)" >&2; exit 1
+fi
 since="$(ls -t "$(mission_dir "$feature")"/workflows/*-build-wave*.js 2>/dev/null | awk 'NR == 1' || true)"
 [ -n "$since" ] || die "no build-wave workflow for $feature yet"
 

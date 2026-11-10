@@ -79,6 +79,8 @@ test("D71: agents start only from a generated workflow file", () => {
   // D75: a reviewer dispatches its code-review axes, fresh, and nothing else.
   assert.equal(sub({ agent: "factory-review-axis", task: "Standards axis: git diff a..b" }), null);
   assert.equal(sub({ agent: "factory-review-axis", task: "Spec axis", context: "fresh", async: false }), null);
+  // E40: pi-subagents adds output: false (no output file) to the reviewer's dispatch.
+  assert.equal(sub({ agent: "factory-review-axis", task: "Spec axis", options: { context: "fresh" }, output: false }), null);
   for (const input of [
     { agent: "worker", task: "build 05" },
     { agent: "factory-worker", task: "x", worktree: true },
@@ -89,6 +91,8 @@ test("D71: agents start only from a generated workflow file", () => {
     { workflow: wf, context: "fresh", agent: "worker" },
     { agent: "factory-review-axis", task: "x", context: "fork" },
     { agent: "factory-review-axis", task: "x", worktree: true },
+    { agent: "factory-review-axis", task: "x", output: "review.md" },
+    { agent: "factory-review-axis", task: "x", output: true },
     { agent: "factory-review-axis" },
     { agent: "factory-reviewer", task: "x", context: "fresh" },
   ]) assert.equal(sub(input)?.rule, "lead", `should block: ${JSON.stringify(input)}`);

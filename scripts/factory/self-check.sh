@@ -61,7 +61,8 @@ if ticket="$(worker_ticket "$feature")"; then draft="$(draft_patch "$feature" "$
 # self-check runs from the project's folder, a monorepo's project included.
 if ! node "$here/node-version.mjs" . > "$tmp/node.out" 2>&1; then cut -f2 "$tmp/node.out" > "$tmp/node.why"; fail node "$tmp/node.why"; fi
 if [ ! -s "$tmp/change.patch" ]; then
-  status "FAIL change"; echo "SELF-CHECK: FAIL change"; echo "No change against HEAD: nothing to hand over."; exit 1
+  status "FAIL change"; [ -z "$draft" ] || rm -f "$draft"   # B1: an older round's draft is not this round's change
+  echo "SELF-CHECK: FAIL change"; echo "No change against HEAD: nothing to hand over."; exit 1
 fi
 # D73: the draft keeps root-relative paths, like a patch rebuilt from a worktree.
 if [ -n "$draft" ]; then

@@ -29,6 +29,19 @@ if [ "${3:-}" = "--provider" ]; then
   exit 0
 fi
 
+# B1: the worker's self-check found nothing to change. On an integrated
+# ticket that is a claim about the code already in: its review runs again on
+# that code (reset-ticket.sh --review), no round is spent. Either way a draft
+# left from an earlier round goes, so nothing integrates it later.
+d="$(draft_patch "$feature" "$ticket")"
+if [[ "$(cat "$d.status" 2>/dev/null || true)" == "FAIL change"* ]]; then
+  rm -f "$d" "$d.status"
+  if [ -n "$(ticket_marker "$feature" "$ticket")" ] && [ -f "$dir/verdicts/$ticket-code.md" ]; then
+    bash "$here/reset-ticket.sh" "$feature" "$ticket" --review "the worker found nothing to change: the integrated code goes to review again, no round spent"
+    exit 0
+  fi
+  set -- "$1" "$2" "${3:-the self-check found nothing to change, and nothing of this ticket is integrated}"
+fi
 note="${3:-the run ended without changing any file}"
 write_fail_verdict "$feature" "$ticket" worker-no-patch \
   "The worker produced no patch ($note). Next round: implement the ticket; if it is too big for one run, say so in your report."
