@@ -1181,6 +1181,24 @@ bash scripts/factory/reset-ticket.sh maint 02-tests --review "VAL-M-001 amended:
   && bash -c '. scripts/factory/lib.sh; compute_ticket_state maint; [[ " ${T_REVIEW[*]} " == *" 02-tests "* ]] && [[ " ${T_BUILD[*]} " != *" 02-tests "* ]]' \
   && t "reset-ticket --review: an integrated ticket goes back to review, not build; history kept, question closed, one commit" || fail "rereview" "$(cat "$work/rr.log"; ls .scratch/maint/verdicts .scratch/maint/state)"
 if bash scripts/factory/reset-ticket.sh maint 03-more --review "x" >/dev/null 2>&1; then fail "rereview must refuse a ticket that isn't integrated"; fi
+# B1 (deps-node-22 ticket 01 round 3): the worker found nothing to change on an
+# integrated ticket; a draft left from an earlier round was integrated instead,
+# "patch does not apply", and the round counted as failed.
+printf '# Verdict: 02-tests\n**Result:** FAIL\n**Commit:** %s\n\n## Assertions\n- VAL-M-001: FAIL — deliverable unchanged in this commit\n' "$mk" > .scratch/maint/verdicts/02-tests-code.md
+mkdir -p .scratch/maint/workflows; echo '// wave' > .scratch/maint/workflows/r3-build-wave.js
+git add .scratch/maint; git commit -qm "test: round 2 FAIL, round 3 wave"
+d02="$(bash -c '. scripts/factory/lib.sh; draft_patch maint 02-tests')"; mkdir -p "$(dirname "$d02")"
+sleep 1; cp "$work/ok.test.js.patch" "$d02"; printf 'FAIL change %s\n' "$(date '+%F %H:%M')" > "$d02.status"
+out="$(bash scripts/factory/locate-patch.sh maint 02-tests 2>&1)" && fail "locate-patch must not hand over a draft when the worker found nothing to change" "$out"
+grep -q 'nothing to change' <<<"$out" && t "locate-patch finds no patch when the worker's self-check said there was no change (B1)" || fail "locate no-change" "$out"
+out="$(bash scripts/factory/integrate.sh maint 02-tests "$d02" 2>&1)" && fail "integrate must refuse a draft from a round with no change" "$out"
+grep -q 'nothing to change' <<<"$out" && grep -q 'record-no-patch.sh' <<<"$out" && [ "$(bash -c '. scripts/factory/lib.sh; verdict_round .scratch/maint/verdicts/02-tests-code.md')" = 1 ] \
+  && t "integrate refuses a leftover draft in a round with no change, without counting a round" || fail "integrate no-change" "$out"
+bash scripts/factory/record-no-patch.sh maint 02-tests >"$work/rnp.log" 2>&1 || fail "record-no-patch no-change" "$(cat "$work/rnp.log")"
+[ ! -e .scratch/maint/verdicts/02-tests-code.md ] && [ ! -e "$d02" ] && [ -f .scratch/maint/state/02-tests.integrated ] \
+  && grep -q $'02-tests\trereview\t.*nothing to change' .scratch/maint/decisions.tsv && [ -z "$(git status --porcelain -- .scratch)" ] \
+  && bash -c '. scripts/factory/lib.sh; compute_ticket_state maint; [[ " ${T_REVIEW[*]} " == *" 02-tests "* ]]' \
+  && t "a worker that finds nothing to change on an integrated ticket sends it to review, not a failed round (B1)" || fail "no-change to review" "$(cat "$work/rnp.log"; ls .scratch/maint/verdicts)"
 bash scripts/factory/reset-ticket.sh maint 02-tests >/dev/null && [ ! -e .scratch/maint/state/02-tests.integrated ] \
   && bash -c '. scripts/factory/lib.sh; compute_ticket_state maint; [[ " ${T_BUILD[*]} " == *" 02-tests "* ]]' \
   && t "reset-ticket: an integrated ticket loses its marker and goes back to build" || fail "reset 02"

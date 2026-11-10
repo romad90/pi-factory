@@ -19,6 +19,11 @@ ticket="${2:?usage: integrate.sh <feature> <ticket> <patch-file>}"
 patch="${3:?usage: integrate.sh <feature> <ticket> <patch-file>}"
 # D60: the wave returned no path; look for the patch here instead of
 # relying on the lead to run locate-patch.sh first.
+# B1: a round whose self-check found no change has no patch of its own; a
+# draft left from an earlier round is not it.
+if [[ "$(cat "$(draft_patch "$feature" "$ticket").status" 2>/dev/null || true)" == "FAIL change"* ]]; then
+  die "the worker's self-check found nothing to change for $ticket this round: nothing to integrate. Run scripts/factory/record-no-patch.sh $feature $ticket"
+fi
 if [ "$patch" = null ]; then patch="$(bash "$here/locate-patch.sh" "$feature" "$ticket" 2>/dev/null || true)"; fi
 dir="$(mission_dir "$feature")"
 [ -f "$dir/issues/$ticket.md" ] || die "unknown ticket $ticket in $dir/issues"
