@@ -9,7 +9,8 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
-import { toContract } from "../scripts/factory/cockpit-contract.mjs";
+import { toContract, parseCritique } from "../scripts/factory/cockpit-contract.mjs";
+import { gateDoc } from "../scripts/factory/gate-doc.mjs";
 
 const require = createRequire(import.meta.url);
 let chromium = null;
@@ -32,12 +33,27 @@ function atTheStop() {
   return s;
 }
 
+// eslint-10 at G1 (D130): the contract amended once, the critique on the
+// version before; the files as they were (tests/fixtures/gate/eslint-10).
+const GATES = new URL("./fixtures/gate/", import.meta.url).pathname;
+function atG1() {
+  const s = structuredClone(gym), m = structuredClone(gym.missions.find((x) => x.name === MISSION));
+  const crit = parseCritique(readFileSync(GATES + "eslint-10/contract-critique.md", "utf8"));
+  Object.assign(m, { name: "eslint-10", title: "eslint-10", intent: "maintenance", step: "approve", human: true, mr: "", otherBranch: "",
+    next: "G1, human: read the contract and .scratch/eslint-10/contract-critique.md, then /factory-approve eslint-10.",
+    contract: { total: 14, approved: false }, counts: { total: 0 }, tickets: [], timeline: [], workers: [], needs: [], log: [],
+    critique: { ...crit, round: 2, at: "2026-11-10T11:56:00Z", afterContract: false } });
+  s.missions = [m, ...s.missions];
+  return s;
+}
+
 let server, browser, snapshot = gym;
 before(async () => {
   if (skip) return;
   server = createServer((req, res) => {
     const u = new URL(req.url, "http://x");
     if (u.pathname === "/") { res.writeHead(200, { "content-type": "text/html" }); res.end(html); return; }
+    if (u.pathname === "/gate.json") { const d = gateDoc(GATES, u.searchParams.get("m") || ""); res.writeHead(d ? 200 : 404, { "content-type": "application/json" }); res.end(d ? JSON.stringify(d) : ""); return; }
     if (u.pathname === "/state.json") { res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify(toContract({ ...snapshot, generated: new Date().toISOString() }))); return; }
     res.writeHead(404); res.end();
   });
@@ -122,4 +138,51 @@ test("every page renders in under 100 ms with 50 missions", { skip }, async () =
   }, `${MISSION}-2`);
   for (const [hash, ms] of Object.entries(times)) assert.ok(ms < 100, `${hash} rendered in ${ms.toFixed(1)} ms`);
   console.log(`render, median of 5, 50 missions: ${Object.entries(times).map(([h, ms]) => `${h} ${ms.toFixed(1)} ms`).join(" · ")}`);
+});
+
+test("\"what does the critic say, and about which assertion?\": the G1 card opens a page to read, not a file name (1 click)", { skip }, async () => {
+  const page = await open(atG1());
+  const card = page.locator('[data-card="eslint-10:step:approve"]');
+  assert.match(await card.textContent(), /the critic found 2 blocking and 1 non-blocking/);
+  await card.locator("text=Read contract and critique").click();
+  await page.waitForSelector(".finding");
+  assert.equal(await page.locator(".finding.blocking").count(), 2);
+  assert.equal(await page.locator(".finding.non-blocking").count(), 1);
+  const f1 = page.locator("#f-1");
+  assert.match(await f1.locator(".callout.wrong").textContent(), /"warn" for lib\/url\.js only/);
+  assert.match(await f1.locator(".callout.fix").textContent(), /every linted file outside test\//);
+  // The fix is said once, in its box, not again in the finding's prose.
+  assert.doesNotMatch(await f1.locator(":scope > .md").textContent(), /retain the exception/);
+  assert.match(await page.textContent(".banner"), /older than the contract/);
+  assert.equal(await page.locator(".opt.sug code").first().textContent(), '/factory-amend eslint-10 "<the change>"');
+  // Formatted, not raw Markdown: no ** or ### left anywhere on the page.
+  assert.doesNotMatch(await page.textContent("#app"), /\*\*|###/);
+});
+
+test("\"which assertion does finding 1 mean?\": a VAL id opens it on the contract tab, Given/When/Then as text (2 clicks)", { skip }, async () => {
+  const page = await open(atG1(), "#/m/eslint-10/gate");
+  await page.waitForSelector("#f-1");
+  await page.locator("#f-1 .chips .vref", { hasText: "VAL-CONF-001" }).click();
+  const a = page.locator("#a-VAL-CONF-001");
+  await a.waitFor();
+  assert.match(await page.locator(".gate-tabs a.on").textContent(), /Contract/);
+  assert.equal(await a.locator(".chip.bad").count(), 2, "findings 1 and 2 point at it");
+  assert.equal(await a.locator(".gwt .md li").count(), 6, "the six exact options are a list");
+  assert.match(await a.locator(".gwt").textContent(), /AmendedThe|Amended2026-11-10/);
+  assert.equal(await page.locator(".assertion").count(), 14);
+  await page.click("button[data-gf=findings]");
+  assert.deepEqual(await page.locator(".assertion .id").allTextContents(), ["VAL-CONF-001", "VAL-CONF-002", "VAL-CONF-003"], "the three the findings name");
+  await page.click(".gate-tabs >> text=Spec");
+  assert.equal(await page.locator(".md h1").textContent(), "eslint-10");
+  await page.click(".gate-tabs >> text=History");
+  assert.match(await page.textContent("#app"), /Critique findings 1 and 2/);
+});
+
+test("the Markdown renderer escapes HTML and never links to javascript:", { skip }, async () => {
+  const page = await open(atG1());
+  const html = await page.evaluate(() => md("<img src=x onerror=alert(1)> **b** `<i>` [x](javascript:alert(1)) [ok](https://example.org)"));
+  assert.doesNotMatch(html, /<img|<i>|href="javascript/);
+  assert.match(html, /<b>b<\/b>/);
+  assert.match(html, /<code>&lt;i&gt;<\/code>/);
+  assert.match(html, /href="https:\/\/example.org"/);
 });

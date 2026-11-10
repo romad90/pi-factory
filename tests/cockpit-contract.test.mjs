@@ -162,3 +162,18 @@ test("D126: from round 3, a blocking finding that names no wrong change that wou
   assert.match(late.evidence[0].text, /names no wrong change that would pass/);
   assert.match(card(5, true).evidence[0].text, /Passes wrongly: a run_tests job that hard-codes/);
 });
+
+test("parseCritique reads numbered findings (\"### 1. [blocking] …\", eslint-10) and keeps each body and the assertions it names", async () => {
+  const { parseCritique } = await import("../scripts/factory/cockpit-contract.mjs");
+  const { readFileSync } = await import("node:fs");
+  const c = parseCritique(readFileSync(new URL("./fixtures/gate/eslint-10/contract-critique.md", import.meta.url), "utf8"));
+  assert.equal(c.result, "FINDINGS");
+  assert.deepEqual(c.findings.map((f) => [f.id, f.level]), [["1", "blocking"], ["2", "blocking"], ["3", "non-blocking"]]);
+  assert.match(c.findings[0].title, /^Unsampled source files can lose `no-shadow`/);
+  assert.match(c.findings[0].passes, /"warn"` for `lib\/url\.js` only/);
+  assert.match(c.findings[1].fix, /^Restrict the override/);
+  assert.equal(c.findings[2].passes, "");
+  assert.deepEqual(c.findings[0].refs, ["VAL-CONF-001", "VAL-CONF-003"]);
+  assert.match(c.findings[0].body, /^`VAL-CONF-001` checks only four files\./);
+  assert.doesNotMatch(c.findings[2].body, /## Review limits/);
+});

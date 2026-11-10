@@ -113,6 +113,38 @@ button.copy{font:inherit;font-size:12.5px;background:#1E232D;color:var(--ink);bo
 .tabs button.on{border-color:var(--blue);color:var(--blue)}
 details summary{cursor:pointer;color:var(--soft)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+/* D130: the gate page, documents to read, not log boxes */
+.md{font-size:14.5px;line-height:1.6;color:var(--ink);max-width:78ch;word-break:break-word}
+.md p{margin:0 0 10px}.md ul,.md ol{margin:0 0 10px;padding-left:22px}.md li{margin:2px 0}
+.md h1,.md h2,.md h3,.md h4{color:var(--ink);text-transform:none;letter-spacing:0;margin:18px 0 8px;font-weight:650}
+.md h1{font-size:20px}.md h2{font-size:17px}.md h3{font-size:15.5px}.md h4{font-size:14.5px}
+.md code{background:#222833;border:1px solid var(--line);border-radius:4px;padding:0 4px;font-size:12.5px;color:#D7DEEA}
+.md pre{background:#0B0D11;border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow:auto}.md pre code{border:0;padding:0;background:none}
+.md table{border-collapse:collapse;margin:6px 0 12px;font-size:13px;width:100%}.md th,.md td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}.md th{color:var(--soft);font-weight:600;background:#1B1F27}
+.md a{color:var(--blue)}.vref{color:var(--blue);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.gate-tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:18px 0 16px;flex-wrap:wrap}
+.gate-tabs a{padding:9px 14px;color:var(--soft);text-decoration:none;border-bottom:2px solid transparent;font-weight:600;min-height:40px}
+.gate-tabs a.on{color:var(--ink);border-color:var(--blue)}.gate-tabs .n{color:var(--dim);font-weight:500;margin-left:4px}
+.finding{border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:14px;background:var(--panel)}
+.finding.blocking{border-left:4px solid var(--red)}.finding.non-blocking{border-left:4px solid var(--amber)}
+.finding h3{margin:0 0 10px;font-size:16.5px;font-weight:650;line-height:1.4}.finding h3 .lvl{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-right:8px}
+.finding.blocking .lvl{color:var(--red)}.finding.non-blocking .lvl{color:var(--amber)}
+.callout{border-radius:8px;padding:10px 12px;margin:10px 0;max-width:78ch}.callout .h{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px}
+.callout.wrong{background:#2A1715;border:1px solid #5A2A24}.callout.wrong .h{color:var(--red)}
+.callout.fix{background:#13241B;border:1px solid #23503A}.callout.fix .h{color:var(--green)}
+.callout .md{font-size:14px}.callout .md p:last-child{margin:0}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.chip{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:2px 9px;color:var(--soft);background:#1B1F27}
+.chip.bad{color:var(--red);border-color:#5A2A24}.chip.warn{color:var(--amber);border-color:#5a4824}.chip.ok{color:var(--green);border-color:#23503A}
+a.chip{text-decoration:none;cursor:pointer}
+.assertion{border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin-bottom:12px;background:var(--panel);scroll-margin-top:90px}
+.assertion.hit{border-left:4px solid var(--red)}.assertion.flash{outline:2px solid var(--blue)}
+.assertion .hd{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}.assertion .id{font-family:ui-monospace,Menlo,monospace;color:var(--blue);font-size:13px}
+.assertion .tt{font-size:15.5px;font-weight:650}
+.gwt{display:grid;grid-template-columns:96px minmax(0,1fr);gap:6px 14px;margin-top:10px}.gwt .k{color:var(--soft);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;padding-top:3px}
+.gwt .md{font-size:14px}.gwt .md p:last-child{margin:0}
+.decide{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px}@media (max-width:1000px){.decide{grid-template-columns:1fr}}
+.banner{border:1px solid #5a4824;background:#241d12;color:var(--amber);border-radius:8px;padding:8px 12px;margin:10px 0}
+.readlink{display:inline-block;margin-top:8px;background:var(--blue);color:#0F1115;font-weight:700;border-radius:8px;padding:8px 14px;text-decoration:none}
 </style>
 </head>
 <body>
@@ -130,7 +162,7 @@ details summary{cursor:pointer;color:var(--soft)}
 let state = null, sel = 0, lastOk = 0, lastText = "";
 const $ = (s) => document.querySelector(s);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const route = () => { const p = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent); return { m: p[0] === "m" ? p[1] : "", t: p[2] === "t" ? p[3] : "", run: p[2] === "run" ? p[3] : "", b: p[0] === "bench" ? (p[1] || "-") : "", list: p[0] === "missions", h: p[0] === "health" }; };
+const route = () => { const p = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent); return { m: p[0] === "m" ? p[1] : "", t: p[2] === "t" ? p[3] : "", run: p[2] === "run" ? p[3] : "", gate: p[2] === "gate" ? (p[3] || "critique") : "", b: p[0] === "bench" ? (p[1] || "-") : "", list: p[0] === "missions", h: p[0] === "health" }; };
 const go = (m, t) => { location.hash = m ? `#/m/${encodeURIComponent(m)}${t ? `/t/${encodeURIComponent(t)}` : ""}` : "#/missions"; };
 const STATE_LABEL = { pass: "PASS", review: "review", build: "build", escalate: "ESCALATE", blocked: "blocked" };
 const pill = (s) => `<span class="pill s-${esc(s)}">${esc(STATE_LABEL[s] || s)}</span>`;
@@ -333,11 +365,133 @@ function runView(m, dir) {
       <div class="panel"><details><summary>Brief (brief.md)</summary><pre class="term mono" data-key="brief:${esc(d.dir)}" style="max-height:420px">${esc(d.brief || "none")}</pre></details></div></div>`;
 }
 
+// D130: Markdown, rendered safely (everything is escaped first; links only to http(s)).
+function inline(t) {
+  const codes = [];
+  let h = esc(t).replace(/`([^`]+)`/g, (_, c) => `\u0000${codes.push(c) - 1}\u0000`);
+  h = h.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/(^|[\s(])\*([^*\s][^*]*)\*/g, "$1<i>$2</i>")
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
+  return h.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${codes[i]}</code>`);
+}
+function md(src, opts = {}) {
+  const lines = String(src || "").replace(/\r/g, "").split("\n"), out = [];
+  const isItem = (l) => /^(\s*)([-*]|\d+\.)\s+/.exec(l);
+  let i = 0;
+  const list = () => {                       // a list block, nested by indent
+    const items = [];
+    while (i < lines.length) {
+      const l = lines[i], m = isItem(l);
+      if (m) { items.push({ ind: m[1].length, ord: /\d/.test(m[2]), text: l.slice(m[0].length) }); i++; continue; }
+      if (/^\s*$/.test(l)) { const n = lines[i + 1] || ""; if (isItem(n) || /^\s{2,}\S/.test(n)) { if (items.length && !isItem(n)) items[items.length - 1].text += "\n\n"; i++; continue; } break; }
+      if (/^\s+\S/.test(l) && items.length) { items[items.length - 1].text += "\n" + l.trim(); i++; continue; }
+      break;
+    }
+    const build = (from, ind) => {
+      let html = "", k = from; const ord = items[from].ord;
+      while (k < items.length && items[k].ind >= ind) {
+        if (items[k].ind > ind) { const [sub, next] = build(k, items[k].ind); html = html.replace(/<\/li>$/, sub + "</li>"); k = next; continue; }
+        html += `<li>${items[k].text.split(/\n\n/).map(inline).join("<br><br>").replace(/\n/g, " ")}</li>`; k++;
+      }
+      return [`<${ord ? "ol" : "ul"}>${html}</${ord ? "ol" : "ul"}>`, k];
+    };
+    out.push(build(0, items[0].ind)[0]);
+  };
+  while (i < lines.length) {
+    const l = lines[i];
+    if (/^\s*$/.test(l)) { i++; continue; }
+    if (/^```/.test(l)) { const b = []; i++; while (i < lines.length && !/^```/.test(lines[i])) b.push(lines[i++]); i++; out.push(`<pre><code>${esc(b.join("\n"))}</code></pre>`); continue; }
+    const h = l.match(/^(#{1,4})\s+(.*)$/);
+    if (h) { out.push(`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`); i++; continue; }
+    if (/^\s*\|/.test(l) && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1] || "")) {
+      const row = (r) => r.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+      const head = row(l); i += 2; const body = [];
+      while (i < lines.length && /^\s*\|/.test(lines[i])) body.push(row(lines[i++]));
+      out.push(`<table><tr>${head.map((c) => `<th>${inline(c)}</th>`).join("")}</tr>${body.map((r) => `<tr>${r.map((c) => `<td>${inline(c)}</td>`).join("")}</tr>`).join("")}</table>`); continue;
+    }
+    if (isItem(l)) { list(); continue; }
+    const p = [];
+    while (i < lines.length && !/^\s*$/.test(lines[i]) && !isItem(lines[i]) && !/^(#{1,4}\s|```|\s*\|)/.test(lines[i])) p.push(lines[i++].trim());
+    out.push(`<p>${inline(p.join(" "))}</p>`);
+  }
+  let html = out.join("");
+  if (opts.refs) html = html.replace(/VAL-[A-Z0-9]+-\d{3}/g, (id) => `<a class="vref" data-a="${id}">${id}</a>`);
+  return `<div class="md">${html}</div>`;
+}
+
+let jumpTo = "";
+let gateCache = { key: "", data: null, err: "" }, gateFilter = "all";
+function loadGate(m) {
+  const key = `${m.name}|${m.critique?.at || ""}|${m.contract?.total}|${m.interventions?.human}|${m.step}`;
+  if (gateCache.key === key) return gateCache;
+  const keep = gateCache.data && gateCache.data.mission === m.name ? gateCache.data : null;
+  gateCache = { key, data: keep, err: "" };
+  fetch(`gate.json?m=${encodeURIComponent(m.name)}`, { cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.status === 404 && location.protocol === "file:" ? "open the cockpit with cockpit.sh" : `HTTP ${r.status}`))))
+    .then((d) => { if (gateCache.key === key) { gateCache.data = d; render(); } }, (e) => { if (gateCache.key === key) { gateCache.err = e.message; render(); } });
+  return gateCache;
+}
+// The finding's body without the lines the page shows on their own.
+const findingProse = (f) => String(f.body || "").replace(/^\s*[-*]?\s*Passes wrongly:.*$/im, "").replace(/^\s*Suggested fix:[\s\S]*?(?=\n\s*\n|(?![\s\S]))/im, "").trim();
+function findingCard(f) {
+  return `<article class="finding ${esc(f.level)}" id="f-${esc(f.id)}"><h3><span class="lvl">${esc(f.level)}</span>${esc(f.id)}. ${inline(f.title)}</h3>
+    ${md(findingProse(f), { refs: true })}
+    ${f.passes ? `<div class="callout wrong"><div class="h">Passes wrongly</div>${md(f.passes, { refs: true })}</div>` : f.level === "blocking" ? `<div class="callout wrong"><div class="h">Passes wrongly</div><div class="md"><p class="muted">The critic names no wrong change that would pass.</p></div></div>` : ""}
+    ${f.fix ? `<div class="callout fix"><div class="h">Suggested fix</div>${md(f.fix, { refs: true })}</div>` : ""}
+    ${f.refs?.length ? `<div class="chips">${f.refs.map((id) => `<a class="chip vref" data-a="${esc(id)}">${esc(id)}</a>`).join("")}</div>` : ""}</article>`;
+}
+function assertionCard(a, byId) {
+  const fs = (a.findings || []).map((n) => byId[n]).filter(Boolean);
+  const hit = fs.some((f) => f.level === "blocking");
+  return `<article class="assertion${hit ? " hit" : ""}" id="a-${esc(a.id)}"><div class="hd"><span class="id">${esc(a.id)}</span><span class="tt">${inline(a.title)}</span>
+      <span class="pill">${esc(a.kind || "?")}</span>${a.amended ? `<span class="chip ok" title="${esc(a.amended)}">amended</span>` : ""}${a.unchecked ? `<span class="chip warn">unchecked</span>` : ""}
+      ${fs.map((f) => `<a class="chip ${f.level === "blocking" ? "bad" : "warn"}" href="#/m/${encodeURIComponent(gateCache.data.mission)}/gate/critique" data-f="${esc(f.id)}">finding ${esc(f.id)} · ${esc(f.level)}</a>`).join("")}</div>
+    <div class="gwt">${[["Given", a.given], ["When", a.when], ["Then", a.then], ["Evidence", a.evidence]].map(([k, v]) => `<div class="k">${k}</div>${md(v, { refs: true })}`).join("")}
+      ${a.amended ? `<div class="k">Amended</div>${md(a.amended)}` : ""}</div></article>`;
+}
+function gateView(m, tab) {
+  const g = loadGate(m), base = `#/m/${encodeURIComponent(m.name)}/gate`;
+  const c = (state.inbox || []).find((x) => x.mission === m.name && x.kind === m.step);
+  const head = `<div class="panel" style="margin-bottom:4px"><div class="row"><div><span class="mono muted">${esc(m.name)}</span>
+      <div class="title" style="font-size:20px">${c ? esc(c.title) : "Contract"}</div></div>${stepPill(m)}</div>
+    ${c ? `<div class="decide"><div><p class="q" style="font-size:15.5px;margin:8px 0 12px">${esc(c.question)}</p>
+      ${c.options.map((o) => `<div class="opt${o.suggested ? " sug" : ""}"><span class="l">${esc(o.label)}</span>${o.suggested ? `<span class="tag">suggested</span>` : ""}
+        <div class="e">${esc(o.effect)}</div>${o.command ? `<div class="cmd"><code class="mono">${esc(o.command)}</code><button type="button" class="copy" data-copy="${esc(o.command)}">Copy</button></div>` : ""}</div>`).join("")}</div>
+      <div>${m.critique && m.critique.afterContract === false ? `<div class="banner">The critique is older than the contract: the critic hasn't read this version yet.</div>` : ""}
+        ${g.data?.amendments?.length ? `<h2>Your changes so far</h2>${g.data.amendments.slice(-3).map((a) => `<div class="need"><span class="k">${esc(a.status || a.file)}</span>\n${esc(a.text.length > 400 ? a.text.slice(0, 398) + "…" : a.text)}</div>`).join("")}` : ""}</div></div>` : `<p class="muted">${esc(m.next || "")}</p>`}</div>`;
+  if (g.err) return head + `<div class="panel"><p class="err">The contract can't be read (${esc(g.err)}). The gate page comes from cockpit.sh (gate.json).</p></div>`;
+  const d = g.data; if (!d) return head + `<p class="muted">Loading the contract and its critique…</p>`;
+  const fs = d.critique?.findings || [], byId = Object.fromEntries(fs.map((f) => [f.id, f])), as = d.contract.assertions;
+  const blocking = fs.filter((f) => f.level === "blocking").length;
+  const tabs = [["critique", "Critique", d.critique ? `${blocking} blocking · ${fs.length - blocking} other` : "none"], ["contract", "Contract", `${as.length} assertions`], ["spec", "Spec", ""], ["history", "History", `${d.amendments.length + d.decisions.length}`]];
+  const nav = `<nav class="gate-tabs">${tabs.map(([k, l, n]) => `<a href="${base}/${k}" class="${tab === k ? "on" : ""}">${l}${n ? `<span class="n">${esc(n)}</span>` : ""}</a>`).join("")}</nav>`;
+  let body = "";
+  if (tab === "critique") {
+    body = !d.critique ? `<div class="panel"><p class="empty">No critique yet (contract-critique.md).</p></div>`
+      : `<div class="row" style="margin-bottom:12px"><span>Critique result: ${pill(d.critique.result === "PASS" ? "pass" : "fail")} <span class="muted">${esc(d.critique.result)}</span></span></div>
+        ${fs.length ? fs.map(findingCard).join("") : `<div class="panel"><p class="empty">No finding.</p></div>`}
+        ${d.critique.traceability ? `<div class="panel" style="margin-bottom:12px"><details><summary>Traceability: spec → contract</summary>${md(d.critique.traceability, { refs: true })}</details></div>` : ""}
+        ${d.critique.checklist ? `<div class="panel" style="margin-bottom:12px"><details><summary>Checklist</summary>${md(d.critique.checklist, { refs: true })}</details></div>` : ""}
+        ${d.critique.limits ? `<div class="panel"><details><summary>What the critic did not check</summary>${md(d.critique.limits)}</details></div>` : ""}`;
+  } else if (tab === "contract") {
+    const shown = as.filter((a) => gateFilter === "all" || (gateFilter === "findings" ? a.findings.length : a.kind === gateFilter));
+    body = `${d.contract.approved ? `<div class="need"><span class="k">approved</span> ${esc(d.contract.approved)}</div>` : ""}${d.contract.preamble ? `<div class="panel" style="margin-bottom:12px">${md(d.contract.preamble, { refs: true })}</div>` : ""}
+      <div class="tabs" style="margin-bottom:12px">${[["all", `All ${as.length}`], ["findings", `With findings ${as.filter((a) => a.findings.length).length}`], ["behavior", "Behavior"], ["code", "Code"]].map(([k, l]) => `<button type="button" data-gf="${k}" class="${gateFilter === k ? "on" : ""}">${l}</button>`).join("")}</div>
+      ${shown.map((a) => assertionCard(a, byId)).join("") || `<p class="empty">No assertion here.</p>`}
+      ${d.contract.notCovered ? `<div class="panel"><h2>Not covered, on purpose</h2>${md(d.contract.notCovered, { refs: true })}</div>` : ""}`;
+  } else if (tab === "spec") {
+    body = `<div class="panel">${md(d.contract.specBody, { refs: true })}</div>`;
+  } else {
+    body = `<div class="panel" style="margin-bottom:12px"><h2>Your changes to the contract</h2>${d.amendments.length ? d.amendments.map((a) => `<div style="margin-bottom:12px"><div class="muted mono" style="font-size:12px">${esc(a.file)} · ${esc(a.status)}</div>${md(a.text, { refs: true })}</div>`).join("") : `<p class="empty">None.</p>`}</div>
+      <div class="panel"><h2>Decisions</h2>${d.decisions.length ? `<table><tr><th>Date</th><th>Kind</th><th>Ticket</th><th>Answer</th></tr>${d.decisions.map((x) => `<tr><td>${esc(x.date)}</td><td>${esc(x.kind)}</td><td>${esc(x.ticket === "-" ? "" : x.ticket)}</td><td>${inline(x.answer || "")}</td></tr>`).join("")}</table>` : `<p class="empty">None yet.</p>`}</div>`;
+  }
+  return head + nav + body;
+}
+
 function missionView(m) {
   const t = active(m);
   return `<div class="panel" style="margin-bottom:16px"><div class="row"><div><span class="mono muted">${esc(m.name)}</span> ${m.intent ? `<span class="pill">${esc(m.intent)}</span>` : ""} ${m.paused ? `<span class="pill s-human">paused</span>` : ""}
       <div class="title">${esc(m.title || m.name)}</div></div>${stepPill(m)}</div>
-    ${m.next ? `<div class="mono muted">NEXT → ${esc(m.next)}</div>` : ""}${metricsRow(m)}</div>
+    ${m.next ? `<div class="mono muted">NEXT → ${esc(m.next)}</div>` : ""}${m.step === "approve" ? `<a class="readlink" href="#/m/${encodeURIComponent(m.name)}/gate">Read the contract and its critique →</a>` : ""}${metricsRow(m)}</div>
     <div class="panel" style="margin-bottom:16px"><h2>Timeline by role</h2>${timelineSvg(m, false)}
       <div class="legend"><span><i style="background:#FF5A4A;width:3px"></i>guard refusal (hover for the rule and the command)</span><span><i style="background:var(--amber);transform:rotate(45deg)"></i>your decision</span><span>contract author and critic runs are not archived yet (F10)</span></div></div>
     <div class="grid mc"><div class="grid" style="align-content:start">${needsPanel(m)}${activePanel(m, t)}</div>${checklist(m, t && t.name)}${liveAndLog(m)}</div>`;
@@ -403,7 +557,7 @@ function waitingBar() {
 function card(c) {
   return `<article class="panel ask" data-card="${esc(c.id)}">
     <div class="top"><span class="k">${esc(c.title)}</span><span class="muted">${esc(c.mission)}${c.ticket ? " · " + esc(c.ticket) : ""}${c.since ? " · last event " + ago(c.since) + " ago" : ""}</span>
-      <span class="spacer"></span><a href="#/m/${encodeURIComponent(c.mission)}${c.ticket ? "/t/" + encodeURIComponent(c.ticket) : ""}" style="color:var(--blue)">open ${c.ticket ? "ticket" : "mission"}</a></div>
+      <span class="spacer"></span>${c.kind === "approve" ? `<a href="#/m/${encodeURIComponent(c.mission)}/gate" class="readlink" style="margin:0 10px 0 0;padding:5px 10px">Read contract and critique</a>` : ""}<a href="#/m/${encodeURIComponent(c.mission)}${c.ticket ? "/t/" + encodeURIComponent(c.ticket) : ""}" style="color:var(--blue)">open ${c.ticket ? "ticket" : "mission"}</a></div>
     <div class="body"><div><p class="q">${esc(c.question)}</p>
       ${c.options.map((o) => `<div class="opt${o.suggested ? " sug" : ""}"><span class="l">${esc(o.label)}</span>${o.suggested ? `<span class="tag">suggested</span>` : ""}
         <div class="e">${esc(o.effect)}</div>${o.command ? `<div class="cmd"><code class="mono">${esc(o.command)}</code><button type="button" class="copy" data-copy="${esc(o.command)}">Copy</button></div>` : ""}</div>`).join("")}
@@ -472,6 +626,7 @@ function render() {
   if (m) crumbs.push(`<span>›</span><a href="#/m/${encodeURIComponent(m.name)}">${esc(m.name)}</a>`);
   if (t) crumbs.push(`<span>›</span><span>${esc(t.name)}</span>`);
   if (m && r.run) crumbs.push(`<span>›</span><span>run ${esc(r.run.slice(0, 8))}</span>`);
+  if (m && r.gate) crumbs.push(`<span>›</span><span>contract (G1)</span>`);
   $("#crumbs").innerHTML = crumbs.join("");
   // The page redraws every poll: keep each log box where the person scrolled it.
   // A box at its bottom follows the run, like a terminal; a new box opens at
@@ -480,7 +635,7 @@ function render() {
   document.querySelectorAll("[data-key]").forEach((el) => {
     kept[el.dataset.key] = { top: el.scrollTop, bottom: el.scrollHeight - el.scrollTop - el.clientHeight < 8 };
   });
-  $("#app").innerHTML = m && r.run ? runView(m, r.run) : t ? ticketView(m, t) : m ? missionView(m) : r.m ? `<p class="err">No mission “${esc(r.m)}”.</p>` + leads() : r.list ? leads() : inboxView();
+  $("#app").innerHTML = m && r.gate ? gateView(m, r.gate) : m && r.run ? runView(m, r.run) : t ? ticketView(m, t) : m ? missionView(m) : r.m ? `<p class="err">No mission “${esc(r.m)}”.</p>` + leads() : r.list ? leads() : inboxView();
   document.querySelectorAll("[data-key]").forEach((el) => {
     const k = kept[el.dataset.key];
     el.scrollTop = !k || k.bottom ? el.scrollHeight : k.top;
@@ -490,6 +645,11 @@ function render() {
   document.querySelectorAll("button[data-evf]").forEach((el) => (el.onclick = () => { evFilter = el.dataset.evf; render(); }));
   document.querySelectorAll("button[data-copy]").forEach((el) => (el.onclick = () => { navigator.clipboard?.writeText(el.dataset.copy).then(() => { el.textContent = "Copied"; }, () => {}); }));
   document.querySelectorAll("[data-t]").forEach((el) => (el.onclick = () => go(r.m, el.dataset.t)));
+  document.querySelectorAll("button[data-gf]").forEach((el) => (el.onclick = () => { gateFilter = el.dataset.gf; render(); }));
+  // A VAL id anywhere on the gate page opens its assertion; a finding chip, its finding.
+  document.querySelectorAll(".vref[data-a]").forEach((el) => (el.onclick = (e) => { e.preventDefault(); gateFilter = "all"; jumpTo = "a-" + el.dataset.a; location.hash = `#/m/${encodeURIComponent(r.m)}/gate/contract`; if (r.gate === "contract") { render(); } }));
+  document.querySelectorAll("a[data-f]").forEach((el) => (el.onclick = () => { jumpTo = "f-" + el.dataset.f; }));
+  if (jumpTo) { const el = document.getElementById(jumpTo); if (el) { jumpTo = ""; el.scrollIntoView({ block: "start" }); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 1200); } }
 }
 
 async function poll() {
@@ -513,12 +673,12 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "n" || e.key === "N") { location.hash = "#/"; }
   else if (e.key === "m" || e.key === "M") { const name = m ? m.name : (state.missions[sel] || state.missions[0])?.name; if (name) go(name); }
   else if ((e.key === "r" || e.key === "R") && m) { const t = r.t ? m.tickets.find((x) => x.name === r.t) : (m.tickets[sel] || active(m)); if (t) go(m.name, t.name); }
-  else if (e.key === "Escape") { if (r.t || r.run) go(r.m); else if (r.m) go(""); else if (r.list) location.hash = "#/"; }
+  else if (e.key === "Escape") { if (r.t || r.run || r.gate) go(r.m); else if (r.m) go(""); else if (r.list) location.hash = "#/"; }
   else if (e.key === "ArrowDown" || e.key === "j") { sel = Math.min(sel + 1, items.length - 1); render(); e.preventDefault(); }
   else if (e.key === "ArrowUp" || e.key === "k") { sel = Math.max(sel - 1, 0); render(); e.preventDefault(); }
   else if (e.key === "Enter") { if (m && !r.t && m.tickets[sel]) go(m.name, m.tickets[sel].name); else if (!m && state.missions[sel]) go(state.missions[sel].name); }
 });
-window.addEventListener("hashchange", () => { sel = 0; render(); });
+window.addEventListener("hashchange", () => { sel = 0; if (!jumpTo) window.scrollTo(0, 0); render(); });
 poll(); setInterval(poll, 2000);
 </script>
 </body>
