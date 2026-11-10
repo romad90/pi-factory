@@ -29,7 +29,7 @@ jobs:
       - name: skills pin (v1.3.1, no shadows)
         run: bash scripts/factory/skills-pin.sh verify
       - name: command guard rules
-        run: node --test tests/guard.test.mjs tests/guard-replay.test.mjs tests/learn-export.test.mjs tests/cockpit-contract.test.mjs tests/run-detail.test.mjs tests/archive.test.mjs tests/node-version.test.mjs
+        run: node --test tests/guard.test.mjs tests/guard-replay.test.mjs tests/learn-export.test.mjs tests/cockpit-contract.test.mjs tests/run-detail.test.mjs tests/archive.test.mjs tests/node-version.test.mjs tests/gate-doc.test.mjs
       - name: cockpit, driven like a person, on the gym's records (D123)
         run: |
           npm i --no-save --no-package-lock playwright@1.63.0

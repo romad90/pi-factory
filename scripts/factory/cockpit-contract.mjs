@@ -129,9 +129,10 @@ export function parseCritique(t) {
   const firstWord = (x) => (x || "").trim().split(/\s+/)[0] || "";
   const field = (text, name) => (text.match(new RegExp(`^\\*\\*${name}:\\*\\*\\s*(.+)$`, "m")) || [])[1]?.trim() || "";
   const findings = [];
-  // The critic writes the level in the heading ("### F6 — [blocking] …") or
-  // as the finding's first bullet ("- [blocking] …"): both seen in one mission.
-  const re = /^###\s+(F\d+)\s*[—–-]+\s*(?:\[(blocking|non-blocking)\]\s*)?(.+)$/gm;
+  // The critic writes the level in the heading ("### F6 — [blocking] …",
+  // "### 1. [blocking] …") or as the finding's first bullet ("- [blocking] …"):
+  // all seen (deps-node-22, eslint-10).
+  const re = /^###\s+(F\d+|\d+)\.?\s*[—–-]*\s*(?:\[(blocking|non-blocking)\]\s*)?(.+)$/gm;
   let m; const at = [];
   while ((m = re.exec(t))) at.push({ id: m[1], level: m[2] || "", title: m[3].trim(), start: re.lastIndex, head: m.index });
   at.forEach((a, i) => {
@@ -141,10 +142,13 @@ export function parseCritique(t) {
     if (tag) body = body.replace(tag[0], "");
     // D126: the concrete wrong change the finding lets pass, on its own line.
     const passes = (body.match(/^\s*[-*]?\s*Passes wrongly:\s*(.+)$/im) || [])[1]?.trim() || "";
+    const full = body.trim();
     body = body.replace(/^\s*[-*]?\s*Passes wrongly:.*$/im, "");
     const paras = body.split(/\n\s*\n/).map((x) => x.replace(/\s+/g, " ").trim()).filter(Boolean);
+    // D130: the whole finding (Markdown) for the gate page, and the assertions it names.
+    const refs = [...new Set((a.title + "\n" + full).match(/VAL-[A-Z0-9]+-\d{3}/g) || [])];
     findings.push({ id: a.id, level, title: a.title, passes: passes.slice(0, 400), text: (paras.find((x) => !/^Suggested fix:/i.test(x)) || "").slice(0, 700),
-      fix: (paras.find((x) => /^Suggested fix:/i.test(x)) || "").replace(/^Suggested fix:\s*/i, "").slice(0, 500) });
+      fix: (paras.find((x) => /^Suggested fix:/i.test(x)) || "").replace(/^Suggested fix:\s*/i, "").slice(0, 500), body: full.slice(0, 6000), refs });
   });
   return { result: firstWord(field(t, "Critique result")), findings };
 }

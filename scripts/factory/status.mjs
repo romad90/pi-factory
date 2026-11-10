@@ -5,6 +5,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { parseCritique, toContract } from "./cockpit-contract.mjs";
 import { replay } from "./run-detail.mjs";
+import { parseContract } from "./gate-doc.mjs";
 
 const env = process.env;
 const root = env.FACTORY_DIR || ".scratch";
@@ -35,17 +36,9 @@ function verdict(file) {
   };
 }
 
+// The contract's assertions by id (gate-doc.mjs parses "- **Given:** …" fields, D130).
 function contract(spec) {
-  const out = {};
-  const re = /^###\s+(VAL-[A-Z0-9]+-\d{3}):?\s*(.*)$/gm;
-  let m; const idx = [];
-  while ((m = re.exec(spec))) idx.push({ id: m[1], title: m[2], at: m.index, end: re.lastIndex });
-  idx.forEach((a, i) => {
-    const body = spec.slice(a.end, i + 1 < idx.length ? idx[i + 1].at : undefined).split(/\n## /)[0];
-    const given = body.split("\n").find((l) => /^Given\b/i.test(l.trim())) || "";
-    out[a.id] = { title: a.title, kind: firstWord(field(body, "Kind")), given: given.trim() };
-  });
-  return out;
+  return Object.fromEntries(parseContract(spec || "").assertions.map((a) => [a.id, { title: a.title, kind: a.kind, given: a.given }]));
 }
 
 const git = (args) => { try { return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 32 << 20 }); } catch { return ""; } };

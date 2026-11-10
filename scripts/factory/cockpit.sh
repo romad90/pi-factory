@@ -38,12 +38,14 @@ esac
 site="$(mktemp -d)"; cp "$here/cockpit.html" "$site/index.html"; snapshot "$site"
 # D121: one archived run on demand (run.json?m=<mission>&r=<run folder>), never in the snapshot.
 archive="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)/pi-factory/archive"
+# D130: the gate page reads one mission's spec, critique and amendments (gate.json?m=<mission>).
+missions="$(pwd)/$FACTORY_DIR"
 ( while sleep "$every"; do snapshot "$site"; done ) & loop=$!
 srv=""
 trap 'kill $loop $srv 2>/dev/null; rm -rf "$site"' EXIT
 trap 'exit 0' INT TERM
 echo "cockpit: http://127.0.0.1:$port  (on $bind; read-only; Ctrl+C to stop)${extra:+; also answers Host $extra}"
-SITE="$site" ARCHIVE="${FACTORY_ARCHIVE_DIR:-$archive}" DETAIL="$here/run-detail.mjs" PORT="$port" BIND="$bind" EXTRA="$extra" node -e '
+SITE="$site" ARCHIVE="${FACTORY_ARCHIVE_DIR:-$archive}" DETAIL="$here/run-detail.mjs" GATE="$here/gate-doc.mjs" MISSIONS="$missions" PORT="$port" BIND="$bind" EXTRA="$extra" node -e '
 const http = require("http"), fs = require("fs"), path = require("path"), { execFile } = require("child_process");
 const site = process.env.SITE, types = { ".html": "text/html; charset=utf-8", ".json": "application/json" };
 const port = Number(process.env.PORT), hosts = [`127.0.0.1:${port}`, `localhost:${port}`];
@@ -64,6 +66,14 @@ http.createServer((req, res) => {
     if (!safe.test(m) || !safe.test(r) || m.startsWith(".") || r.startsWith(".")) { res.writeHead(400); return res.end(); }
     return execFile(process.execPath, [process.env.DETAIL, process.env.ARCHIVE, m, r], { maxBuffer: 16 << 20, timeout: 10000 }, (err, out) => {
       if (err || !out.trim()) { res.writeHead(404); return res.end("no such archived run"); }
+      res.writeHead(200, { "Content-Type": types[".json"], "Cache-Control": "no-store" }); res.end(out);
+    });
+  }
+  if (url.pathname === "/gate.json") {
+    const m = url.searchParams.get("m") || "";
+    if (!/^[\w.-]+$/.test(m) || m.startsWith(".")) { res.writeHead(400); return res.end(); }
+    return execFile(process.execPath, [process.env.GATE, process.env.MISSIONS, m], { maxBuffer: 16 << 20, timeout: 10000 }, (err, out) => {
+      if (err || !out.trim()) { res.writeHead(404); return res.end("no such mission"); }
       res.writeHead(200, { "Content-Type": types[".json"], "Cache-Control": "no-store" }); res.end(out);
     });
   }
