@@ -176,6 +176,8 @@ grep -q '^BLOCKED generated: reports/mutation/mutation.json' "$work/pg.log" || f
 printf 'diff --git a/test/.eslintrc.js b/test/.eslintrc.js\ndeleted file mode 100644\n--- a/test/.eslintrc.js\n+++ /dev/null\n@@ -1 +0,0 @@\n-module.exports = {}\n' > "$work/pg.patch"
 bash scripts/factory/patch-guard.sh "$work/pg.patch" >/dev/null && t "patch guard: deleting a dotfile config under test/ is not removing a test (eslint-10)" || fail "dot config in test/" "$(bash scripts/factory/patch-guard.sh "$work/pg.patch")"
 pg_blocks "patch guard: deleting a test file is still refused" 'diff --git a/test/a.test.js b/test/a.test.js\ndeleted file mode 100644\n--- a/test/a.test.js\n+++ /dev/null\n@@ -1 +0,0 @@\n-x\n'
+pg_blocks "patch guard: a test without .test in its name deleted" 'diff --git a/test/client.js b/test/client.js\ndeleted file mode 100644\n--- a/test/client.js\n+++ /dev/null\n@@ -1 +0,0 @@\n-x\n'
+grep -q '^BLOCKED tests: test/client.js deleted' "$work/pg.log" || fail "test deleted reason" "$(cat "$work/pg.log")"
 printf 'diff --git a/tests/a.test.js b/tests/b.test.js\nsimilarity index 100%%\nrename from tests/a.test.js\nrename to tests/b.test.js\n' > "$work/pg.patch"
 bash scripts/factory/patch-guard.sh "$work/pg.patch" >/dev/null && t "patch guard: moving a test file is fine" || fail "test move" "$(bash scripts/factory/patch-guard.sh "$work/pg.patch")"
 
@@ -252,8 +254,12 @@ depbase="$(git rev-parse HEAD)"
 if bash scripts/factory/human.sh deps depsm "nothing changed" >"$work/deps.log" 2>&1; then fail "human.sh deps must refuse a commit with no manifest" "$(cat "$work/deps.log")"; fi
 mkdir -p vendor-demo; printf '{"devDependencies":{"tap":"^21.8.1"}}\n' > vendor-demo/package.json; printf '{"lockfileVersion":3}\n' > vendor-demo/package-lock.json
 git add vendor-demo; git commit -qm "chore(deps): tap 21 by hand"; depc="$(git rev-parse --short HEAD)"
-bash scripts/factory/human.sh deps depsm "tap 16 to 21, lockfile committed" > "$work/deps.log" 2>&1
-grep -qF "$(printf 'deps\tDependencies changed by hand (D124)\tcommit %s: vendor-demo/package-lock.json, vendor-demo/package.json — tap 16 to 21' "$depc")" .scratch/depsm/decisions.tsv \
+/bin/bash -s > "$work/deps.log" 2>&1 <<'LEAD'
+bash scripts/factory/human.sh deps depsm --stdin <<'FACTORY_TEXT_END'
+tap 16 to 21, lockfile committed (npm's own)
+FACTORY_TEXT_END
+LEAD
+grep -qF "$(printf 'deps\tDependencies changed by hand (D124)\tcommit %s: vendor-demo/package-lock.json, vendor-demo/package.json — tap 16 to 21, lockfile committed (npm'"'"'s own)' "$depc")" .scratch/depsm/decisions.tsv \
   && t "human.sh deps records the person's dependency commit and its files (D124)" || fail "human deps" "$(cat "$work/deps.log" .scratch/depsm/decisions.tsv 2>&1)"
 r="$(bash scripts/factory/resolve.sh depsm 01-up 'Should I FAIL the ticket? vendor-demo/package.json is not changed in this commit.' || true)"
 [ "${r%%$'\t'*}" = deliverable-by-hand ] && grep -qF "commit $depc" <<<"$r" && t "resolver: a deliverable changed by hand is delivered, not a missing one (D124)" || fail "resolver by hand" "$r"
@@ -538,17 +544,18 @@ grep -q 'sent back to review' "$work/collect.log" && [ ! -f $m/verdicts/01-hello
 # D117 (E33, E34): a review that judged no assertion (the guard blocked its
 # test runs: 0 pass, 0 fail, all unverified) is not a finding on the code. Set
 # aside, not a round, reviewed again; a second one in a row escalates with why.
-not_run_verdict() { printf '# Verdict: 01-hello\n**Result:** FAIL\n**Commit:** %s\n\n## Assertions\n- VAL-HELLO-001: UNVERIFIED — The factory guard blocked the test command before execution.\n\n## Issues\n- [blocking] Review execution stopped before tests ran.\n' "$c1" > $m/verdicts/01-hello-code.md; }
+not_run_verdict() { printf '# Verdict: 01-hello\n**Result:** FAIL\n**Commit:** %s\n\n## Assertions\n%s- VAL-HELLO-001: UNVERIFIED — The factory guard blocked the test command before execution.\n\n## Issues\n- [blocking] Review execution stopped before tests ran.\n' "$c1" "${1:-}" > $m/verdicts/01-hello-code.md; }
 not_run_verdict
 out="$(bash scripts/factory/collect.sh demo)"
-grep -q 'judged no assertion' <<<"$out" && [ ! -f $m/verdicts/01-hello-code.r3.md ] && ! grep -q 'guard blocked' $m/verdicts/01-hello-code.md \
+grep -q 'judged too little (0 pass, 0 fail, 1 unverified)' <<<"$out" && [ ! -f $m/verdicts/01-hello-code.r3.md ] && ! grep -q 'guard blocked' $m/verdicts/01-hello-code.md \
   && [ -f $m/state/01-hello.not-run-verdict.md ] && [ "$(bash scripts/factory/next.sh demo 2>&1 | head -1)" = "STEP: review" ] \
   && t "a review that judged no assertion is set aside, not a round, and reviewed again (D117)" || fail "review not run" "$out $(ls $m/verdicts $m/state)"
-not_run_verdict
+# eslint-10: "review incomplete", 1 PASS and 13 UNVERIFIED, counted as round 2.
+not_run_verdict '- VAL-HELLO-002: UNVERIFIED — The review stopped early.\n- VAL-HELLO-003: PASS — git show lists the file.\n'
 out="$(bash scripts/factory/collect.sh demo)"
-grep -q 'judged no assertion again' <<<"$out" && [ -f $m/state/01-hello.stuck ] && grep -q 'factory guard blocked' $m/state/01-hello.stuck \
+grep -q 'judged too little again' <<<"$out" && [ -f $m/state/01-hello.stuck ] && grep -q 'factory guard blocked' $m/state/01-hello.stuck \
   && [ "$(bash scripts/factory/next.sh demo 2>&1 | head -1)" = "STEP: escalate" ] && [ ! -f $m/verdicts/01-hello-code.r3.md ] \
-  && t "a second review in a row that judged nothing escalates, with the reviewer's reasons (D117)" || fail "review not run twice" "$out $(cat $m/state/01-hello.stuck 2>&1)"
+  && t "a second review in a row that judged too little (1 pass, 2 unverified) escalates, with the reviewer's reasons (D117)" || fail "review not run twice" "$out $(cat $m/state/01-hello.stuck 2>&1)"
 rm -f $m/state/01-hello.stuck $m/state/01-hello.not-run $m/state/01-hello.not-run-verdict.md $m/verdicts/01-hello-code.md
 # P25 (1): a review run that leaves no file is not a verdict: back to review once, then escalated.
 out="$(bash scripts/factory/collect.sh demo)"
@@ -1187,10 +1194,17 @@ cp .scratch/maint/verdicts/02-tests-code.md .scratch/maint/verdicts/02-tests-cod
 printf '**Ticket:** 02-tests\n\nNothing to change: hand over as is?\n' > .scratch/maint/state/open-question.md
 grep -q '/factory-rereview maint 02-tests' <<<"$(bash scripts/factory/next.sh maint 2>&1)" \
   && t "a question about an integrated ticket names the way to review it again instead of rebuilding it" || fail "rereview hint" "$(bash scripts/factory/next.sh maint 2>&1 | tail -3)"
-bash scripts/factory/reset-ticket.sh maint 02-tests --review "VAL-M-001 amended: the fixture is in scope" >"$work/rr.log" \
-  && [ ! -e .scratch/maint/verdicts/02-tests-code.md ] && [ -f .scratch/maint/verdicts/02-tests-code.r1.md ] \
+# The /factory-rereview template, as the lead runs it: /bin/bash is 3.2 on
+# macOS, where an apostrophe inside "$(cat <<'END' ... END)" fails to parse.
+/bin/bash -s >"$work/rr.log" 2>&1 <<'LEAD' && rr=0 || rr=1
+bash scripts/factory/reset-ticket.sh maint 02-tests --review --stdin <<'FACTORY_TEXT_END'
+VAL-M-001 amended: the fixture's in scope,
+`rm` and "$HOME" stay text
+FACTORY_TEXT_END
+LEAD
+[ "$rr" = 0 ] && [ ! -e .scratch/maint/verdicts/02-tests-code.md ] && [ -f .scratch/maint/verdicts/02-tests-code.r1.md ] \
   && [ -f .scratch/maint/state/02-tests.integrated ] && [ ! -e .scratch/maint/state/open-question.md ] \
-  && grep -q $'02-tests\trereview\t.*VAL-M-001 amended' .scratch/maint/decisions.tsv && [ -z "$(git status --porcelain -- .scratch)" ] \
+  && grep -qF "VAL-M-001 amended: the fixture's in scope, \`rm\` and \"\$HOME\" stay text" .scratch/maint/decisions.tsv && [ -z "$(git status --porcelain -- .scratch)" ] \
   && bash -c '. scripts/factory/lib.sh; compute_ticket_state maint; [[ " ${T_REVIEW[*]} " == *" 02-tests "* ]] && [[ " ${T_BUILD[*]} " != *" 02-tests "* ]]' \
   && t "reset-ticket --review: an integrated ticket goes back to review, not build; history kept, question closed, one commit" || fail "rereview" "$(cat "$work/rr.log"; ls .scratch/maint/verdicts .scratch/maint/state)"
 if bash scripts/factory/reset-ticket.sh maint 03-more --review "x" >/dev/null 2>&1; then fail "rereview must refuse a ticket that isn't integrated"; fi
@@ -1376,6 +1390,29 @@ git ls-remote --heads "$work/origin.git" "$cur" | grep -q . && grep -qx 'product
   && t "mr.sh pushes the branch and opens the MR with glab, squash on; heading becomes the title, the rest the description, plus what else rides in it (D86)" || fail "mr glab create" "$(cat "$work/mr.log" "$work/glab.log")"
 ls "$work/data"/*/demo-*.tar.gz >/dev/null 2>&1 && tar -tzf "$work/data"/*/demo-*.tar.gz | grep -q 'demo/metrics.json' \
   && t "mr.sh keeps the mission's data: metrics next to its runs, one export in the machine's data folder (D103)" || fail "mission data" "$(ls -R "$work/data" 2>&1; cat "$work/mr.log")"
+# eslint-10: on a GitHub remote mr.sh printed GitLab token tips and a paste step.
+git remote set-url origin https://github.com/o/p.git; git remote set-url --push origin "$work/origin.git"; rm -f $m/mr.url
+cat > "$work/bin/gh" <<'GH'
+#!/usr/bin/env bash
+case "$1 $2" in
+  "auth status") exit 0 ;;
+  "pr list") ;;
+  "pr create") printf '%s\n' "$@" > "$GH_LOG"; for a; do [ "$p" = --body-file ] && cp "$a" "$GH_LOG.body"; p="$a"; done; echo "https://github.com/o/p/pull/9" ;;
+  "pr view") echo "https://github.com/o/p/pull/9" ;;
+esac
+GH
+chmod +x "$work/bin/gh"; git branch -f production "$(bash -c '. scripts/factory/lib.sh; mission_base demo')"
+FACTORY_DATA_DIR="$work/data" GH_LOG="$work/gh.log" GLAB_LOG="$work/glab2.log" PATH="$work/bin:$PATH" FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo --draft >"$work/mr.log" 2>&1 || fail "mr gh" "$(cat "$work/mr.log")"
+git branch -D production >/dev/null
+grep -qx -- '--body-file' "$work/gh.log" && grep -qx -- '--draft' "$work/gh.log" && grep -qx 'test(demo): characterize the hello tools' "$work/gh.log" \
+  && grep -q '^## Summary' "$work/gh.log.body" && grep -q '^Merge with \*\*squash\*\*:' "$work/gh.log.body" && [ ! -e "$work/glab2.log" ] \
+  && grep -q 'pull/9' $m/mr.url && ! grep -qi 'gitlab' "$work/mr.log" \
+  && t "mr.sh on a GitHub remote opens the PR with gh --body-file, no GitLab steps" || fail "mr gh create" "$(cat "$work/mr.log" "$work/gh.log")"
+printf '#!/usr/bin/env bash\nexit 1\n' > "$work/bin/gh"   # installed, not logged in
+out="$(PATH="$work/bin:$PATH" FACTORY_DATA_DIR="$work/data" FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo 2>&1)" \
+  && grep -q 'gh pr create --base production' <<<"$out" && ! grep -qi 'gitlab' <<<"$out" \
+  && t "mr.sh on GitHub without a logged-in gh prints the GitHub steps" || fail "mr gh steps" "$out"
+rm "$work/bin/gh"
 git remote remove origin; rm -f $m/pr.md $m/mr.url
 
 # D96: new tests must disagree with the code before the change, as the intent says.

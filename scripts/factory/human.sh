@@ -18,7 +18,7 @@
 # heredoc, so backticks, $ and quotes in a question or answer stay text.
 #   human.sh amend             <feature> <change...>
 #   human.sh accept-unverified <feature> <VAL-…,VAL-…|ALL> <why...>
-#   human.sh deps              <feature> [<commit>] <what you changed...>   D124: record a dependency change made by hand
+#   human.sh deps              <feature> [<commit>] <what you changed...>   D124: record a dependency change made by hand (or --stdin)
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib.sh
@@ -211,11 +211,12 @@ case "$cmd" in
     # packages, and an open question about it closes.
     commit=HEAD
     if [ $# -gt 1 ] && git cat-file -e "$1^{commit}" 2>/dev/null; then commit="$1"; shift; fi
-    [ $# -gt 0 ] || die "usage: human.sh deps <feature> [<commit>] <what you changed...>"
+    what="$(text_arg "$@")"
+    [ -n "$what" ] || die "usage: human.sh deps <feature> [<commit>] <what you changed...> (or --stdin)"
     c="$(git rev-parse --short "$commit")"
     files="$(git show --name-only --relative --format= "$commit" | grep -E "$DEPS_FILES_RE|(^|/)\.gitignore$" | paste -sd, - | sed 's/,/, /g')"
     [ -n "$files" ] || die "commit $c changes no dependency manifest or lockfile: make the change, commit it, then run this (or name the commit)"
-    decision_log "$feature" - deps "Dependencies changed by hand (D124)" "commit $c: $files — $*" mission
+    decision_log "$feature" - deps "Dependencies changed by hand (D124)" "commit $c: $files — $what" mission
     q="$dir/state/open-question.md"
     if [ -f "$q" ] && grep -qiE 'install|dependenc|package\.json|lock ?file|package-lock' "$q"; then
       if git ls-files --error-unmatch -- "$q" >/dev/null 2>&1; then git rm -q -- "$q"; else rm -f -- "$q"; fi

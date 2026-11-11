@@ -12,6 +12,8 @@
 #
 # Usage: scripts/factory/reset-ticket.sh <mission> <ticket> [reason]
 #        scripts/factory/reset-ticket.sh <mission> <ticket> --review "<why>"
+#        scripts/factory/reset-ticket.sh <mission> <ticket> --review --stdin < why
+# --stdin reads the reason verbatim, newlines become spaces (as human.sh does).
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib.sh
@@ -27,7 +29,8 @@ dir="$(mission_dir "$feature")"
 shopt -s nullglob
 
 if [ "${3:-}" = "--review" ]; then
-  why="${4:?--review needs a reason: what changed since the review}"
+  if [ "${4:-}" = --stdin ]; then why="$(tr '\n' ' ' | sed 's/  */ /g; s/^ //; s/ $//')"; else why="${4:-}"; fi
+  [ -n "$why" ] || die "--review needs a reason: what changed since the review"
   [ -n "$(ticket_marker "$feature" "$ticket")" ] || die "$ticket isn't integrated: there is nothing to review again (reset-ticket.sh $feature $ticket rebuilds it)"
   v="$dir/verdicts/$ticket-code.md"
   [ -f "$v" ] || { echo "No verdict for $ticket: next.sh already sends it to review."; exit 0; }
