@@ -845,7 +845,9 @@ mission_base() {
 }
 
 is_code_file()  { [[ "$1" =~ $FACTORY_CODE_RE ]] && ! [[ "$1" =~ $FACTORY_EXCLUDE_RE ]]; }
-is_test_file()  { [[ "$1" =~ $FACTORY_TEST_RE ]]; }
+# A dotfile is a tool's config, not a test, even under test/ (eslint-10: the
+# guard refused deleting test/.eslintrc.js as "a test removed").
+is_test_file()  { [[ "$1" =~ $FACTORY_TEST_RE ]] && [[ "${1##*/}" != .* ]]; }
 
 # Changed source files (not tests) between two commits, existing at the second.
 changed_code_files() {                 # <base> <commit>

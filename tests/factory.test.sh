@@ -171,6 +171,10 @@ pg_blocks "patch guard: a test renamed away" 'diff --git a/tests/a.test.js b/src
 pg_blocks "patch guard: a new symbolic link" 'diff --git a/src/l b/src/l\nnew file mode 120000\n--- /dev/null\n+++ b/src/l\n@@ -0,0 +1 @@\n+../instrument\n\\ No newline at end of file\n'
 pg_blocks "patch guard: a new file in a tool's output folder (P25)" 'diff --git a/reports/mutation/mutation.json b/reports/mutation/mutation.json\nnew file mode 100644\n--- /dev/null\n+++ b/reports/mutation/mutation.json\n@@ -0,0 +1 @@\n+{}\n'
 grep -q '^BLOCKED generated: reports/mutation/mutation.json' "$work/pg.log" || fail "generated reason" "$(cat "$work/pg.log")"
+pg_blocks "patch guard: a test without .test in its name deleted" 'diff --git a/test/client.js b/test/client.js\ndeleted file mode 100644\n--- a/test/client.js\n+++ /dev/null\n@@ -1 +0,0 @@\n-x\n'
+grep -q '^BLOCKED tests: test/client.js deleted' "$work/pg.log" || fail "test deleted reason" "$(cat "$work/pg.log")"
+printf 'diff --git a/test/.eslintrc.js b/test/.eslintrc.js\ndeleted file mode 100644\n--- a/test/.eslintrc.js\n+++ /dev/null\n@@ -1 +0,0 @@\n-x\n' > "$work/pg.patch"
+bash scripts/factory/patch-guard.sh "$work/pg.patch" >/dev/null && t "patch guard: deleting a tool's config under test/ is not removing a test (eslint-10)" || fail "test config delete" "$(bash scripts/factory/patch-guard.sh "$work/pg.patch")"
 printf 'diff --git a/tests/a.test.js b/tests/b.test.js\nsimilarity index 100%%\nrename from tests/a.test.js\nrename to tests/b.test.js\n' > "$work/pg.patch"
 bash scripts/factory/patch-guard.sh "$work/pg.patch" >/dev/null && t "patch guard: moving a test file is fine" || fail "test move" "$(bash scripts/factory/patch-guard.sh "$work/pg.patch")"
 
