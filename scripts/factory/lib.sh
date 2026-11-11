@@ -846,6 +846,10 @@ mission_base() {
 
 is_code_file()  { [[ "$1" =~ $FACTORY_CODE_RE ]] && ! [[ "$1" =~ $FACTORY_EXCLUDE_RE ]]; }
 is_test_file()  { [[ "$1" =~ $FACTORY_TEST_RE ]]; }
+# A test the runner can run: a file under a test folder whose name starts with
+# a dot (test/.eslintrc.js, test/.mocharc.yml) is a tool's config, not a test
+# (eslint-10 round 1: the guard refused a deletion the ticket required).
+is_test_case()  { local b="${1##*/}"; [ "${b#.}" = "$b" ] && is_test_file "$1"; }
 
 # Changed source files (not tests) between two commits, existing at the second.
 changed_code_files() {                 # <base> <commit>
