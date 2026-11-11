@@ -70,7 +70,7 @@ check_path() {                          # <path>
 while IFS=$'\x1f' read -r st old new mode; do
   [ -n "${st:-}" ] || continue
   check_path "$old"; [ "$new" = "$old" ] || check_path "$new"
-  if is_test_file "$old" && { [ "$st" = D ] || { [ "$st" = R ] && ! is_test_file "$new"; }; }; then
+  if is_test_case "$old" && { [ "$st" = D ] || { [ "$st" = R ] && ! is_test_case "$new"; }; }; then
     block "tests: $old deleted; tests are never removed to make a change pass"
   fi
   [ "$mode" != 120000 ] || block "paths: ${new:-$old} is a symbolic link; a link can point at the instrument or outside the project"

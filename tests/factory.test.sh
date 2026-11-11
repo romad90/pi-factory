@@ -171,10 +171,13 @@ pg_blocks "patch guard: a test renamed away" 'diff --git a/tests/a.test.js b/src
 pg_blocks "patch guard: a new symbolic link" 'diff --git a/src/l b/src/l\nnew file mode 120000\n--- /dev/null\n+++ b/src/l\n@@ -0,0 +1 @@\n+../instrument\n\\ No newline at end of file\n'
 pg_blocks "patch guard: a new file in a tool's output folder (P25)" 'diff --git a/reports/mutation/mutation.json b/reports/mutation/mutation.json\nnew file mode 100644\n--- /dev/null\n+++ b/reports/mutation/mutation.json\n@@ -0,0 +1 @@\n+{}\n'
 grep -q '^BLOCKED generated: reports/mutation/mutation.json' "$work/pg.log" || fail "generated reason" "$(cat "$work/pg.log")"
+# eslint-10 round 1: the ticket deleted test/.eslintrc.js, an ESLint config
+# under test/, and the guard read it as a test removed (verdict r1, decision).
+printf 'diff --git a/test/.eslintrc.js b/test/.eslintrc.js\ndeleted file mode 100644\n--- a/test/.eslintrc.js\n+++ /dev/null\n@@ -1 +0,0 @@\n-module.exports = {}\n' > "$work/pg.patch"
+bash scripts/factory/patch-guard.sh "$work/pg.patch" >/dev/null && t "patch guard: deleting a dotfile config under test/ is not removing a test (eslint-10)" || fail "dot config in test/" "$(bash scripts/factory/patch-guard.sh "$work/pg.patch")"
+pg_blocks "patch guard: deleting a test file is still refused" 'diff --git a/test/a.test.js b/test/a.test.js\ndeleted file mode 100644\n--- a/test/a.test.js\n+++ /dev/null\n@@ -1 +0,0 @@\n-x\n'
 pg_blocks "patch guard: a test without .test in its name deleted" 'diff --git a/test/client.js b/test/client.js\ndeleted file mode 100644\n--- a/test/client.js\n+++ /dev/null\n@@ -1 +0,0 @@\n-x\n'
 grep -q '^BLOCKED tests: test/client.js deleted' "$work/pg.log" || fail "test deleted reason" "$(cat "$work/pg.log")"
-printf 'diff --git a/test/.eslintrc.js b/test/.eslintrc.js\ndeleted file mode 100644\n--- a/test/.eslintrc.js\n+++ /dev/null\n@@ -1 +0,0 @@\n-x\n' > "$work/pg.patch"
-bash scripts/factory/patch-guard.sh "$work/pg.patch" >/dev/null && t "patch guard: deleting a tool's config under test/ is not removing a test (eslint-10)" || fail "test config delete" "$(bash scripts/factory/patch-guard.sh "$work/pg.patch")"
 printf 'diff --git a/tests/a.test.js b/tests/b.test.js\nsimilarity index 100%%\nrename from tests/a.test.js\nrename to tests/b.test.js\n' > "$work/pg.patch"
 bash scripts/factory/patch-guard.sh "$work/pg.patch" >/dev/null && t "patch guard: moving a test file is fine" || fail "test move" "$(bash scripts/factory/patch-guard.sh "$work/pg.patch")"
 
@@ -265,6 +268,14 @@ grep -qF "changed by hand, as dependency changes must be (D124), in commit $depc
 printf 'diff --git a/tests/dep.test.js b/tests/dep.test.js\nnew file mode 100644\n--- /dev/null\n+++ b/tests/dep.test.js\n@@ -0,0 +1 @@\n+ok\n' > "$work/dep.patch"
 tob="$(bash -c '. scripts/factory/lib.sh; load_commands; test_on_base depsm 01-up "$1" "$2" "$3"' _ "$work/dep.patch" "$work/dep-tob.log" "$depbase")"
 grep -q "^test on base: skipped by a dependency change (commit $depc" <<<"$tob" && t "test on base skips a base older than the dependency change made by hand (D124)" || fail "tob deps" "$tob"
+# eslint-10 round 2: VAL-CROSS-002 says "runs the command in ## Done when",
+# the brief forbids spec.md, and the reviewer stopped to ask for the command.
+printf '\n### VAL-X-002: The done-when command passes\n- **When:** the validator runs the command in `## Done when`\n- **Then:** it exits 0\n- **Kind:** behavior\n\n## Done when\n\n`npm run lint:ci && npm test`\n' >> .scratch/depsm/spec.md
+printf '\n- VAL-X-002\n' >> .scratch/depsm/issues/01-up.md
+rbd="$(bash scripts/factory/brief.sh reviewer depsm 01-up HEAD)"
+grep -qF '`npm run lint:ci && npm test`' <<<"$rbd" && grep -q 'never stop to ask' <<<"$rbd" \
+  && t "the reviewer's brief carries the Done when commands an assertion names, and says never to stop to ask (eslint-10)" || fail "brief done when" "$(tail -12 <<<"$rbd")"
+git checkout -q -- .scratch/depsm
 git rm -rq .scratch/depsm vendor-demo; git commit -qm "test: drop the dependency mission"
 git checkout -q "$cmds0" -- .factory/commands.env; git commit -qm "test: reset commands"
 

@@ -91,6 +91,12 @@ if [[ "$text" == *"{{TICKET_TEXT}}"* || "$text" == *"{{ASSERTIONS}}"* ]]; then
       # E38: a health fix carries the quality-bar lines it answers to.
       for q in $qids; do atext+="${atext:+$'\n'}$(grep -- "$q" docs/agents/quality-bar.md 2>/dev/null | head -3)"; done
       [ -n "$atext" ] || atext="(listed under ## Covers but not found in spec.md: $(echo $ids))"
+      # eslint-10 round 2: an assertion that runs "the command in ## Done when"
+      # can't be checked by an agent told not to read spec.md: carry the commands.
+      if [[ "$atext" == *"Done when"* ]]; then
+        dw="$(done_commands "$d/spec.md" | sed 's/.*/- `&`/')"
+        [ -z "$dw" ] || atext+=$'\n\n'"The commands under \"## Done when\" in spec.md:"$'\n'"$dw"
+      fi
     fi
   fi
   text="${text//"{{TICKET_TEXT}}"/"$ttext"}"
