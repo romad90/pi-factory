@@ -1379,6 +1379,29 @@ git ls-remote --heads "$work/origin.git" "$cur" | grep -q . && grep -qx 'product
   && t "mr.sh pushes the branch and opens the MR with glab, squash on; heading becomes the title, the rest the description, plus what else rides in it (D86)" || fail "mr glab create" "$(cat "$work/mr.log" "$work/glab.log")"
 ls "$work/data"/*/demo-*.tar.gz >/dev/null 2>&1 && tar -tzf "$work/data"/*/demo-*.tar.gz | grep -q 'demo/metrics.json' \
   && t "mr.sh keeps the mission's data: metrics next to its runs, one export in the machine's data folder (D103)" || fail "mission data" "$(ls -R "$work/data" 2>&1; cat "$work/mr.log")"
+# eslint-10: on a GitHub remote mr.sh printed GitLab token tips and a paste step.
+git remote set-url origin https://github.com/o/p.git; git remote set-url --push origin "$work/origin.git"; rm -f $m/mr.url
+cat > "$work/bin/gh" <<'GH'
+#!/usr/bin/env bash
+case "$1 $2" in
+  "auth status") exit 0 ;;
+  "pr list") ;;
+  "pr create") printf '%s\n' "$@" > "$GH_LOG"; for a; do [ "$p" = --body-file ] && cp "$a" "$GH_LOG.body"; p="$a"; done; echo "https://github.com/o/p/pull/9" ;;
+  "pr view") echo "https://github.com/o/p/pull/9" ;;
+esac
+GH
+chmod +x "$work/bin/gh"; git branch -f production "$(bash -c '. scripts/factory/lib.sh; mission_base demo')"
+FACTORY_DATA_DIR="$work/data" GH_LOG="$work/gh.log" GLAB_LOG="$work/glab2.log" PATH="$work/bin:$PATH" FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo --draft >"$work/mr.log" 2>&1 || fail "mr gh" "$(cat "$work/mr.log")"
+git branch -D production >/dev/null
+grep -qx -- '--body-file' "$work/gh.log" && grep -qx -- '--draft' "$work/gh.log" && grep -qx 'test(demo): characterize the hello tools' "$work/gh.log" \
+  && grep -q '^## Summary' "$work/gh.log.body" && grep -q '^Merge with \*\*squash\*\*:' "$work/gh.log.body" && [ ! -e "$work/glab2.log" ] \
+  && grep -q 'pull/9' $m/mr.url && ! grep -qi 'gitlab' "$work/mr.log" \
+  && t "mr.sh on a GitHub remote opens the PR with gh --body-file, no GitLab steps" || fail "mr gh create" "$(cat "$work/mr.log" "$work/gh.log")"
+printf '#!/usr/bin/env bash\nexit 1\n' > "$work/bin/gh"   # installed, not logged in
+out="$(PATH="$work/bin:$PATH" FACTORY_DATA_DIR="$work/data" FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo 2>&1)" \
+  && grep -q 'gh pr create --base production' <<<"$out" && ! grep -qi 'gitlab' <<<"$out" \
+  && t "mr.sh on GitHub without a logged-in gh prints the GitHub steps" || fail "mr gh steps" "$out"
+rm "$work/bin/gh"
 git remote remove origin; rm -f $m/pr.md $m/mr.url
 
 # D96: new tests must disagree with the code before the change, as the intent says.

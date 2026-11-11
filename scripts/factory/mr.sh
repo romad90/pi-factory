@@ -19,6 +19,9 @@
 # Reviewer: $FACTORY_MR_REVIEWER, else the spec's **Reviewer:** line (a GitLab
 #         username): the person who approved the contract and design (D95).
 # How the MR is created, first that works:
+#   0. origin on github.com: gh, if installed and logged in (gh pr create
+#      --body-file; draft with --draft; the reviewer is asked, best effort);
+#      without gh, the branch is pushed and the steps to open the PR printed
 #   1. glab, if installed and logged in
 #   2. the GitLab API, with the token in the variable $FACTORY_GITLAB_TOKEN_ENV
 #      names (default GITLAB_TOKEN; the name only, never the token), or in
@@ -34,7 +37,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 
 warn() { printf 'factory: %s\n' "$*" >&2; }
 
-case "${1:-}" in ""|-h|--help|help) sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;; -*) die "unknown option $1 (mr.sh --help)" ;; esac
+case "${1:-}" in ""|-h|--help|help) sed -n '2,32p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;; -*) die "unknown option $1 (mr.sh --help)" ;; esac
 feature="${1}"; shift
 draft=""; dry=""; local_why=""
 while [ $# -gt 0 ]; do
@@ -108,7 +111,9 @@ fi
 case "$title" in *'[skip ci]'*|*'[ci skip]'*) die "the title would skip CI: $title" ;; esac
 desc="$(mktemp)"; trap 'rm -f "$desc"' EXIT
 awk 'done || !/^# /{print; next} {done=1}' "$body_file" | sed '/./,$!d' > "$desc"
-[ -z "$draft" ] || title="Draft: $title"
+# GitHub: the PR body says so where GitLab would set it (eslint-10 printed GitLab steps on GitHub).
+github=""; [[ "$(git config --get remote.origin.url || true)" =~ ^(https?://([^@/]+@)?|(ssh://)?git@)github\.com[:/] ]] && github=1
+[ -n "$github" ] || [ -z "$draft" ] || title="Draft: $title"
 
 # What else rides in this MR, said up front so nobody finds it after merging
 # (mission 5: setup commits and ~150 mission-record files the reviewer wasn't told about).
@@ -127,7 +132,7 @@ also_in_mr() {
   printf '\n## Also in this MR\n\n'
   [ -z "$others" ] || printf 'Commits that are not the mission'"'"'s work (setup, configuration), to review as such:\n%s\n\n' "$others"
   [ "${nscratch:-0}" -eq 0 ] || printf '%s of the %s changed files are the mission'"'"'s record under `%s/` (spec, contract, tickets, verdicts, decisions): the audit trail, not product code.\n' "$nscratch" "$nfiles" "$(mission_dir "$feature")"
-  printf '\nMerge with **squash** (set on this MR): `develop` gets one commit; the detailed history stays here.\n'
+  printf '\nMerge with **squash**%s: `develop` gets one commit; the detailed history stays here.\n' "$([ -n "$github" ] || echo ' (set on this MR)')"
 }
 also_in_mr >> "$desc" || true
 if [ -n "$stacked" ]; then
@@ -160,6 +165,32 @@ mission_data() {
   bash "$here/archive.sh" export "$feature" "$data/$feature-$(date +%Y%m%d).tar.gz" 2>/dev/null | sed 's/^/  /' || true
 }
 mission_data
+
+# 0. GitHub: gh, else the steps to open the PR by hand.
+if [ -n "$github" ]; then
+  git push -u origin "$branch"
+  if ! command -v gh >/dev/null 2>&1 || ! gh auth status >/dev/null 2>&1; then
+    desc_keep="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/mr-description-$feature.md"
+    mkdir -p "$(dirname "$desc_keep")"; cp "$desc" "$desc_keep"     # outside the tree: never dirties it
+    echo
+    echo "origin is on GitHub and gh isn't installed or logged in (gh auth login). Open the PR with:"
+    echo "    gh pr create --base $target --head $branch --title \"$title\" --body-file \"$desc_keep\"${draft:+ --draft}"
+    echo "or on github.com (compare $target...$branch), pasting the description from $desc_keep, then merge with squash."
+    exit 0
+  fi
+  existing="$(gh pr list --head "$branch" --base "$target" --state open --json number --jq '.[0].number // empty' 2>/dev/null || true)"
+  if [ -n "$existing" ]; then
+    gh pr edit "$existing" --title "$title" --body-file "$desc" >/dev/null
+    echo "updated PR #$existing"
+  else
+    out="$(gh pr create --head "$branch" --base "$target" --title "$title" --body-file "$desc" ${draft:+--draft} 2>&1)" || die "gh: $out"
+    existing="$(printf '%s\n' "$out" | grep -o 'https://[^ ]*/pull/[0-9]*' | head -1)"
+    # D95's reviewer is a GitLab username: asked, never a reason to fail.
+    [ -z "$reviewer" ] || gh pr edit "$existing" --add-reviewer "$reviewer" >/dev/null 2>&1 || warn "could not ask $reviewer to review (not a GitHub user here?)"
+  fi
+  record "$(gh pr view "$existing" --json url --jq .url 2>/dev/null || true)"
+  exit 0
+fi
 
 # 1. glab
 if command -v glab >/dev/null 2>&1 && glab auth status >/dev/null 2>&1; then
