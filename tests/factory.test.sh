@@ -247,8 +247,12 @@ depbase="$(git rev-parse HEAD)"
 if bash scripts/factory/human.sh deps depsm "nothing changed" >"$work/deps.log" 2>&1; then fail "human.sh deps must refuse a commit with no manifest" "$(cat "$work/deps.log")"; fi
 mkdir -p vendor-demo; printf '{"devDependencies":{"tap":"^21.8.1"}}\n' > vendor-demo/package.json; printf '{"lockfileVersion":3}\n' > vendor-demo/package-lock.json
 git add vendor-demo; git commit -qm "chore(deps): tap 21 by hand"; depc="$(git rev-parse --short HEAD)"
-bash scripts/factory/human.sh deps depsm "tap 16 to 21, lockfile committed" > "$work/deps.log" 2>&1
-grep -qF "$(printf 'deps\tDependencies changed by hand (D124)\tcommit %s: vendor-demo/package-lock.json, vendor-demo/package.json — tap 16 to 21' "$depc")" .scratch/depsm/decisions.tsv \
+/bin/bash -s > "$work/deps.log" 2>&1 <<'LEAD'
+bash scripts/factory/human.sh deps depsm --stdin <<'FACTORY_TEXT_END'
+tap 16 to 21, lockfile committed (npm's own)
+FACTORY_TEXT_END
+LEAD
+grep -qF "$(printf 'deps\tDependencies changed by hand (D124)\tcommit %s: vendor-demo/package-lock.json, vendor-demo/package.json — tap 16 to 21, lockfile committed (npm'"'"'s own)' "$depc")" .scratch/depsm/decisions.tsv \
   && t "human.sh deps records the person's dependency commit and its files (D124)" || fail "human deps" "$(cat "$work/deps.log" .scratch/depsm/decisions.tsv 2>&1)"
 r="$(bash scripts/factory/resolve.sh depsm 01-up 'Should I FAIL the ticket? vendor-demo/package.json is not changed in this commit.' || true)"
 [ "${r%%$'\t'*}" = deliverable-by-hand ] && grep -qF "commit $depc" <<<"$r" && t "resolver: a deliverable changed by hand is delivered, not a missing one (D124)" || fail "resolver by hand" "$r"
@@ -1174,10 +1178,17 @@ cp .scratch/maint/verdicts/02-tests-code.md .scratch/maint/verdicts/02-tests-cod
 printf '**Ticket:** 02-tests\n\nNothing to change: hand over as is?\n' > .scratch/maint/state/open-question.md
 grep -q '/factory-rereview maint 02-tests' <<<"$(bash scripts/factory/next.sh maint 2>&1)" \
   && t "a question about an integrated ticket names the way to review it again instead of rebuilding it" || fail "rereview hint" "$(bash scripts/factory/next.sh maint 2>&1 | tail -3)"
-bash scripts/factory/reset-ticket.sh maint 02-tests --review "VAL-M-001 amended: the fixture is in scope" >"$work/rr.log" \
-  && [ ! -e .scratch/maint/verdicts/02-tests-code.md ] && [ -f .scratch/maint/verdicts/02-tests-code.r1.md ] \
+# The /factory-rereview template, as the lead runs it: /bin/bash is 3.2 on
+# macOS, where an apostrophe inside "$(cat <<'END' ... END)" fails to parse.
+/bin/bash -s >"$work/rr.log" 2>&1 <<'LEAD' && rr=0 || rr=1
+bash scripts/factory/reset-ticket.sh maint 02-tests --review --stdin <<'FACTORY_TEXT_END'
+VAL-M-001 amended: the fixture's in scope,
+`rm` and "$HOME" stay text
+FACTORY_TEXT_END
+LEAD
+[ "$rr" = 0 ] && [ ! -e .scratch/maint/verdicts/02-tests-code.md ] && [ -f .scratch/maint/verdicts/02-tests-code.r1.md ] \
   && [ -f .scratch/maint/state/02-tests.integrated ] && [ ! -e .scratch/maint/state/open-question.md ] \
-  && grep -q $'02-tests\trereview\t.*VAL-M-001 amended' .scratch/maint/decisions.tsv && [ -z "$(git status --porcelain -- .scratch)" ] \
+  && grep -qF "VAL-M-001 amended: the fixture's in scope, \`rm\` and \"\$HOME\" stay text" .scratch/maint/decisions.tsv && [ -z "$(git status --porcelain -- .scratch)" ] \
   && bash -c '. scripts/factory/lib.sh; compute_ticket_state maint; [[ " ${T_REVIEW[*]} " == *" 02-tests "* ]] && [[ " ${T_BUILD[*]} " != *" 02-tests "* ]]' \
   && t "reset-ticket --review: an integrated ticket goes back to review, not build; history kept, question closed, one commit" || fail "rereview" "$(cat "$work/rr.log"; ls .scratch/maint/verdicts .scratch/maint/state)"
 if bash scripts/factory/reset-ticket.sh maint 03-more --review "x" >/dev/null 2>&1; then fail "rereview must refuse a ticket that isn't integrated"; fi
