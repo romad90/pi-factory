@@ -1057,7 +1057,8 @@ cp $m/spec.md "$work/spec.keep"; printf '\n## Frozen path\n- src/\n' >> $m/spec.
 out="$(bash scripts/factory/next.sh demo)"; cp "$work/spec.keep" $m/spec.md
 echo "$out" | grep -q '^STEP: blocked' && echo "$out" | grep -q 'must be exactly "## Frozen paths"' \
   && t "next.sh blocks a misspelled '## Frozen paths' heading (D88)" || fail "frozen heading" "$out"
-grep -q 'Tokens (usage.tsv, D85) | 1 runs' "$work/metrics.md" && grep -q 'workers 0.1M' "$work/metrics.md" && t "metrics: tokens from usage.tsv, workers summed by agent" || fail "metrics tokens" "$(grep -i token "$work/metrics.md")"
+grep -q 'Tokens (usage.tsv, D85) | 1 runs' "$work/metrics.md" && grep -q 'workers 0.1M' "$work/metrics.md" \
+  && grep -qF '0.2M in (43% cached)' "$work/metrics.md" && t "metrics: tokens from usage.tsv, workers summed by agent, the cached share of all input (get-port-7: 640%)" || fail "metrics tokens" "$(grep -i token "$work/metrics.md")"
 mj="$(bash scripts/factory/metrics.sh demo --json)"
 node -e 'const j=JSON.parse(process.argv[1]);process.exit(/^\d+\.\d+\.\d+/.test(j.factory||"")&&"models" in j?0:1)' "$mj" \
   && t "metrics --json records the factory version and models the mission ran with" || fail "metrics version" "$mj"
