@@ -1,6 +1,6 @@
 # Roadmap
 
-From mission 1's retro and from ideas borrowed (never installed) elsewhere. One item per issue; `scripts/dev/open-roadmap-issues.sh` creates the open ones on GitHub (sections marked ✅ are skipped).
+From the missions' retros and records, and from ideas borrowed (never installed) elsewhere. Rewritten in November 2026 from the [assessment](proposals/assessment-2026-11.md) of what the code holds.
 
 Sources: **M** mission 1 retro · **A** Addy Osmani's agent-skills · **P** pstack · **E** ECC · **N** new, from reviewing the flow.
 Effort: S < half a day · M ≈ 1–2 days · L > 2 days.
@@ -48,57 +48,80 @@ Effort: S < half a day · M ≈ 1–2 days · L > 2 days.
 | P1 | Practice packs: content for a kind of software (api, batch), `install-into.sh --pack` | N, you | ✅ 1.1.0 |
 | X4 | Batch contract checklist (now the `batch` pack) | M, A | ✅ 1.1.0 |
 
-## v1.2.0: contract quality and supervision
+## Since v1.1.0 ✅
 
-**Contract quality and fluidity**
+Built between 1.2 and 1.4.0-rc.78, from the proposals (the ADR has each decision):
 
-| # | Item | Src | Why | Fix | Effort |
-|---|---|---|---|---|---|
-| H1 | Human time ledger | N, you | The return is measured in human hours (see [INTENT.md](INTENT.md)), and nothing computes them | `human.sh` timestamps each human step; the mission records a manual estimate up front; `metrics.sh` reports human minutes by kind, MR review time and the ratio to the estimate | S |
-| C6 | Contract self-consistency | M | An outcome count contradicted another assertion and passed every judge | Critic mechanical checks: processed = succeeded + failed + deferred; one counting rule everywhere; Given = preconditions; regression fixture | M |
-| C7 | Critic output format enforced | M | Emoji headings, no `[blocking]` tags | Strict template; `next.sh` lints the critique before G1 | S |
-| C10 | Spec drift check before PR | M, N | Spec still described the old design after decisions | `STEP: pr` runs a fresh drift checker (spec ↔ contract ↔ tests ↔ README ↔ decisions.tsv) | M |
-| F8 | Compact only between waves | E | Lead context growth | Playbook rule | S |
-| F12 | Attack the premise at escalation | P | Real cause (too big) found by hand | Before round 3, log the shared premise of failed attempts; propose split / amend / heavy | S |
-| F13 | Draft MR and CI status from the factory | N | MR created by hand, CI log photographed | Project token for `glab`; `/pr` opens the draft; failed jobs feed the fix lane | S |
-| F16 | Models profile per machine | you | Nine models re-entered per repo | `models-profile.mjs capture/apply`, applied at install (D55) | ✅ |
-| F17 | Monorepo projects | you | Each domain is a folder with its own CI | Factory scoped to the folder: relative diffs, patches, guards, CI jobs (D56) | ✅ |
-| F15 | Starter kit ships the factory | N | Per-repo setup | New repos born with factory, CI include, commands.env, behavior-paths | M |
+| What | Decision |
+|---|---|
+| Models profile per machine (F16), monorepo projects (F17) | D55, D56 |
+| Hands-off steps 1 to 3 (P8), rounds with a journal (P9) | D65–D70, D84 |
+| The lead as a script, `run.sh` (P2): built, not yet used on a mission | D91 |
+| Install once per machine (P11), setup by rehearsal (P18) | D92, D102 |
+| Refactor and maintenance intents with frozen paths and tests (P3, X9) | D93, D96 |
+| Run archive, scoring, benchmark (P14); tokens per run (X10) | D97, D98, D85 |
+| Context repos (P13); jobs planned by an architect (P22's first step) | D99, D105, D109 |
+| The learning loop and lessons between machines (P15's first form) | D114, D115 |
+| The cockpit: inbox, timeline, run page, health, gate page, reports (P10, X12) | D119–D123, D130, D133 |
+| Dependency lane, real paths in tickets, the critic's "Passes wrongly", Node check | D124–D127 |
+| Fixes from the nightly loop | D128, D129, D131, D132 |
 
-**Safety and supervision**
+## Now: run missions and learn
 
-| # | Item | Src | Why | Fix | Effort |
-|---|---|---|---|---|---|
-| S2 | Intake scan of vendored skills | E | Third-party text becomes instructions for agents with bash | Scan upstream text before re-pinning; record in UPSTREAM.md | M |
-| S3 | READY / NOT READY report | E | Evidence hard to read for a reviewer | Build / Lint / Tests / Secrets / Diff outside scope → READY | S |
-| S4 | Learnings unreviewed until promoted | E, P | Retro items could silently become rules | Status column in decisions and retro; only a human promotes | S |
-| S5 | Minimum bar for autonomy (Step 3 ADR) | E | Agents run with your identity | Sandbox, least agency, kill switch, no default egress, short-lived credentials | L |
-| S8 | OS sandbox for agent commands (srt) | N, study | Deny-list stops known commands only; a dependency script or an unknown command isn't covered | Pi extension wrapping commands with sandbox-runtime: writes only in the worktree, network allowlist from commands.env, credentials unreadable. See [docs/research/agent-sandboxing.md](research/agent-sandboxing.md) | S |
-| S6 | Security review role | A | Features that delete production data | `factory-security-reviewer` per mission, triggered by `.factory/security-paths`, another family | M |
-| S7 | Install lifecycle | E | Multi-repo updates | `install-into.sh --dry-run`, `uninstall`; doctor warns on outdated `.factory/VERSION` | S |
+Decided on 2026-11-12: nothing new is built until missions show which item is worth it. The [November assessment](proposals/assessment-2026-11.md) sorts every proposal and every item that was open here.
 
-## v1.3.0: proof and scale
+The measure that sorts them, on the gym: $3.93 of model cost per MR, 11 logged decisions per MR (13 planned gates and 31 unplanned over 4 MRs), 44% first-pass reviews. The person's attention is the cost.
 
-| # | Item | Src | Why | Fix | Effort |
-|---|---|---|---|---|---|
-| X1 | Bot harness / verification skill | M, P | G4 only by human acceptance | Generated verification skill that drives the bot like a user; replay in CI | L |
-| X2 | Skill evals with pass@k | A, E | Critic regressions found live | Fixtures per local skill, 3 runs, require 3/3 | M |
-| X3 | Anti-rationalization tables | A | "Tests pass so the assertion holds" | Excuse/rebuttal tables in contract, critic, verify-behavior, worker | S |
-| X5 | Reviewer does both axes inline | A, M | 3 agents per review under a small quota | Axes inline; axis agents only for L tickets | S |
-| X6 | Interrogate panel for risky missions | P | Production deletes deserve more than one judge | Opt-in multi-family panel before `/pr` | M |
-| X7 | Definition of Done | A | No standing bar across missions | `docs/agents/definition-of-done.md`, checked by gate and `/pr` | S |
-| X8 | Rollout template in the MR | A | Rollout written by hand | Known limits (from labels), prerequisites, staged rollout, emergency stop | S |
-| X9 | Mission intents beyond features | P, N | Only a feature path exists | Bugfix lane (reproduce → fix → verify), maintenance lane | M |
-| X10 | Request accounting + quota case | M | 429s under a shared quota | Requests per role from run metadata | S |
-| X11 | Model compatibility map + smoke | M | Thinking levels and reasoning replay found at run time | `.factory/model-compat.json` in models-lint; `/factory-smoke` | S |
-| X12 | Dashboard, perf-analyst | N | Supervision at a glance; ops | Static dashboard from `.scratch/`; perf-analyst read-only on captured artifacts | L |
-| X14 | Gondolin micro-VM spike for workers | N, study | Hardware boundary, instrument never mounted, secrets as placeholders | Route one or two workers into Gondolin for a mission; measure test time; security team review. See [docs/research/agent-sandboxing.md](research/agent-sandboxing.md) | M |
+| Next mission | Question it answers |
+|---|---|
+| get-port 5 to 7 | a third dependency mission: does the deps lane hold, and is P31 worth its guard decision? |
+| a bug fix in `lib/` | gates on product code: first-pass rate, the reviewer's yield (P30) |
+| docs against code on the gym | P34's project drift, by hand, before anything is built |
+| any of them, run with `run.sh` | P2: does a scripted lead change the decision count? |
 
-## After Step 2 is declared
+The nightly loop keeps fixing factory bugs from the records (its backlog is in the scheduled task, not here).
 
-| # | Item | Src | Why | Fix | Effort |
-|---|---|---|---|---|---|
-| X13 | Durable mission runner on Pi Durable | N | Step 3 needs unattended missions that survive crashes mid-wave, steering from phone or Slack, and per-agent sandboxed environments (S5) | A thin runner that loops on `next.sh` with Pi Durable checkpoints, execution environments and multi-client steering; scripts and files stay the source of truth. Wait for the API to settle. | L |
+## Waiting on evidence
+
+| Item | What would start it |
+|---|---|
+| P28 checklist packs, P33 contract angles | evidence in hand (eslint-10: 6 blocking findings over four rounds); the replay decides between them |
+| P30 gate yield, P32 hand touches as events | early: they are the measure the rest waits on; the hand-commit count is fixed first |
+| P34 drift report (was C10) | early for mission drift: two stale values are on the gym's master |
+| P29 ticket scope check | 10 flags |
+| P31 scripted install | Rode's guard decision |
+| P23 seeded-fault bench (with X2) | 3 more missions |
+| P20 token budget | a mission that stops on a token limit |
+| P1 fallback chain | a mission that stops on a provider with another one free |
+| P12 durable runner (was X13), P16 issue in, MR out (was F13) | P2 in use; `mr.sh` gets its GitHub path first |
+| P19 proactive systems, P22 tiers | their entry criteria; P30's numbers |
+| P21 security layer (with S6) | before a mission on production code that handles untrusted input |
+| P24 code health loop | the first refactor mission |
+| P7 launch gate, X8 rollout template | the first service that runs |
+| One sandbox decision (S5, S8, X14) | before any unattended run on work machines |
+| X1 bot harness | a mission that needs it |
+| S2 intake scan of vendored skills | before the next skill re-pin |
+| F12 attack the premise at escalation | the next escalation |
+
+## Dropped or folded (November 2026)
+
+| Item | Where it went |
+|---|---|
+| P4 director | the job (D105); triggers are P19 |
+| P5 continuous improvement | P15 and P19 |
+| P6 control room, hosted | dropped ("hosted apps" below); the dashboard is the cockpit |
+| P17 plans that leave no decision | P33 and P34 |
+| H1 human time ledger | P30 |
+| C6 contract self-consistency | a P28 pack question |
+| C7 critic output format | P33's merge script |
+| S3 READY / NOT READY report | to check against `verify.sh` and the gate page, then drop |
+| F8 compact between waves | moot with a scripted lead |
+| F15 starter kit, S7 install lifecycle | replaced by install once (D92) |
+| X3 anti-rationalization tables | D126's "Passes wrongly" rule |
+| X5 reviewer does both axes inline | dropped: the opposite of P33, and requests per window no longer limit us |
+| X6 interrogate panel | P33 |
+| X7 Definition of Done | the quality bar and the code steward (CH1) |
+| S4 learnings unreviewed until promoted, X11 model compatibility | done in practice (decisions marked unreviewed; `models-probe.mjs`, D59) |
 
 ## Explicitly not taking
 

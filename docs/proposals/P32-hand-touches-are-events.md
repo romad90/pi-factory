@@ -1,6 +1,6 @@
-# P30. Every hand touch is a learning event: fix the factory, not the feature
+# P32. Every hand touch is a learning event: fix the factory, not the feature
 
-**Status:** draft, for review before the nightly loop builds it · **Effort:** S · **Depends on:** D114 (learning loop), D89 (hand commits counted)
+**Status:** draft, early: fix the hand-commit count first (see the [November assessment](assessment-2026-11.md)) · **Effort:** S · **Depends on:** D114 (learning loop), D89 (hand commits counted)
 
 ## Problem
 
@@ -23,7 +23,7 @@ The learning loop reads four kinds of event: guard refusals, lost rounds, lead d
    - `hand_commit`: a commit on the mission branch without the factory's trailer (`metrics.sh`'s D89 rule).
    - `hand_edit`: a ticket, contract or state file changed outside the factory's own commits (git log on `.scratch/<mission>/issues/`, `spec.md` outside amendments, `state/`).
    - `hand_step`: decisions of kind `rereview`, `deps`, or `decide` that answer a factory question (not a gate meant for people).
-2. **A cause asked at the time.** `human.sh` already logs decisions. For a hand commit or edit, the next `next.sh` run lists the unexplained ones on one line ("2 hand changes since the last step: give a cause with `human.sh why <commit> <cause>`"). The cause is one of P28's classes (gate, gap, error) and a few words. It never blocks.
+2. **A cause asked at the time.** `human.sh` already logs decisions. For a hand commit or edit, the next `next.sh` run lists the unexplained ones on one line ("2 hand changes since the last step: give a cause with `human.sh why <commit> <cause>`"). The cause is one of P30's classes (gate, gap, error) and a few words. It never blocks.
 3. **The nightly loop codes them** like the other events: a `factory_bug` or `factory_gap` among them becomes work, as today.
 
 ## Steps

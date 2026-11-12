@@ -1,6 +1,6 @@
 # P17. Plans that leave no decision: readiness, reuse, plain words, drift
 
-**Status:** draft, after mission 4 · **Effort:** S to M, one part at a time · **Depends on:** D94 (design step); P14's benchmark to prove each part
+**Status:** folded: drift is P34, measuring first is P33's grounding angle; readiness is built (D28) (see the [November assessment](assessment-2026-11.md)) · **Effort:** S to M, one part at a time · **Depends on:** D94 (design step); P14's benchmark to prove each part
 
 ## Problem
 

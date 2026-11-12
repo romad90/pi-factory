@@ -1,6 +1,6 @@
 # P23. Gates that can't be fooled: checks in code where code can decide, and every gate's recall measured
 
-Status: proposed, after mission 6. Depends on D98 (bench), D97 (archive), P14; section 7 on P2.
+Status: keep: applied piecemeal (D125–D127, D131, D132); its measuring half is P30 (see the [November assessment](assessment-2026-11.md)). Depends on D98 (bench), D97 (archive), P14; section 7 on P2.
 
 ## North star: delegate, don't supervise
 

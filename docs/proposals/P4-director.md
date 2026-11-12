@@ -1,6 +1,6 @@
 # P4. Director and triggers
 
-**Status:** draft · **Effort:** L · **Depends on:** P1 (shared budget), P2 (a lead that doesn't drift)
+**Status:** folded: the director is the job (D105, D109), triggers are P19 (see the [November assessment](assessment-2026-11.md)) · **Effort:** L · **Depends on:** P1 (shared budget), P2 (a lead that doesn't drift)
 
 ## Problem
 

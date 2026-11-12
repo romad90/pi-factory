@@ -1,6 +1,6 @@
 # P16. Issue in, MR out: the factory works where the team already looks
 
-**Status:** draft, after mission 4 · **Effort:** M · **Depends on:** P2 (the scripted lead, D91); P6 hosts it later, P12 keeps it running
+**Status:** keep, later: the GitHub path of `mr.sh` first, intake after P2 is in use (see the [November assessment](assessment-2026-11.md)) · **Effort:** M · **Depends on:** P2 (the scripted lead, D91); P6 hosts it later, P12 keeps it running
 
 ## Problem
 

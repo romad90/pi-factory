@@ -1,6 +1,6 @@
 # P9. Rounds that converge: reproduce first, carry what was learned, doubt the contract early
 
-**Status:** draft · **Effort:** M · **Depends on:** nothing to start; P2 makes steps 3 and 4 simpler
+**Status:** done (journal, reproduce first, D84) (see the [November assessment](assessment-2026-11.md)) · **Effort:** M · **Depends on:** nothing to start; P2 makes steps 3 and 4 simpler
 
 ## Problem
 

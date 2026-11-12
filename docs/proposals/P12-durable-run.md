@@ -1,6 +1,6 @@
 # P12. A durable runner: the mission survives a closed laptop, and the human answers from anywhere
 
-**Status:** draft · **Effort:** M (spike S) · **Depends on:** P2 (this is one way to build it); P10 and P8 fit on top
+**Status:** keep, later: needs P2 in use (see the [November assessment](assessment-2026-11.md)) · **Effort:** M (spike S) · **Depends on:** P2 (this is one way to build it); P10 and P8 fit on top
 
 ## Problem
 

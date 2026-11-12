@@ -1,6 +1,6 @@
 # P3. Maintenance lane: discover, confirm, freeze, refactor
 
-**Status:** draft · **Effort:** L · **Depends on:** P1 (throughput)
+**Status:** done (intents with frozen paths and tests, D93, D96) (see the [November assessment](assessment-2026-11.md)) · **Effort:** L · **Depends on:** P1 (throughput)
 
 ## Problem
 

@@ -1,6 +1,6 @@
 # P11. Install the factory once per machine; onboard a project with only what is its own
 
-**Status:** step 1 done, steps 2–5 shipped opt-in (D92) · **Effort:** M · **Depends on:** nothing to start; P2 and P10 fit on top
+**Status:** done (D92) (see the [November assessment](assessment-2026-11.md)) · **Effort:** M · **Depends on:** nothing to start; P2 and P10 fit on top
 
 ## Problem
 

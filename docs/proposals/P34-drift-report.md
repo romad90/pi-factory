@@ -1,6 +1,6 @@
-# P32. Drift report: the spec says what was decided, and the docs say what the code does
+# P34. Drift report: the spec says what was decided, and the docs say what the code does
 
-**Status:** draft, for review; nothing is built until missions show the need · **Effort:** M (mission drift), then a mission (project drift) · **Depends on:** `decisions.tsv`, the `/pr` step; builds roadmap item C10 and P17 section 4
+**Status:** draft, early for mission drift (see the [November assessment](assessment-2026-11.md)) · **Effort:** M (mission drift), then a mission (project drift) · **Depends on:** `decisions.tsv`, the `/pr` step; builds roadmap item C10 and P17 section 4
 
 ## Problem
 

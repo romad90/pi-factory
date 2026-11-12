@@ -1,6 +1,6 @@
 # P5. Continuous improvement: observe, decide, improve, prove
 
-**Status:** draft · **Effort:** L · **Depends on:** P3 (frozen behavior), P4 (scheduled runs) for the unattended part
+**Status:** folded into P15 and P19 (see the [November assessment](assessment-2026-11.md)) · **Effort:** L · **Depends on:** P3 (frozen behavior), P4 (scheduled runs) for the unattended part
 
 ## Problem
 

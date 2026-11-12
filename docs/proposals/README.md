@@ -6,36 +6,39 @@ Status: **draft** (open for discussion) · **accepted** (in the roadmap) · **re
 
 | # | Proposal | Status | Depends on |
 |---|---|---|---|
-| P1 | [Several gateways, fallback chain, production budget](P1-gateways.md) | draft | — |
-| P2 | [The lead becomes a script](P2-scripted-lead.md) | draft | — |
-| P3 | [Maintenance lane: discover, confirm, freeze, refactor](P3-maintenance-lane.md) | draft | P1 |
-| P4 | [Director and triggers](P4-director.md) | draft | P1, P2 |
-| P5 | [Continuous improvement: observe, decide, improve, prove](P5-continuous-improvement.md) | draft | P3, P4 |
-| P6 | [Control room: a hosted factory, a dashboard, events from operations](P6-control-room.md) | draft | P2, P4, P5 |
-| P7 | [Launch gate: done when the service runs, in a sandbox, secure by design](P7-launch-gate.md) | draft | — |
+| P1 | [Several gateways, fallback chain, production budget](P1-gateways.md) | keep, later | — |
+| P2 | [The lead becomes a script](P2-scripted-lead.md) | built | — |
+| P3 | [Maintenance lane: discover, confirm, freeze, refactor](P3-maintenance-lane.md) | done | P1 |
+| P4 | [Director and triggers](P4-director.md) | folded | P1, P2 |
+| P5 | [Continuous improvement: observe, decide, improve, prove](P5-continuous-improvement.md) | folded into P15 and P19 | P3, P4 |
+| P6 | [Control room: a hosted factory, a dashboard, events from operations](P6-control-room.md) | hosted part dropped; the dashboard is the cockpit | P2, P4, P5 |
+| P7 | [Launch gate: done when the service runs, in a sandbox, secure by design](P7-launch-gate.md) | keep, later | — |
 | P8 | [Hands-off mission: the human decides, the factory does the rest](P8-hands-off-mission.md) | steps 1–3 done | P2 for the last step |
-| P9 | [Rounds that converge: reproduce first, carry what was learned, doubt the contract early](P9-converging-rounds.md) | draft | — |
-| P10 | [Front page: every subagent, at every stage, on one page](P10-front-page.md) | draft | — (P2 completes the events) |
-| P11 | [Install the factory once per machine; onboard a project with only what is its own](P11-install-once.md) | draft | — |
-| P12 | [A durable runner: the mission survives a closed laptop, and the human answers from anywhere](P12-durable-run.md) | draft | P2 |
-| P13 | [Context repos: investigate across services, change only one](P13-context-repos.md) | draft | — |
-| P14 | [Measure and improve: a run archive, a benchmark from our own tickets, scoring](P14-measure-and-improve.md) | draft | — (P5 builds on it) |
-| P15 | [The factory improves itself: agents that read failed runs and propose changes to the factory](P15-factory-improves-itself.md) | draft, later | P14 |
-| P16 | [Issue in, MR out: the factory works where the team already looks](P16-issue-in-mr-out.md) | draft, after mission 4 | P2 (P12 keeps it running) |
-| P17 | [Plans that leave no decision: readiness, reuse, plain words, drift](P17-plans-that-leave-no-decision.md) | draft, after mission 4 | D94, P14 |
-| P18 | [Setup by rehearsal: the factory finds its own commands and proves them as a worker would](P18-setup-by-rehearsal.md) | accepted (D102) | P11 |
-| P19 | [Proactive systems: work that starts before anyone sits down](P19-proactive-systems.md) | draft, later (entry criteria) | P12, P16, P14, P4 |
-| P20 | [Token budget: every agent fits a known budget, measured before it is cut](P20-token-budget.md) | proposed; step 1 built (`factory tokens`) | D97, D85 |
-| P21 | [Security layer: a scanner gate in code, then a security axis that reads what the scanner can't](P21-security-layer.md) | proposed, after mission 5 | D62, P20 |
-| P22 | [One entry, derived process: the change sets the tier, a function in code sets the steps](P22-one-entry-derived-process.md) | proposed, after mission 5 | lanes, P20, P21 |
-| P23 | [Gates that can't be fooled: checks in code where code can decide, every gate's recall measured](P23-gates-that-cannot-be-fooled.md) | proposed, after mission 6; holds the next release plan | D98, P14 |
-| P26 | [Checklist packs: what a good contract looks like for a kind of change, asked in round 1](P26-checklist-packs.md) | draft | — |
-| P27 | [A patch stays inside its ticket: a scope check in code, flagged first](P27-ticket-scope-check.md) | draft (guard change) | D125 |
-| P28 | [Gate yield: what each gate catches, gets wrong, and costs the person](P28-gate-yield.md) | draft | D97, P23 |
-| P29 | [Dependency bumps without hands: a scripted install step, outside the agents](P29-scripted-install.md) | draft (guard decision) | D124, P19 |
-| P30 | [Every hand touch is a learning event](P30-hand-touches-are-events.md) | draft | D114, D89 |
-| P31 | [Several angles on the contract at once: an adversary, a grounding check, a naive reader](P31-contract-angles.md) | draft | P26 |
-| P32 | [Drift report: the spec says what was decided, the docs say what the code does](P32-drift-report.md) | draft | C10, P17 |
+| P9 | [Rounds that converge: reproduce first, carry what was learned, doubt the contract early](P9-converging-rounds.md) | done | — |
+| P10 | [Front page: every subagent, at every stage, on one page](P10-front-page.md) | done | — (P2 completes the events) |
+| P11 | [Install the factory once per machine; onboard a project with only what is its own](P11-install-once.md) | done | — |
+| P12 | [A durable runner: the mission survives a closed laptop, and the human answers from anywhere](P12-durable-run.md) | keep, later | P2 |
+| P13 | [Context repos: investigate across services, change only one](P13-context-repos.md) | done | — |
+| P14 | [Measure and improve: a run archive, a benchmark from our own tickets, scoring](P14-measure-and-improve.md) | done | — (P5 builds on it) |
+| P15 | [The factory improves itself: agents that read failed runs and propose changes to the factory](P15-factory-improves-itself.md) | running | P14 |
+| P16 | [Issue in, MR out: the factory works where the team already looks](P16-issue-in-mr-out.md) | keep, later | P2 (P12 keeps it running) |
+| P17 | [Plans that leave no decision: readiness, reuse, plain words, drift](P17-plans-that-leave-no-decision.md) | folded | D94, P14 |
+| P18 | [Setup by rehearsal: the factory finds its own commands and proves them as a worker would](P18-setup-by-rehearsal.md) | done | P11 |
+| P19 | [Proactive systems: work that starts before anyone sits down](P19-proactive-systems.md) | keep, later | P12, P16, P14, P4 |
+| P20 | [Token budget: every agent fits a known budget, measured before it is cut](P20-token-budget.md) | keep, low | D97, D85 |
+| P21 | [Security layer: a scanner gate in code, then a security axis that reads what the scanner can't](P21-security-layer.md) | keep, later | D62, P20 |
+| P22 | [One entry, derived process: the change sets the tier, a function in code sets the steps](P22-one-entry-derived-process.md) | keep, later | lanes, P20, P21 |
+| P23 | [Gates that can't be fooled: checks in code where code can decide, every gate's recall measured](P23-gates-that-cannot-be-fooled.md) | keep | D98, P14 |
+| P24 | [Code health as a closed loop, for any language](P24-code-health-loop.md) | keep, later | — |
+| P25 | [What the first real job found](P25-first-job-findings.md) | must-fixes 1–6 built | D113 |
+| P26, P27 | The learning loop from raw records, and lessons between machines: built without a proposal page (ADR D114, D115) | done | D97 |
+| P28 | [Checklist packs: what a good contract looks like for a kind of change, asked in round 1](P28-checklist-packs.md) | draft, first | — |
+| P29 | [A patch stays inside its ticket: a scope check in code, flagged first](P29-ticket-scope-check.md) | draft | D125 |
+| P30 | [Gate yield: what each gate catches, gets wrong, and costs the person](P30-gate-yield.md) | draft, early | D97, P23 |
+| P31 | [Dependency bumps without hands: a scripted install step, outside the agents](P31-scripted-install.md) | draft | D124, P19 |
+| P32 | [Every hand touch is a learning event](P32-hand-touches-are-events.md) | draft, early | D114, D89 |
+| P33 | [Several angles on the contract at once: an adversary, a grounding check, a naive reader](P33-contract-angles.md) | draft | P28 |
+| P34 | [Drift report: the spec says what was decided, the docs say what the code does](P34-drift-report.md) | draft, early for mission drift | C10, P17 |
 
 ## Why these four, in this order
 
@@ -88,6 +91,6 @@ P22 replaces the three lanes with one entry. The person describes the work; a fu
 
 P23 comes from mission 6: every gate green, and one defect through all of them, an inferred return type that changed the published API, caught only by a ten-second mechanical diff the human ran. A property a script can decide is decided by a script; a seeded-fault corpus measures each gate's recall per fault class, and that table decides which judges and which tiers are trusted. It also lists the next release, item by item.
 
-P26 to P30 come from the gym's records read against a talk on trusted software factories (Tessl, November 2026). Model cost is $3.93 per MR; human interventions are 15.3 per MR. So they aim at the person's attention: ask the right questions in round 1 (P26), keep patches in scope (P27), measure what each gate costs the person (P28), take dependency installs off their hands (P29), and see every hand fix (P30).
+P28 to P32 come from the gym's records read against a talk on trusted software factories (Tessl, November 2026). Model cost is $3.93 per MR; human interventions are 15.3 per MR. So they aim at the person's attention: ask the right questions in round 1 (P28), keep patches in scope (P29), measure what each gate costs the person (P30), take dependency installs off their hands (P31), and see every hand fix (P32).
 
-P31 and P32 come from Google's Elephant-Goldfish Model plugin, read at its source. The [November assessment](assessment-2026-11.md) sorts every proposal and open roadmap item into done, keep, fold or drop, from what the code holds today.
+P33 and P34 come from Google's Elephant-Goldfish Model plugin, read at its source. The [November assessment](assessment-2026-11.md) sorts every proposal and open roadmap item into done, keep, fold or drop, from what the code holds today.

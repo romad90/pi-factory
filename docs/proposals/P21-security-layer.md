@@ -1,6 +1,6 @@
 # P21. Security layer: a scanner gate in code, then a security axis that reads what the scanner can't
 
-**Status:** proposed, after mission 5 · **Effort:** M · **Depends on:** D62 (lint ratchet, the same pattern), P20 (token budget: the axis reads the diff and the scanner's findings, not the spec)
+**Status:** keep, later (see the [November assessment](assessment-2026-11.md)) · **Effort:** M · **Depends on:** D62 (lint ratchet, the same pattern), P20 (token budget: the axis reads the diff and the scanner's findings, not the spec)
 
 ## Problem
 

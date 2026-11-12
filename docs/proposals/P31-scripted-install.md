@@ -1,6 +1,6 @@
-# P29. Dependency bumps without hands: a scripted install step, outside the agents
+# P31. Dependency bumps without hands: a scripted install step, outside the agents
 
-**Status:** draft, for review: a guard decision for Rode before anything is built · **Effort:** M · **Depends on:** D124 (dependency lane), D65; first use is P19 row 1 (dependency and vulnerability bumps)
+**Status:** draft: a guard decision for Rode (see the [November assessment](assessment-2026-11.md)) · **Effort:** M · **Depends on:** D124 (dependency lane), D65; first use is P19 row 1 (dependency and vulnerability bumps)
 
 ## Problem
 

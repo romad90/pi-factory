@@ -1,6 +1,6 @@
-# P27. A patch stays inside its ticket: a scope check in code, flagged first, blocking once measured
+# P29. A patch stays inside its ticket: a scope check in code, flagged first, blocking once measured
 
-**Status:** draft, for review before the nightly loop builds it · **Effort:** S · **Depends on:** coverage.sh's path reader (D125); changes `patch-guard.sh`, so a "guard change"
+**Status:** draft: wait for 10 flags (see the [November assessment](assessment-2026-11.md)) · **Effort:** S · **Depends on:** coverage.sh's path reader (D125); changes `patch-guard.sh`, so a "guard change"
 
 ## Problem
 

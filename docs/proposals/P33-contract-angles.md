@@ -1,6 +1,6 @@
-# P31. Several angles on the contract at once: an adversary, a grounding check and a naive reader
+# P33. Several angles on the contract at once: an adversary, a grounding check and a naive reader
 
-**Status:** draft, for review; nothing is built until missions show the need · **Effort:** M · **Depends on:** the contract step (`workflow.sh contract`), P26 (packs feed the adversary)
+**Status:** draft: the eslint-10 replay decides between it and P28 alone (see the [November assessment](assessment-2026-11.md)) · **Effort:** M · **Depends on:** the contract step (`workflow.sh contract`), P28 (packs feed the adversary)
 
 ## Problem
 
@@ -37,7 +37,7 @@ A script, not a model, merges the three files into `contract-critique.md`: findi
 
 One more round at most. After the second critique, open findings go to the gate page as "accept or amend", and the person decides once.
 
-The grounding angle needs the target version installed. Until P29 exists, it runs after the person's dependency commit when the mission has one, and says "not checkable before the install" otherwise.
+The grounding angle needs the target version installed. Until P31 exists, it runs after the person's dependency commit when the mission has one, and says "not checkable before the install" otherwise.
 
 ## Steps
 
@@ -54,7 +54,7 @@ Replay on eslint-10. The first contract draft is still in the gym's pull request
 - The grounding angle reports nine keys for `no-unused-vars` and 695 assertions, without a person.
 - Cost of the three angles in tokens, against the six single-critic rounds it replaces.
 
-It fails if round 1 finds fewer than 4 of the 6: then angles don't replace rounds, and P26's pack is the cheaper fix alone.
+It fails if round 1 finds fewer than 4 of the 6: then angles don't replace rounds, and P28's pack is the cheaper fix alone.
 
 ## Open questions for Rode
 

@@ -1,6 +1,6 @@
 # P20. Token budget: every agent fits a known budget, measured before it is cut
 
-**Status:** proposed; step 1 (measure) built with this proposal · **Effort:** M · **Depends on:** D97 (run archive), D85 (usage); changes no gate
+**Status:** keep, low: step 1 built (`factory tokens`); cost is $3.93 per MR (see the [November assessment](assessment-2026-11.md)) · **Effort:** M · **Depends on:** D97 (run archive), D85 (usage); changes no gate
 
 ## Problem
 

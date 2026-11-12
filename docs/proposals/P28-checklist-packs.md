@@ -1,6 +1,6 @@
-# P26. Checklist packs: what a good contract looks like for a kind of change, asked in round 1
+# P28. Checklist packs: what a good contract looks like for a kind of change, asked in round 1
 
-**Status:** draft, for review before the nightly loop builds it · **Effort:** S · **Depends on:** nothing new (the slot exists)
+**Status:** draft, first: evidence in hand (eslint-10) (see the [November assessment](assessment-2026-11.md)) · **Effort:** S · **Depends on:** nothing new (the slot exists)
 
 ## Problem
 

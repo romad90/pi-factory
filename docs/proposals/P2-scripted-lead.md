@@ -1,6 +1,6 @@
 # P2. The lead becomes a script
 
-**Status:** draft · **Effort:** M · **Depends on:** nothing
+**Status:** built (`run.sh`, D91), not yet used on a mission (see the [November assessment](assessment-2026-11.md)) · **Effort:** M · **Depends on:** nothing
 
 ## Problem
 

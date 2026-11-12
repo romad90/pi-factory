@@ -1,6 +1,6 @@
-# P28. Gate yield: what each gate catches, what it gets wrong, and what it costs the person
+# P30. Gate yield: what each gate catches, what it gets wrong, and what it costs the person
 
-**Status:** draft, for review before the nightly loop builds it · **Effort:** M · **Depends on:** D97 (run archive), `metrics.sh`; complements P23 (recall on seeded faults)
+**Status:** draft, early: the measure the others wait on (see the [November assessment](assessment-2026-11.md)) · **Effort:** M · **Depends on:** D97 (run archive), `metrics.sh`; complements P23 (recall on seeded faults)
 
 ## Problem
 
@@ -18,10 +18,10 @@ The talk can say what each stage catches: verification caught more than half of 
 
 eslint-10 shows why that matters:
 
-- **The critic** ran 6 rounds. Every finding was real, but found one at a time (see P26).
+- **The critic** ran 6 rounds. Every finding was real, but found one at a time (see P28).
 - **The reviewer** failed twice for process reasons and judged nothing. The first time it returned no output; the second time it stopped on a supervisor message (D132).
 - **The patch guard** blocked once, wrongly: the deleted file was a config, not a test (D131).
-- Of the mission's 11 decisions, 2 were the gates meant for people (G1 and ticket approval). The others came from these gates' misses and false alarms, plus the dependency step (P29).
+- Of the mission's 11 decisions, 2 were the gates meant for people (G1 and ticket approval). The others came from these gates' misses and false alarms, plus the dependency step (P31).
 
 ## Design
 
