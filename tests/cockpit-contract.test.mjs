@@ -187,3 +187,26 @@ test("parseCritique reads numbered findings (\"### 1. [blocking] …\", eslint-1
   assert.match(c.findings[0].body, /^`VAL-CONF-001` checks only four files\./);
   assert.doesNotMatch(c.findings[2].body, /## Review limits/);
 });
+
+test("parseReport reads an agent's final answer: the prose, its acceptance-report fields, and what follows (deps-node-22 heavy worker)", async () => {
+  const { parseReport } = await import("../scripts/factory/cockpit-contract.mjs");
+  const { readFileSync } = await import("node:fs");
+  const text = readFileSync(new URL("./fixtures/reports/worker-heavy.md", import.meta.url), "utf8");
+  const r = parseReport(text);
+  assert.match(r.prose, /^`npm test` now runs the whole suite on tap 21/);
+  assert.doesNotMatch(r.prose, /acceptance-report|criteriaSatisfied/);
+  assert.equal(r.fields.diffSummary.slice(0, 15), "tap 21 setup: e");
+  assert.equal(r.fields.changedFiles.length, 8);
+  assert.equal(r.fields.commandsRun[0].result, "passed");
+  assert.equal(r.fields.residualRisks.length, 4);
+  assert.match(r.after, /^I skipped `npm ci`/);
+  // A live log's tail: tool lines before, the report at the end; a cut JSON is no report.
+  const live = parseReport("[tool] bash npm test\nok 12\n" + text);
+  assert.equal(live.fields.changedFiles.length, 8);
+  assert.equal(parseReport("```acceptance-report\n{\"diffSummary\": \"cut").fields, null);
+  assert.equal(parseReport("still working: running npm test").fields, null);
+  // The older shape: a plain ```json block with the same keys (eslint-10's contract author and critic).
+  const j = parseReport("Done.\n```json\n{\"diffSummary\": \"Added a contract\", \"reviewFindings\": [\"blocking: x\", \"non-blocking: y\"], \"manualNotes\": \"n\"}\n```\n");
+  assert.deepEqual(j.fields.reviewFindings, ["blocking: x", "non-blocking: y"]);
+  assert.equal(j.prose, "Done.");
+});

@@ -158,6 +158,21 @@ export function parseCritique(t) {
   return { result: firstWord(field(t, "Critique result")), findings };
 }
 
+// An agent's final answer (output.md, or the tail of its live log): the prose,
+// the fields of its report block ("```acceptance-report" or "```json" with
+// the report's keys), and the lines after it. A block that doesn't parse, or a
+// run still working, gives fields: null (D130).
+const REPORT_KEYS = ["criteriaSatisfied", "changedFiles", "commandsRun", "residualRisks", "diffSummary", "reviewFindings", "manualNotes", "validationOutput", "status"];
+export function parseReport(text) {
+  const t = String(text || ""), re = /^```(acceptance-report|json)[ \t]*\n([\s\S]*?)\n```[ \t]*$/gm;
+  let m, last = null;
+  while ((m = re.exec(t))) {
+    try { const j = JSON.parse(m[2]); if (j && typeof j === "object" && !Array.isArray(j) && REPORT_KEYS.some((k) => k in j)) last = { j, at: m.index, end: re.lastIndex }; } catch {}
+  }
+  if (!last) return { prose: t.trim(), fields: null, after: "" };
+  return { prose: t.slice(0, last.at).trim(), fields: last.j, after: t.slice(last.end).trim() };
+}
+
 export function inbox(snapshot) {
   const cards = [];
   for (const m0 of snapshot.missions || []) {
