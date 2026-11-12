@@ -29,6 +29,11 @@ Status: **draft** (open for discussion) · **accepted** (in the roadmap) · **re
 | P21 | [Security layer: a scanner gate in code, then a security axis that reads what the scanner can't](P21-security-layer.md) | proposed, after mission 5 | D62, P20 |
 | P22 | [One entry, derived process: the change sets the tier, a function in code sets the steps](P22-one-entry-derived-process.md) | proposed, after mission 5 | lanes, P20, P21 |
 | P23 | [Gates that can't be fooled: checks in code where code can decide, every gate's recall measured](P23-gates-that-cannot-be-fooled.md) | proposed, after mission 6; holds the next release plan | D98, P14 |
+| P26 | [Checklist packs: what a good contract looks like for a kind of change, asked in round 1](P26-checklist-packs.md) | draft | — |
+| P27 | [A patch stays inside its ticket: a scope check in code, flagged first](P27-ticket-scope-check.md) | draft (guard change) | D125 |
+| P28 | [Gate yield: what each gate catches, gets wrong, and costs the person](P28-gate-yield.md) | draft | D97, P23 |
+| P29 | [Dependency bumps without hands: a scripted install step, outside the agents](P29-scripted-install.md) | draft (guard decision) | D124, P19 |
+| P30 | [Every hand touch is a learning event](P30-hand-touches-are-events.md) | draft | D114, D89 |
 
 ## Why these four, in this order
 
@@ -80,3 +85,5 @@ P21 adds the security review the factory doesn't have. A scanner (Semgrep, rules
 P22 replaces the three lanes with one entry. The person describes the work; a function in code derives the tier from the change (paths, boundaries, size, intent) twice: predicted at intake to plan the steps, actual from the diff before the MR, which can only escalate. Each mission writes its plan and why; the tier sets the steps and, through the forge, the approvals (one for low and medium, two for high). Auto-merge for low comes only after evidence, with a revert-rate circuit breaker. A shadow phase compares the function with the person's choices first.
 
 P23 comes from mission 6: every gate green, and one defect through all of them, an inferred return type that changed the published API, caught only by a ten-second mechanical diff the human ran. A property a script can decide is decided by a script; a seeded-fault corpus measures each gate's recall per fault class, and that table decides which judges and which tiers are trusted. It also lists the next release, item by item.
+
+P26 to P30 come from the gym's records read against a talk on trusted software factories (Tessl, November 2026). Model cost is $3.93 per MR; human interventions are 15.3 per MR. So they aim at the person's attention: ask the right questions in round 1 (P26), keep patches in scope (P27), measure what each gate costs the person (P28), take dependency installs off their hands (P29), and see every hand fix (P30).
