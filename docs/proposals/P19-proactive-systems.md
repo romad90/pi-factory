@@ -1,6 +1,6 @@
 # P19. Proactive systems: work that starts before anyone sits down
 
-**Status:** draft, later: only once the core engine meets its entry criteria (below) · **Effort:** L, one candidate at a time · **Depends on:** P12 (durable runner), P16 (issue in, MR out), P14 (measured runs), P4 (director)
+**Status:** keep, later: entry criteria unchanged; rows 1 and 7 wait on P31 and P34 (see the [November assessment](assessment-2026-11.md)) · **Effort:** L, one candidate at a time · **Depends on:** P12 (durable runner), P16 (issue in, MR out), P14 (measured runs), P4 (director)
 
 ## Problem
 

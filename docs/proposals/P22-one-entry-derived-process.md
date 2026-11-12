@@ -1,6 +1,6 @@
 # P22. One entry, derived process: the change sets the tier, a function in code sets the steps
 
-**Status:** proposed, after mission 5; the architect step is built (D105, below) · **Effort:** L · **Depends on:** the MR gate's lanes (behavior-paths), P20 (token budget), P21 (boundary detection); replaces the idea of risk tiers as a separate feature
+**Status:** keep, later: the architect step is built (D105); tiers need P30's numbers (see the [November assessment](assessment-2026-11.md)) · **Effort:** L · **Depends on:** the MR gate's lanes (behavior-paths), P20 (token budget), P21 (boundary detection); replaces the idea of risk tiers as a separate feature
 
 ## Problem
 

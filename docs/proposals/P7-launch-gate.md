@@ -1,6 +1,6 @@
 # P7. Launch gate: a mission is done when the service runs, in a sandbox, secure by design
 
-**Status:** draft · **Effort:** M · **Depends on:** nothing to start; the sandbox levels of [agent-sandboxing](../research/agent-sandboxing.md)
+**Status:** keep, later: with the first service that runs; the sandbox joins S8 (see the [November assessment](assessment-2026-11.md)) · **Effort:** M · **Depends on:** nothing to start; the sandbox levels of [agent-sandboxing](../research/agent-sandboxing.md)
 
 ## Problem
 

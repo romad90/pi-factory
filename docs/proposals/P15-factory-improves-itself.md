@@ -1,6 +1,6 @@
 # P15. The factory improves itself: agents that read failed runs and propose changes to the factory
 
-**Status:** draft, for later · **Effort:** M · **Depends on:** P14 (run archive, scoring, benchmark); P5 shares its strategist
+**Status:** running: `learn-loop.sh` and the nightly task are its first form (see the [November assessment](assessment-2026-11.md)) · **Effort:** M · **Depends on:** P14 (run archive, scoring, benchmark); P5 shares its strategist
 
 ## Problem
 

@@ -1,6 +1,6 @@
 # P13. Context repos: investigate across services, change only one
 
-**Status:** steps 1–3 implemented (D99); step 4, the first real use, is next · **Effort:** M · **Depends on:** nothing to start; P9 (reproduce first) fits on top
+**Status:** done (`context.sh`, D99) (see the [November assessment](assessment-2026-11.md)) · **Effort:** M · **Depends on:** nothing to start; P9 (reproduce first) fits on top
 
 ## Problem
 

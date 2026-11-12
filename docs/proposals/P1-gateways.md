@@ -1,6 +1,6 @@
 # P1. Several gateways, a fallback chain, a production budget
 
-**Status:** draft · **Effort:** M · **Depends on:** nothing
+**Status:** keep, later: probe per provider built (D59, D79), no fallback chain (see the [November assessment](assessment-2026-11.md)) · **Effort:** M · **Depends on:** nothing
 
 ## Problem
 

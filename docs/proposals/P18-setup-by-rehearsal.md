@@ -1,6 +1,6 @@
 # P18. Setup by rehearsal: the factory finds its own commands and proves them as a worker would
 
-**Status:** accepted, built as D102 (factory setup, env-check, factory report) · **Effort:** M · **Depends on:** P11 (onboard); none of the mission loop changes
+**Status:** done (D102) (see the [November assessment](assessment-2026-11.md)) · **Effort:** M · **Depends on:** P11 (onboard); none of the mission loop changes
 
 ## Problem
 

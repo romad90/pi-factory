@@ -1,6 +1,6 @@
 # P24. Code health as a closed loop, for any language
 
-Status: queued (after the current job; no factory change during a mission).
+Status: keep, later: with the first refactor mission (see the [November assessment](assessment-2026-11.md)).
 
 Source: Adam Tornhill, "AI-Friendly Code" (GOTO Copenhagen 2026). Agents told only to "improve" fix 20–50% of health issues; given a measured gap they close most of it (closed-loop control). A refactoring playbook the agent writes as it goes, specific to the codebase, made large refactors mechanical. Change coupling and author density find the modules every change collides in. The speaker sells a proprietary metric: we take the method, not the score.
 

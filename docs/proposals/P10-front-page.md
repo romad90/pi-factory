@@ -1,6 +1,6 @@
 # P10. Front page: every subagent, at every stage, on one page
 
-**Status:** v1 built (D90): snapshot, page, zoom to the ticket; SSE, health thresholds and the phone view remain · **Effort:** M · **Depends on:** nothing to start; P2 makes the events complete
+**Status:** done (cockpit D119–D123, gate page D130, reports D133); more gate pages when a mission asks (see the [November assessment](assessment-2026-11.md)) · **Effort:** M · **Depends on:** nothing to start; P2 makes the events complete
 
 ## Problem
 

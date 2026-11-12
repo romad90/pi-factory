@@ -1,6 +1,6 @@
 # P8. Hands-off mission: the human decides, the factory does the rest
 
-**Status:** steps 1–3 done (D65–D70), step 4 partly (metrics count human and auto decisions apart) · **Effort:** M · **Depends on:** nothing to start; P2 for the last step
+**Status:** steps 1–3 done (D65–D70); step 4 is P30's number (see the [November assessment](assessment-2026-11.md)) · **Effort:** M · **Depends on:** nothing to start; P2 for the last step
 
 ## Problem
 

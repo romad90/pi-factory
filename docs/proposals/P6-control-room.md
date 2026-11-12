@@ -1,6 +1,6 @@
 # P6. Control room: a hosted factory, a dashboard, events from operations
 
-**Status:** draft · **Effort:** L · **Depends on:** P2 (scripted lead), P4 (director and triggers), P5 (improvement PRs); step 3 of the [ladder](../LADDER.md)
+**Status:** hosted part dropped; the dashboard is the cockpit (P10), operations events are P19 (see the [November assessment](assessment-2026-11.md)) · **Effort:** L · **Depends on:** P2 (scripted lead), P4 (director and triggers), P5 (improvement PRs); step 3 of the [ladder](../LADDER.md)
 
 ## Problem
 
