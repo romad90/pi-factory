@@ -251,6 +251,10 @@ depq='Someone has to run npm install to upgrade tap and write package-lock.json:
 r="$(bash scripts/factory/resolve.sh maint 01-doc "$depq" || true)"; r2="$(bash scripts/factory/resolve.sh depsm 01-up "$depq" || true)"
 [ "${r%%$'\t'*}" = dependencies ] && [ -z "$r2" ] && t "resolver: installing goes to the person when the mission's scope names a manifest, else the rule says no (D124)" || fail "resolver deps" "$r / $r2"
 depbase="$(git rev-parse HEAD)"
+# get-port-7: "/factory-deps get-port-7" was refused twice with a bare usage line.
+if bash scripts/factory/human.sh deps depsm >"$work/deps.log" 2>&1; then fail "human.sh deps must refuse without what changed"; fi
+grep -q 'what you changed is required: .* e.g. human.sh deps depsm ' "$work/deps.log" && grep -qF '/factory-deps <mission> [<sha>] <what changed>' .pi/prompts/factory-deps.md \
+  && t "/factory-deps states its form, and human.sh deps says what changed is required, with an example (get-port-7)" || fail "deps form" "$(cat "$work/deps.log")"
 if bash scripts/factory/human.sh deps depsm "nothing changed" >"$work/deps.log" 2>&1; then fail "human.sh deps must refuse a commit with no manifest" "$(cat "$work/deps.log")"; fi
 mkdir -p vendor-demo; printf '{"devDependencies":{"tap":"^21.8.1"}}\n' > vendor-demo/package.json; printf '{"lockfileVersion":3}\n' > vendor-demo/package-lock.json
 git add vendor-demo; git commit -qm "chore(deps): tap 21 by hand"; depc="$(git rev-parse --short HEAD)"

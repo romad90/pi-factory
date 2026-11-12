@@ -212,7 +212,7 @@ case "$cmd" in
     commit=HEAD
     if [ $# -gt 1 ] && git cat-file -e "$1^{commit}" 2>/dev/null; then commit="$1"; shift; fi
     what="$(text_arg "$@")"
-    [ -n "$what" ] || die "usage: human.sh deps <feature> [<commit>] <what you changed...> (or --stdin)"
+    [ -n "$what" ] || die "what you changed is required: human.sh deps <feature> [<commit>] <what you changed...> (or --stdin), e.g. human.sh deps $feature get-port 5.1.1 to 7.1.0, lockfile by npm 10"
     c="$(git rev-parse --short "$commit")"
     files="$(git show --name-only --relative --format= "$commit" | grep -E "$DEPS_FILES_RE|(^|/)\.gitignore$" | paste -sd, - | sed 's/,/, /g')"
     [ -n "$files" ] || die "commit $c changes no dependency manifest or lockfile: make the change, commit it, then run this (or name the commit)"
