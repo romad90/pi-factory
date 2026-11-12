@@ -3,6 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { parseCritique, toContract } from "./cockpit-contract.mjs";
 import { replay } from "./run-detail.mjs";
 import { parseContract } from "./gate-doc.mjs";
@@ -165,7 +166,24 @@ function critique(dir) {
   if (!t) return null;
   const mtime = (p) => { try { return fs.statSync(p).mtimeMs; } catch { return 0; } };
   let amendments = 0; try { amendments = fs.readdirSync(path.join(dir, "amendments")).filter((x) => x.endsWith(".md")).length; } catch {}
-  return { ...parseCritique(t), round: amendments + 1, at: new Date(mtime(f)).toISOString(), afterContract: mtime(f) >= mtime(path.join(dir, "spec.md")) };
+  return { ...parseCritique(t), round: amendments + 1, at: new Date(mtime(f)).toISOString(), afterContract: mtime(f) >= mtime(path.join(dir, "spec.md")),
+    openAmendments: openAmendments(dir) };
+}
+
+// B9: amendments the contract doesn't carry yet, by lib.sh's rule
+// (amendment_open): pending, or sent while spec.md is still the one it was
+// sent against (the hash leaves the approval line out, like contract_sha).
+function openAmendments(dir) {
+  let files = []; try { files = fs.readdirSync(path.join(dir, "amendments")).filter((x) => x.endsWith(".md")).sort(); } catch {}
+  if (!files.length) return [];
+  const lines = read(path.join(dir, "spec.md")).split("\n");
+  if (lines[lines.length - 1] === "") lines.pop();
+  const sha = createHash("sha256").update(lines.filter((l) => !/^\*\*Contract approved:\*\*/.test(l)).map((l) => l + "\n").join("")).digest("hex").slice(0, 12);
+  return files.flatMap((file) => {
+    const t = read(path.join(dir, "amendments", file)), status = field(t, "Status"), sent = field(t, "Spec at send");
+    if (!/^pending/.test(status) && !(sent && sent === sha)) return [];
+    return [{ file, status, text: t.replace(/^#.*$/m, "").replace(/^\*\*[A-Za-z ]+:\*\*.*$/gm, "").trim().slice(0, 600) }];
+  });
 }
 
 function mission(name, lines) {

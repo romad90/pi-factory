@@ -173,11 +173,19 @@ if investigation_applies "$spec"; then
     step report "human: the approved investigation is the deliverable: $inv. Nothing is built; the mission ends here"
   fi
 fi
-pending_amendment=""
+# B9: an amendment stays open until spec.md changes after it was sent, so a
+# contract author that stopped (a question, an error) never leads to G1.
+open_amendments=()
 for a in "$dir"/amendments/*.md; do
-  [ -f "$a" ] && grep -q '^\*\*Status:\*\* pending' "$a" && pending_amendment="$a"
+  [ -f "$a" ] && amendment_open "$a" "$spec" && open_amendments+=("$a")
 done
-if ! has_contract "$spec" || [ ! -f "$critique" ] || [ -n "$pending_amendment" ]; then
+if ! has_contract "$spec" || [ ! -f "$critique" ] || [ ${#open_amendments[@]} -gt 0 ]; then
+  unsent=""
+  for a in "${open_amendments[@]}"; do
+    grep -q '^\*\*Status:\*\* pending' "$a" && continue
+    unsent="${unsent:+$unsent, }$(basename "$a") ($(sed -n 's/^\*\*Status:\*\* //p' "$a" | head -1))"
+  done
+  [ -n "$unsent" ] && STATUS="Amendment not in the contract yet: $unsent. spec.md hasn't changed since it was sent; the author runs again with it."$'\n'
   step contract "scripts/factory/workflow.sh contract $feature (author, then critic, fresh, other families)"
 fi
 if ! contract_approved "$spec"; then

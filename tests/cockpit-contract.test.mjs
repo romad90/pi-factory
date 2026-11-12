@@ -119,6 +119,16 @@ test("G1: the critique's findings are the evidence, and a blocking one makes Ame
   assert.equal(stale.evidence[0].label, "stale", "a critique older than the contract says so first");
 });
 
+test("G1: an amendment the contract doesn't carry yet comes first, and Approve isn't suggested (B9, eslint-10 round 4)", () => {
+  const critique = { result: "approve", at: "t", afterContract: true, findings: [],
+    openAmendments: [{ file: "20261110-142211.md", status: "sent 2026-11-10", text: "Critique round 4, finding 1." }] };
+  const [c] = inbox({ missions: [mission({ name: "eslint-10", step: "approve", human: true, contract: { total: 12 }, critique })] });
+  assert.equal(c.evidence[0].label, "not in the contract");
+  assert.match(c.evidence[0].text, /Amendment 20261110-142211\.md \(sent 2026-11-10\) isn't in the contract yet/);
+  assert.match(c.evidence[0].path, /eslint-10\/amendments\/20261110-142211\.md$/);
+  assert.equal(c.options.find((o) => o.label === "Approve").suggested, false);
+});
+
 test("approve-tickets: each ticket is a line of evidence", () => {
   const [c] = inbox({ missions: [mission({ step: "approve-tickets", human: true, counts: { total: 2 },
     tickets: [{ name: "01-a", num: "01", title: "Upgrade tap", size: "M", covers: ["VAL-DEPS-001"], blockedBy: [] }, { name: "02-b", num: "02", title: "Lockfile", covers: [], blockedBy: ["01"] }] })] });

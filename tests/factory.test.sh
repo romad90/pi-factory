@@ -275,6 +275,23 @@ printf '\n- VAL-X-002\n' >> .scratch/depsm/issues/01-up.md
 rbd="$(bash scripts/factory/brief.sh reviewer depsm 01-up HEAD)"
 grep -qF '`npm run lint:ci && npm test`' <<<"$rbd" && grep -q 'never stop to ask' <<<"$rbd" \
   && t "the reviewer's brief carries the Done when commands an assertion names, and says never to stop to ask (eslint-10)" || fail "brief done when" "$(tail -12 <<<"$rbd")"
+# B2: deps-node-22 ticket 01, rounds 2 and 4, failed on "deliverable unchanged in
+# this commit" while the ticket's whole diff had it: the brief said git show
+# <last commit>. The reviewer now judges the ticket's diff since the commit
+# before its first integration (or its first recorded hand commit), and is told
+# which commits in that range belong to other tickets.
+git checkout -q -- .scratch/depsm; pre_b2="$(git rev-parse HEAD)"
+mkdir -p vendor-demo/lib; echo 'module.exports = 1' > vendor-demo/lib/a.js; git add vendor-demo
+git commit -q -m "chore(depsm): 01-up" -m "Integrated by the factory after lint and tests passed." -m "Factory-Script: integrate"; i1="$(git rev-parse HEAD)"
+echo 'module.exports = 2' > vendor-demo/lib/b.js; git add vendor-demo
+git commit -q -m "feat(depsm): 02-other" -m "Integrated by the factory after lint and tests passed." -m "Factory-Script: integrate"; o2="$(git rev-parse --short HEAD)"
+echo 'module.exports = 3' > vendor-demo/lib/a.js; git add vendor-demo
+git commit -q -m "chore(depsm): 01-up" -m "Integrated by the factory after lint and tests passed." -m "Factory-Script: integrate"; i2="$(git rev-parse HEAD)"
+rbt="$(bash scripts/factory/brief.sh reviewer depsm 01-up "$i2")"
+grep -qF "git diff $(git rev-parse --short "$depbase") $(git rev-parse --short "$i2")" <<<"$rbt" \
+  && grep -qF "$(git rev-parse --short "$i1")" <<<"$rbt" && grep -qF "not this ticket's: $o2" <<<"$rbt" && ! grep -q "git show $i2\b" <<<"$rbt" \
+  && t "the reviewer judges the ticket's whole diff, its integrations and hand commits, not its last commit (B2)" || fail "brief ticket diff" "$(sed -n 1,4p <<<"$rbt")"
+git reset -q --hard "$pre_b2"
 git checkout -q -- .scratch/depsm
 git rm -rq .scratch/depsm vendor-demo; git commit -qm "test: drop the dependency mission"
 git checkout -q "$cmds0" -- .factory/commands.env; git commit -qm "test: reset commands"
@@ -336,6 +353,26 @@ bash scripts/factory/workflow.sh contract demo >"$work/wf.log"
 wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
 [ -f "$wf" ] && grep -q 'const ITEMS' "$wf" && t "contract wave written to a file ($(basename "$wf"))" || fail "workflow file"
 grep -q '^\*\*Status:\*\* sent' $m/amendments/*.md && t "amendment marked sent" || fail "amendment status"
+# B9: eslint-10 round 4 (amendments/20261110-142211.md). The author stopped with
+# a question and left spec.md unchanged; next.sh then said approve, offering a
+# contract without the change the person had asked for. An amendment stays
+# open until spec.md changes after it was sent.
+mkdir -p $m/state; printf '# Open question\n**Ticket:** contract\n**Asked:** %s\n\nWhere does the reference config go?\n' "$(date +%F)" > $m/state/open-question.md
+touch $m/contract-critique.md
+expect_step decide "the contract author's question comes first"
+bash scripts/factory/human.sh decide demo "(a) under the mission's tmp" >/dev/null
+out="$(bash scripts/factory/next.sh demo 2>&1)"
+am1="$(basename "$(ls $m/amendments/*.md | head -1)")"
+[ "$(head -1 <<<"$out")" = "STEP: contract" ] && grep -q "$am1" <<<"$out" && grep -q 'not in the contract yet' <<<"$out" \
+  && t "an amendment sent but not applied (spec.md unchanged) keeps the contract step, named (B9)" || fail "open amendment" "$out"
+FACTORY_STATUS_METRICS=0 bash scripts/factory/status.sh demo --json 2>/dev/null | node -e '
+  const s = JSON.parse(require("fs").readFileSync(0, "utf8")); const m = s.missions.find((x) => x.name === "demo");
+  process.exit(m?.critique?.openAmendments?.[0]?.file === process.argv[1] ? 0 : 1)' "$am1" \
+  && t "the snapshot names the amendment the contract doesn't carry yet (B9)" || fail "snapshot open amendment" "$(FACTORY_STATUS_METRICS=0 bash scripts/factory/status.sh demo --json 2>&1 | head -c 400)"
+bash scripts/factory/workflow.sh contract demo >/dev/null
+expect_step contract "re-sending an open amendment doesn't close it"
+printf -- '- **Amended:** %s count starts at zero\n' "$(date +%F)" >> $m/spec.md; touch $m/contract-critique.md
+expect_step approve "the author's change to spec.md closes the amendment"
 FACTORY_APPROVER="Test Human" bash scripts/factory/human.sh approve demo >/dev/null
 grep -qE '^\*\*Contract approved:\*\* [0-9-]+ — by Test Human' $m/spec.md && t "the approval line records who approved (D95)" || fail "approver" "$(grep 'Contract approved' $m/spec.md)"
 # D94: a feature mission gets a program design after G1, approved before tickets.

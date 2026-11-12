@@ -86,10 +86,15 @@ const STEPS = {
       text: `${f.title}. ${f.text}${f.passes ? `\nPasses wrongly: ${f.passes}` : f.level === "blocking" && round >= 3 ? "\n(names no wrong change that would pass)" : ""}${f.fix ? `\nFix: ${f.fix}` : ""}`,
       path: `${m.factoryDir || ".scratch"}/${m.name}/contract-critique.md` }));
     if (c && !c.afterContract) evidence.unshift({ label: "stale", level: "blocking", text: "The critique is older than the contract: the critic hasn't judged this version.", path: "" });
+    // B9: an amendment the contract author never applied (eslint-10 round 4).
+    const open = c?.openAmendments || [];
+    for (const a of [...open].reverse()) evidence.unshift({ label: "not in the contract", level: "blocking",
+      text: `Amendment ${a.file} (${a.status}) isn't in the contract yet: spec.md hasn't changed since it was sent. Run the contract step again before approving.${a.text ? `\n${a.text}` : ""}`,
+      path: `${m.factoryDir || ".scratch"}/${m.name}/amendments/${a.file}` });
     return { title: "Contract (G1)",
       question: `Approve the contract of ${m.name}?${round > 1 ? ` Round ${round}.` : ""} ${m.contract?.total ?? "?"} assertions; the critic found ${blocking} blocking and ${(c?.findings || []).length - blocking} non-blocking problem${(c?.findings || []).length - blocking === 1 ? "" : "s"}.`,
       options: [
-        { label: "Approve", effect: `The tickets are written next; you approve them before any build.${blocking ? " Approving accepts the open findings; it is recorded." : ""}`, command: `/factory-approve ${m.name}`, suggested: !amend },
+        { label: "Approve", effect: `The tickets are written next; you approve them before any build.${blocking ? " Approving accepts the open findings; it is recorded." : ""}`, command: `/factory-approve ${m.name}`, suggested: !amend && !open.length },
         { label: "Amend", effect: `The contract author rewrites it with your change, the critic reads it again, you approve again.${blocking ? " Answer the blocking findings in your change." : ""}`, command: `/factory-amend ${m.name} ${q("<the change>")}`, suggested: amend }],
       evidence };
   },

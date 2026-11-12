@@ -798,6 +798,19 @@ deps_commits() {                               # <feature> [<base>]: "<hash>\t<f
   done
 }
 
+# B2: the commits that built a ticket up to <commit>, oldest first: its
+# integrations (integrate.sh's "<type>(<feature>): <ticket>" with the
+# Factory-Script trailer) and the dependency commits a person recorded (D124).
+ticket_commits() {                             # <feature> <ticket> <commit>
+  local mb own c; mb="$(mission_base "$1")"
+  own="$( { git log --format='%H%x09%s' --grep='^Factory-Script: integrate$' "$mb..$3" -- 2>/dev/null \
+              | awk -F'\t' -v t="): $2" 'length($2) >= length(t) && substr($2, length($2) - length(t) + 1) == t { print $1 }'
+            deps_commits "$1" "$mb" | cut -f1 | while read -r c; do
+              git merge-base --is-ancestor "$c" "$3" 2>/dev/null && git rev-parse "$c"; done; } | sort -u)"
+  [ -n "$own" ] || return 0
+  git rev-list --reverse "$mb..$3" | grep -Fx -f <(printf '%s\n' "$own") || true
+}
+
 decision_log() {
   local f t who
   f="$(mission_dir "$1")/decisions.tsv"; mkdir -p "$(dirname "$f")"
@@ -831,6 +844,18 @@ sha256() {                  # sha256 [file] — stdin when no file
 
 # brief_id <role> <scope> <ticket|-> <commit>: stable id recorded in verdicts.
 brief_id() { printf '%s|%s|%s|%s' "$1" "$2" "$3" "$4" | sha256 "" | cut -c1-12; }
+
+# B9: an amendment (human.sh amend) is open until spec.md changes after it was
+# sent. workflow.sh contract records the contract's hash when it sends one;
+# eslint-10 round 4: the author stopped with a question, spec.md stayed as it
+# was, and next.sh offered G1 on a contract without the change. The approval
+# line isn't part of the hash: approving changes nothing the author wrote.
+contract_sha() { grep -v '^\*\*Contract approved:\*\*' "$1" | sha256 | cut -c1-12; }
+amendment_open() {          # amendment_open <amendment.md> <spec.md>
+  grep -q '^\*\*Status:\*\* pending' "$1" && return 0
+  local s; s="$(sed -n 's/^\*\*Spec at send:\*\* //p' "$1" | head -1)"
+  [ -n "$s" ] && [ "$s" = "$(contract_sha "$2")" ]
+}
 
 # --- mission diff (D49) -------------------------------------------------------
 
