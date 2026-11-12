@@ -311,6 +311,15 @@ ticket_blockers() {
     }' "$1" | sort -u
 }
 
+# owner/name of origin when it is on github.com, else nothing. gh guesses the
+# repository from the remotes: with origin and an archived upstream it opened
+# the PR on upstream (get-port-7), so every gh call passes --repo with this.
+github_repo() {
+  local u; u="$(git config --get remote.origin.url || true)"
+  [[ "$u" =~ ^(https?://([^@/]+@)?|(ssh://)?git@)github\.com[:/]([^/]+/[^/]+)$ ]] || return 0
+  printf '%s\n' "${BASH_REMATCH[4]%.git}"
+}
+
 # The repository's name, the same from every worktree of it: the folder that
 # holds the shared git folder. A worktree's own folder name (api-next, say)
 # would file a mission's data apart from the repository's other missions.

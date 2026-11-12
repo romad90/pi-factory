@@ -20,7 +20,8 @@
 #         username): the person who approved the contract and design (D95).
 # How the MR is created, first that works:
 #   0. origin on github.com: gh, if installed and logged in (gh pr create
-#      --body-file; draft with --draft; the reviewer is asked, best effort);
+#      --repo <origin's owner/name> --body-file, never another remote's
+#      repository; draft with --draft; the reviewer is asked, best effort);
 #      without gh, the branch is pushed and the steps to open the PR printed
 #   1. glab, if installed and logged in
 #   2. the GitLab API, with the token in the variable $FACTORY_GITLAB_TOKEN_ENV
@@ -112,7 +113,7 @@ case "$title" in *'[skip ci]'*|*'[ci skip]'*) die "the title would skip CI: $tit
 desc="$(mktemp)"; trap 'rm -f "$desc"' EXIT
 awk 'done || !/^# /{print; next} {done=1}' "$body_file" | sed '/./,$!d' > "$desc"
 # GitHub: the PR body says so where GitLab would set it (eslint-10 printed GitLab steps on GitHub).
-github=""; [[ "$(git config --get remote.origin.url || true)" =~ ^(https?://([^@/]+@)?|(ssh://)?git@)github\.com[:/] ]] && github=1
+github="$(github_repo)"
 [ -n "$github" ] || [ -z "$draft" ] || title="Draft: $title"
 
 # What else rides in this MR, said up front so nobody finds it after merging
@@ -174,21 +175,21 @@ if [ -n "$github" ]; then
     mkdir -p "$(dirname "$desc_keep")"; cp "$desc" "$desc_keep"     # outside the tree: never dirties it
     echo
     echo "origin is on GitHub and gh isn't installed or logged in (gh auth login). Open the PR with:"
-    echo "    gh pr create --base $target --head $branch --title \"$title\" --body-file \"$desc_keep\"${draft:+ --draft}"
+    echo "    gh pr create --repo $github --base $target --head $branch --title \"$title\" --body-file \"$desc_keep\"${draft:+ --draft}"
     echo "or on github.com (compare $target...$branch), pasting the description from $desc_keep, then merge with squash."
     exit 0
   fi
-  existing="$(gh pr list --head "$branch" --base "$target" --state open --json number --jq '.[0].number // empty' 2>/dev/null || true)"
+  existing="$(gh pr list --repo "$github" --head "$branch" --base "$target" --state open --json number --jq '.[0].number // empty' 2>/dev/null || true)"
   if [ -n "$existing" ]; then
-    gh pr edit "$existing" --title "$title" --body-file "$desc" >/dev/null
+    gh pr edit "$existing" --repo "$github" --title "$title" --body-file "$desc" >/dev/null
     echo "updated PR #$existing"
   else
-    out="$(gh pr create --head "$branch" --base "$target" --title "$title" --body-file "$desc" ${draft:+--draft} 2>&1)" || die "gh: $out"
+    out="$(gh pr create --repo "$github" --head "$branch" --base "$target" --title "$title" --body-file "$desc" ${draft:+--draft} 2>&1)" || die "gh: $out"
     existing="$(printf '%s\n' "$out" | grep -o 'https://[^ ]*/pull/[0-9]*' | head -1)"
     # D95's reviewer is a GitLab username: asked, never a reason to fail.
-    [ -z "$reviewer" ] || gh pr edit "$existing" --add-reviewer "$reviewer" >/dev/null 2>&1 || warn "could not ask $reviewer to review (not a GitHub user here?)"
+    [ -z "$reviewer" ] || gh pr edit "$existing" --repo "$github" --add-reviewer "$reviewer" >/dev/null 2>&1 || warn "could not ask $reviewer to review (not a GitHub user here?)"
   fi
-  record "$(gh pr view "$existing" --json url --jq .url 2>/dev/null || true)"
+  record "$(gh pr view "$existing" --repo "$github" --json url --jq .url 2>/dev/null || true)"
   exit 0
 fi
 

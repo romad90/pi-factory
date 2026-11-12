@@ -1453,9 +1453,12 @@ git ls-remote --heads "$work/origin.git" "$cur" | grep -q . && grep -qx 'product
 ls "$work/data"/*/demo-*.tar.gz >/dev/null 2>&1 && tar -tzf "$work/data"/*/demo-*.tar.gz | grep -q 'demo/metrics.json' \
   && t "mr.sh keeps the mission's data: metrics next to its runs, one export in the machine's data folder (D103)" || fail "mission data" "$(ls -R "$work/data" 2>&1; cat "$work/mr.log")"
 # eslint-10: on a GitHub remote mr.sh printed GitLab token tips and a paste step.
+# get-port-7: with origin and an archived upstream, gh picked upstream.
 git remote set-url origin https://github.com/o/p.git; git remote set-url --push origin "$work/origin.git"; rm -f $m/mr.url
+git remote add upstream https://github.com/archived/p.git
 cat > "$work/bin/gh" <<'GH'
 #!/usr/bin/env bash
+[ "$1 $2" = "auth status" ] || printf '%s\n' "$*" >> "$GH_LOG.calls"
 case "$1 $2" in
   "auth status") exit 0 ;;
   "pr list") ;;
@@ -1469,13 +1472,14 @@ git branch -D production >/dev/null
 grep -qx -- '--body-file' "$work/gh.log" && grep -qx -- '--draft' "$work/gh.log" && grep -qx 'test(demo): characterize the hello tools' "$work/gh.log" \
   && grep -q '^## Summary' "$work/gh.log.body" && grep -q '^Merge with \*\*squash\*\*:' "$work/gh.log.body" && [ ! -e "$work/glab2.log" ] \
   && grep -q 'pull/9' $m/mr.url && ! grep -qi 'gitlab' "$work/mr.log" \
-  && t "mr.sh on a GitHub remote opens the PR with gh --body-file, no GitLab steps" || fail "mr gh create" "$(cat "$work/mr.log" "$work/gh.log")"
+  && [ "$(grep -c . "$work/gh.log.calls")" -ge 3 ] && ! grep -v -- '--repo o/p' "$work/gh.log.calls" | grep -q . \
+  && t "mr.sh on a GitHub remote opens the PR with gh --body-file, no GitLab steps, every gh call on origin's repository (get-port-7)" || fail "mr gh create" "$(cat "$work/mr.log" "$work/gh.log")"
 printf '#!/usr/bin/env bash\nexit 1\n' > "$work/bin/gh"   # installed, not logged in
 out="$(PATH="$work/bin:$PATH" FACTORY_DATA_DIR="$work/data" FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo 2>&1)" \
-  && grep -q 'gh pr create --base production' <<<"$out" && ! grep -qi 'gitlab' <<<"$out" \
+  && grep -q 'gh pr create --repo o/p --base production' <<<"$out" && ! grep -qi 'gitlab' <<<"$out" \
   && t "mr.sh on GitHub without a logged-in gh prints the GitHub steps" || fail "mr gh steps" "$out"
 rm "$work/bin/gh"
-git remote remove origin; rm -f $m/pr.md $m/mr.url
+git remote remove upstream; git remote remove origin; rm -f $m/pr.md $m/mr.url
 
 # D96: new tests must disagree with the code before the change, as the intent says.
 echo "Test on base (D96)"
