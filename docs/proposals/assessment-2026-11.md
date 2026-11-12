@@ -1,6 +1,6 @@
 # Assessment after eslint-10 (November 2026)
 
-Six missions have run on the gym; four merged. This page sorts every proposal (P1 to P34) and every open roadmap item into four piles: **done**, **keep** (with what would start it), **fold** (into another item) and **drop**. It decides nothing: each line is a recommendation for Rode.
+Six missions have run on the gym; four merged. This page sorts every proposal (P1 to P34; P26 and P27 exist only in the ADR) and every open roadmap item into four piles: **done**, **keep** (with what would start it), **fold** (into another item) and **drop**. It decides nothing: each line is a recommendation for Rode.
 
 ## The measure that sorts them
 
@@ -48,6 +48,7 @@ Status is read from the code (`scripts/factory/`, the ADR), not from the proposa
 | P23 | Gates that can't be fooled | principle applied piecemeal (D125 to D127, D131, D132); no recall bench | keep | its measuring half is P30; the seeded-fault bench after 3 more missions |
 | P24 | Code health loop | queued | keep, later | start with the first refactor mission |
 | P25 | First job findings | must-fixes 1 to 6 (D113) | **done** to 6 | re-read the queued rest against the nightly backlog; drop what it already covers |
+| P26, P27 | Learning loop, lessons between machines (no proposal page) | `learn-loop.sh`, `learn-export.sh` (D114, D115) | **done** | they are P15's first form |
 | P28 | Checklist packs | the slot exists; no pack | keep, **first** | evidence in hand (eslint-10). It is P33's adversary list, so build them together or P28 alone first |
 | P29 | Ticket scope check | nothing | keep | 1 flag in 7 commits, a false alarm: wait for 10 flags |
 | P30 | Gate yield | nothing | keep, **early** | it is the measure everything else here waits on |
