@@ -277,6 +277,9 @@ if [ ${#T_ESCALATE[@]} -gt 0 ]; then
   step escalate "human: ${T_ESCALATE[*]} failed $FACTORY_ROUND_LIMIT rounds. Usually the contract or spec is wrong: consider 'workflow.sh contract' (amend)."
 fi
 if [ ${#T_BLOCKED[@]} -gt 0 ]; then
+  missing=""
+  for name in "${T_BLOCKED[@]}"; do [ -z "${T_MISSING[$name]:-}" ] || missing+="${missing:+; }$name names ticket ${T_MISSING[$name]}, which doesn't exist"; done
+  [ -z "$missing" ] || step blocked "human: $missing. Fix its '## Blocked by' (None when nothing blocks it)."
   step blocked "human: ${T_BLOCKED[*]} can't start. Check '## Blocked by' for cycles."
 fi
 

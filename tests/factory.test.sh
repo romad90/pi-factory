@@ -447,6 +447,16 @@ bash scripts/factory/workflow.sh build-wave demo >"$work/wf.log"
 wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
 grep -q '"key": "01-hello"' "$wf" && ! grep -q '"key": "02-count"' "$wf" && t "build wave holds only unblocked tickets" || fail "build wave"
 grep -q 'patchOf' "$wf" && t "build wave returns patch paths" || fail "patchOf"
+# get-port-7: "None. It needs ... package.json line 35" blocked the ticket on a
+# ticket 35 that doesn't exist, and next.sh said to look for cycles.
+tb() { printf '# t\n## Blocked by\n%b\n## Notes\n12\n' "$1" > "$work/tb.md"; bash -c '. scripts/factory/lib.sh; ticket_blockers "$1" | paste -sd, -' _ "$work/tb.md"; }
+[ -z "$(tb 'None. It needs the hand commit: package.json line 35 still holds ^5.1.1')" ] && [ -z "$(tb 'It needs package.json line 35.')" ] \
+  && [ "$(tb '01, #2 and 03-slug')" = 01,02,03 ] && [ "$(tb '- 04: the parser\n1. `05-x`')" = 04,05 ] \
+  && t "Blocked by: None, or a number in prose, is no blocker; 01, #2, 03-slug and list items are (get-port-7)" || fail "ticket_blockers" "$(tb 'It needs line 35.')|$(tb '- 04: the parser\n1. `05-x`')"
+cp $m/issues/02-count.md "$work/02-count.md"; sed -i 's/^01$/01\n- 35: the parser/' $m/issues/02-count.md
+mt="$(bash -c '. scripts/factory/lib.sh; compute_ticket_state demo; echo "${T_MISSING[02-count]:-}|${T_BLOCKED[*]}"')"
+cp "$work/02-count.md" $m/issues/02-count.md
+[ "$mt" = "35|02-count" ] && t "a blocker naming a ticket that doesn't exist is reported as missing, not as a cycle (get-port-7)" || fail "missing blocker" "$mt"
 [ -z "$(git status --porcelain --untracked-files=all -- .scratch)" ] && t "generated workflow is committed (tree stays clean)" || fail "workflow file left untracked"
 
 # A provider error (429…) is not a round: the mission pauses (D58).
