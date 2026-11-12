@@ -54,7 +54,7 @@ fi
 
 # 1b. A reviewer asking whether a missing deliverable fails the ticket (D82).
 if has '(should|shall|do|must) i (fail|reject)|fail the (review|ticket)' && has 'not (changed|updated|modified|added|touched)|missing|only (modifies|changes|touches)|absent'; then
-  answer deliverable "Yes, FAIL. A file or deliverable the ticket or its assertions name that the commit does not change is a [blocking] issue: list it, and the next round adds it. Reviewers decide this without asking."
+  answer deliverable "Yes, FAIL. A deliverable the ticket or its assertions name that the ticket's whole diff lacks is a [blocking] issue: list it, and the next round adds it. Reviewers decide this without asking."
 fi
 
 # 2. Silencing a check.

@@ -89,10 +89,13 @@ return { explorers: found.map((x, i) => ({ key: explorers[i].key, output: x?.out
     ;;
 
   contract)
-    # Amendment requests (human.sh amend) go to this wave, then are marked sent.
+    # Amendment requests (human.sh amend) go to this wave, then are marked sent
+    # with the contract's hash: the request stays open until spec.md changes (B9).
     shopt -s nullglob
+    cspec="$(mission_dir "$feature")/spec.md"; csha="$(contract_sha "$cspec")"
     for a in "$(mission_dir "$feature")"/amendments/*.md; do
-      grep -q '^\*\*Status:\*\* pending' "$a" && sed -i.bak "s/^\*\*Status:\*\* pending.*/**Status:** sent $(date +%F)/" "$a" && rm -f "$a.bak"
+      grep -q '^\*\*Status:\*\* pending' "$a" || continue
+      awk -v d="$(date +%F)" -v s="$csha" '/^\*\*Status:\*\* pending/ { print "**Status:** sent " d; print "**Spec at send:** " s; next } { print }' "$a" > "$a.tmp" && mv "$a.tmp" "$a"
     done
     add contract-author factory-contract-author false contract-author "$feature"
     add contract-critic factory-contract-critic false contract-critic "$feature"
