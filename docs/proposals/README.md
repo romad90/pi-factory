@@ -34,6 +34,8 @@ Status: **draft** (open for discussion) · **accepted** (in the roadmap) · **re
 | P28 | [Gate yield: what each gate catches, gets wrong, and costs the person](P28-gate-yield.md) | draft | D97, P23 |
 | P29 | [Dependency bumps without hands: a scripted install step, outside the agents](P29-scripted-install.md) | draft (guard decision) | D124, P19 |
 | P30 | [Every hand touch is a learning event](P30-hand-touches-are-events.md) | draft | D114, D89 |
+| P31 | [Several angles on the contract at once: an adversary, a grounding check, a naive reader](P31-contract-angles.md) | draft | P26 |
+| P32 | [Drift report: the spec says what was decided, the docs say what the code does](P32-drift-report.md) | draft | C10, P17 |
 
 ## Why these four, in this order
 
@@ -87,3 +89,5 @@ P22 replaces the three lanes with one entry. The person describes the work; a fu
 P23 comes from mission 6: every gate green, and one defect through all of them, an inferred return type that changed the published API, caught only by a ten-second mechanical diff the human ran. A property a script can decide is decided by a script; a seeded-fault corpus measures each gate's recall per fault class, and that table decides which judges and which tiers are trusted. It also lists the next release, item by item.
 
 P26 to P30 come from the gym's records read against a talk on trusted software factories (Tessl, November 2026). Model cost is $3.93 per MR; human interventions are 15.3 per MR. So they aim at the person's attention: ask the right questions in round 1 (P26), keep patches in scope (P27), measure what each gate costs the person (P28), take dependency installs off their hands (P29), and see every hand fix (P30).
+
+P31 and P32 come from Google's Elephant-Goldfish Model plugin, read at its source. The [November assessment](assessment-2026-11.md) sorts every proposal and open roadmap item into done, keep, fold or drop, from what the code holds today.
