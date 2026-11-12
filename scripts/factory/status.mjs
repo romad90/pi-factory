@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { parseCritique, toContract } from "./cockpit-contract.mjs";
+import { parseCritique, parseReport, toContract } from "./cockpit-contract.mjs";
 import { replay } from "./run-detail.mjs";
 import { parseContract } from "./gate-doc.mjs";
 
@@ -115,13 +115,19 @@ function workers(mission) {
         if (!head.includes(`Mission ${mission}`) && !head.includes(`/${mission}/`)) continue;
         const text = stripAnsi(read(p, 20000));
         const lines = text.split("\n").map((l) => l.trimEnd()).filter((l) => l.trim());
-        const done = /\b(completed|finished|Workflow complete)\b/i.test(lines.slice(-3).join(" ")) || (lastCommitMs > 0 && st.mtimeMs < lastCommitMs);
+        // D130: the agent's final report block is the last thing a run writes: done,
+        // and shown as a report, not as raw JSON (eslint-10: two "quiet" cards for runs long finished).
+        const rep = parseReport(text);
+        const done = !!rep.fields || /\b(completed|finished|Workflow complete)\b/i.test(lines.slice(-3).join(" ")) || (lastCommitMs > 0 && st.mtimeMs < lastCommitMs);
+        const fields = rep.fields && JSON.stringify(rep.fields).length > 8000
+          ? Object.fromEntries(["diffSummary", "reviewFindings", "residualRisks", "manualNotes", "changedFiles"].filter((k) => k in rep.fields).map((k) => [k, rep.fields[k]])) : rep.fields;
         out.push({
           run: r, agent: (head.match(/factory-[a-z-]+/) || [""])[0],
           ticket: (head.match(/ticket\s+(\d\d[\w-]*)/i) || [])[1] || "",
           ageSec: Math.round((Date.now() - st.mtimeMs) / 1000), done,
           quiet: !done && Date.now() - st.mtimeMs > quietMs,
           last: lines.slice(-60).map((l) => l.slice(0, 400)),   // the box scrolls; the tail is enough to follow a run
+          report: fields ? { fields, after: rep.after.slice(0, 2000) } : null,
         });
       }
     }

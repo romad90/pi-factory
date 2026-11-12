@@ -145,6 +145,10 @@ a.chip{text-decoration:none;cursor:pointer}
 .decide{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px}@media (max-width:1000px){.decide{grid-template-columns:1fr}}
 .banner{border:1px solid #5a4824;background:#241d12;color:var(--amber);border-radius:8px;padding:8px 12px;margin:10px 0}
 .readlink{display:inline-block;margin-top:8px;background:var(--blue);color:#0F1115;font-weight:700;border-radius:8px;padding:8px 14px;text-decoration:none}
+.report{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#12151B}.report .rs{font-weight:600;margin-bottom:4px}
+.report h4{font-size:11.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--soft);margin:10px 0 4px}
+.rl{margin:0;padding-left:18px}.rl li{margin:3px 0}.rl li.bad::marker{color:var(--red)}.rl li.warn::marker{color:var(--amber)}.rl li.ok::marker{color:var(--green)}
+.rl li.bad{color:#FFB3A8}.report .md{font-size:13.5px}
 </style>
 </head>
 <body>
@@ -300,10 +304,36 @@ function logItem(e) {
     <span class="t" style="white-space:normal">${e.ticket ? `<b>${esc(e.ticket)}</b> ` : ""}<span class="muted" title="${esc(e.text)}">${esc(e.text.length > 170 ? e.text.slice(0, 168) + "…" : e.text)}</span></span></li>`;
 }
 
+// D130: an agent's report, read as a report: what it changed, what it found,
+// what it ran, what it couldn't check. The raw lines stay one click away.
+const asList = (v) => (Array.isArray(v) ? v : v ? [v] : []);
+const txt = (v) => (typeof v === "string" ? v : v && typeof v === "object" ? (v.summary || v.evidence || v.text || JSON.stringify(v)) : String(v ?? ""));
+function reportBlock(f, after) {
+  if (!f) return "";
+  const finds = asList(f.reviewFindings), risks = asList(f.residualRisks), cmds = asList(f.commandsRun), files = asList(f.changedFiles), crit = asList(f.criteriaSatisfied);
+  const lvl = (x) => /^\s*blocking\b/i.test(x) ? "bad" : /^\s*non-blocking\b/i.test(x) ? "warn" : /^\s*no blockers?\b/i.test(x) ? "ok" : "";
+  return `<div class="report">
+    ${f.diffSummary ? `<div class="rs">${inline(txt(f.diffSummary))}</div>` : ""}${f.status ? `<div class="muted">status: ${esc(txt(f.status))}</div>` : ""}
+    ${finds.length ? `<h4>Findings</h4><ul class="rl">${finds.map((x) => `<li class="${lvl(txt(x))}">${inline(txt(x))}</li>`).join("")}</ul>` : ""}
+    ${crit.length ? `<h4>Criteria</h4><ul class="rl">${crit.map((c) => `<li class="${c.status === "satisfied" ? "ok" : "warn"}"><b>${esc(c.status || "")}</b> ${inline(txt(c.evidence || c))}</li>`).join("")}</ul>` : ""}
+    ${cmds.length ? `<h4>What it ran</h4><ul class="rl">${cmds.map((c) => `<li class="${c.result === "passed" ? "ok" : c.result ? "bad" : ""}"><code>${esc(c.command || txt(c))}</code>${c.result ? ` <b>${esc(c.result)}</b>` : ""}${c.summary ? ` · ${inline(c.summary)}` : ""}</li>`).join("")}</ul>` : ""}
+    ${files.length ? `<h4>Files</h4><div class="chips">${files.map((x) => `<span class="chip mono">${esc(txt(x))}</span>`).join("")}</div>` : ""}
+    ${risks.length ? `<h4>Not checked, or risky</h4><ul class="rl">${risks.map((x) => `<li class="warn">${inline(txt(x))}</li>`).join("")}</ul>` : ""}
+    ${f.manualNotes ? `<h4>Notes</h4>${md(txt(f.manualNotes), { refs: true })}` : ""}
+    ${after ? md(after, { refs: true }) : ""}</div>`;
+}
+
+function parseReportClient(t) {
+  const re = /^```(acceptance-report|json)[ \t]*\n([\s\S]*?)\n```[ \t]*$/gm, keys = ["criteriaSatisfied", "changedFiles", "commandsRun", "residualRisks", "diffSummary", "reviewFindings", "manualNotes", "validationOutput", "status"];
+  let m, last = null;
+  while ((m = re.exec(t))) { try { const j = JSON.parse(m[2]); if (j && typeof j === "object" && !Array.isArray(j) && keys.some((k) => k in j)) last = { j, at: m.index, end: re.lastIndex }; } catch {} }
+  return last ? { prose: t.slice(0, last.at).trim(), fields: last.j, after: t.slice(last.end).trim() } : { prose: t.trim(), fields: null, after: "" };
+}
 function liveAndLog(m) {
   const w = m.workers;
   const workers = w.length ? w.map((x) => `<div style="margin-bottom:12px"><div class="row"><span><span class="dot" style="background:${x.done ? "var(--dim)" : x.quiet ? "var(--amber)" : "var(--green)"}"></span> <b>${esc(x.agent || "agent")}</b> ${esc(x.ticket)}</span><span class="age">${x.done ? "done" : "active"} · ${Math.round(x.ageSec / 60)} min ago</span></div>
-      <pre class="term mono" data-key="w:${esc(x.run)}">${esc(x.last.join("\n"))}</pre></div>`).join("")
+      ${x.report ? `${reportBlock(x.report.fields, x.report.after)}<details style="margin-top:6px"><summary class="muted">Raw log</summary><pre class="term mono" data-key="w:${esc(x.run)}">${esc(x.last.join("\n"))}</pre></details>`
+        : `<pre class="term mono" data-key="w:${esc(x.run)}">${esc(x.last.join("\n"))}</pre>`}</div>`).join("")
     : `<p class="empty">No agent run seen for this mission (pi-subagents run logs, best effort).</p>`;
   const runs = m.runs.slice(-4).reverse().map((r) => `<li><span class="when">${esc((r.date || "").slice(5))}</span><span class="t">${esc(r.agent)} <span class="muted">${esc(r.model)}${r.thinking ? " · " + esc(r.thinking) : ""}</span></span></li>`).join("");
   return `<div class="panel"><h2>Active worker</h2>${workers}
@@ -361,7 +391,8 @@ function runView(m, dir) {
         <span class="${e.kind === "refused" ? "today-refused" : "muted"}">${esc(e.kind === "call" ? e.tool : e.kind === "refused" ? "refused" : e.kind)}</span>
         <span class="x mono">${e.kind === "refused" ? `<b>${esc(e.tool)}</b> ` : ""}${esc(e.text)}${e.result && (e.error || e.kind === "refused") ? `<div class="res">${esc(e.result)}</div>` : ""}</span></div>`).join("") : `<p class="empty" style="padding:10px">No transcript archived for this run.</p>`}</div></div>
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(380px,1fr))">
-      <div class="panel"><details${d.output ? " open" : ""}><summary>Final answer (output.md)</summary><pre class="term mono" data-key="out:${esc(d.dir)}" style="max-height:420px">${esc(d.output || "none")}</pre></details></div>
+      <div class="panel"><details${d.output ? " open" : ""}><summary>Final answer (output.md)</summary>${(() => { const r = parseReportClient(d.output || "");
+        return d.output ? `${r.prose ? md(r.prose, { refs: true }) : ""}${reportBlock(r.fields, r.after)}<details><summary class="muted">Raw</summary><pre class="term mono" data-key="out:${esc(d.dir)}" style="max-height:420px">${esc(d.output)}</pre></details>` : `<p class="empty">none</p>`; })()}</details></div>
       <div class="panel"><details><summary>Brief (brief.md)</summary><pre class="term mono" data-key="brief:${esc(d.dir)}" style="max-height:420px">${esc(d.brief || "none")}</pre></details></div></div>`;
 }
 
