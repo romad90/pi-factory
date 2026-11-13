@@ -1269,6 +1269,70 @@ bash scripts/factory/reset-ticket.sh maint 02-tests >/dev/null && [ ! -e .scratc
 [ "$(bash scripts/factory/reset-ticket.sh maint 02-tests)" = "Nothing to reset for 02-tests." ] && t "reset-ticket: nothing to reset is a no-op" || fail "reset noop"
 if bash scripts/factory/reset-ticket.sh maint 99-nope >/dev/null 2>&1; then fail "unknown ticket must be refused"; fi
 t "reset-ticket: an unknown ticket is refused"
+# B3: deps-node-22 ticket 03 changed only `.github/workflows/main.yml`, a path
+# the patch guard reserves for people. It went to a worker anyway (refused,
+# guard.log), then the person asked, made the change and wrote
+# state/03-ci-tests-node-22-and-24.integrated by hand (decisions.tsv, 2026-11-09).
+# Now approval routes such a ticket to the person, and human.sh deliver records
+# the person's commit as its integration.
+cat > .scratch/maint/issues/04-ci.md <<'TICKET'
+# 04 CI tests Node 22 and 24 on both operating systems
+**Size:** S
+
+Change the `run_tests` job of `.github/workflows/main.yml` so its matrix `node` list is `22` and `24`. At the end of the mission, the diff from `887d2bf` touches only `package.json`, `package-lock.json`, `.github/workflows/main.yml` and files under `test/`.
+
+## Covers
+VAL-M-001
+
+## Blocked by
+None.
+
+## Notes
+- File: `.github/workflows/main.yml` only.
+TICKET
+mkdir -p .github/workflows; printf 'jobs:\n  run_tests:\n    strategy:\n      matrix:\n        node: [16, 18, 20]\n' > .github/workflows/main.yml
+printf '**Task:** all\n' > .scratch/maint/state/tickets.pending
+git add .github .scratch/maint; git commit -qm "test: a ticket only a person may deliver"
+ap="$(bash scripts/factory/human.sh approve maint tickets 2>&1)" || fail "approve tickets with a people's ticket" "$ap"
+grep -q '04-ci changes only paths reserved for people (.github/workflows/main.yml)' <<<"$ap" \
+  && bash -c '. scripts/factory/lib.sh; compute_ticket_state maint; [[ " ${T_HAND[*]} " == *" 04-ci "* ]] && [[ " ${T_BUILD[*]} " != *" 04-ci "* ]]' \
+  && t "approval routes a ticket whose files are all reserved for people to the person, not the worker queue (B3)" || fail "route by hand" "$ap"
+bash scripts/factory/workflow.sh build-wave maint >"$work/wf.log" 2>&1 || true
+wfm="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
+[ -n "$wfm" ] && ! grep -q '"key": "04-ci"' "$wfm" && t "the build wave leaves the person's ticket out" || fail "wave by hand" "$(cat "$work/wf.log")"
+mkdir -p "$work/held"; for f in .scratch/maint/issues/0[123]-*.md; do cp "$f" "$work/held/"; done
+git rm -q .scratch/maint/issues/0[123]-*.md; echo "No findings. Critique result: approve" > .scratch/maint/contract-critique.md
+git add .scratch/maint; git commit -qm "test: only the person's ticket left"; bash scripts/factory/human.sh approve maint >/dev/null
+nh="$(bash scripts/factory/next.sh maint 2>&1)"
+[ "$(head -1 <<<"$nh")" = "STEP: hand" ] && grep -q '/factory-deliver maint 04-ci' <<<"$nh" && grep -qE '04-ci +by hand' <<<"$nh" \
+  && t "next.sh: a ticket for the person → STEP: hand, with the command that records it" || fail "STEP hand" "$nh"
+echo 'readme' >> README.md; git commit -qam "docs: not the ticket"
+if bash scripts/factory/human.sh deliver maint 04-ci "matrix" >"$work/dl.log" 2>&1; then fail "deliver must refuse a commit that doesn't touch the ticket's files" "$(cat "$work/dl.log")"; fi
+grep -q "touches none of the files 04-ci names" "$work/dl.log" && [ ! -e .scratch/maint/state/04-ci.integrated ] \
+  && t "deliver refuses a commit that touches none of the ticket's files" || fail "deliver refuse" "$(cat "$work/dl.log")"
+printf 'jobs:\n  run_tests:\n    strategy:\n      matrix:\n        node: [22, 24]\n' > .github/workflows/main.yml
+git commit -qam "ci: node 22 and 24"; dc="$(git rev-parse HEAD)"
+printf '**Ticket:** 04-ci\n**Asked:** x\n\nThe worker may not edit .github/: who does?\n' > .scratch/maint/state/open-question.md
+git add .scratch/maint; git commit -qm "test: the worker's question"
+/bin/bash -s > "$work/dl.log" 2>&1 <<'LEAD'
+bash scripts/factory/human.sh deliver maint 04-ci HEAD~1 --stdin <<'FACTORY_TEXT_END'
+matrix node 22 and 24, os unchanged; `.github/` stays the person's
+FACTORY_TEXT_END
+LEAD
+[ "$(cat .scratch/maint/state/04-ci.integrated 2>/dev/null)" = "$dc" ] && [ ! -e .scratch/maint/state/open-question.md ] \
+  && grep -qF "$(printf '04-ci\tdeliver\tTicket delivered by hand (B3)\tcommit %s: .github/workflows/main.yml — matrix node 22 and 24, os unchanged; `.github/` stays the person'"'"'s' "$(git rev-parse --short "$dc")")" .scratch/maint/decisions.tsv \
+  && [ -z "$(git status --porcelain -- .scratch)" ] \
+  && bash -c '. scripts/factory/lib.sh; compute_ticket_state maint; [[ " ${T_REVIEW[*]} " == *" 04-ci "* ]]' \
+  && t "human.sh deliver records the person's commit as the ticket's integration, logs it, closes its question; the ticket goes to review (B3)" || fail "deliver" "$(cat "$work/dl.log" .scratch/maint/decisions.tsv; ls .scratch/maint/state)"
+rbh="$(bash scripts/factory/brief.sh reviewer maint 04-ci "$dc")"
+grep -qF "git diff $(git rev-parse --short "$dc^") $(git rev-parse --short "$dc")" <<<"$rbh" \
+  && t "the reviewer judges the person's commit as the ticket's diff" || fail "brief deliver" "$(grep -n 'change under review' <<<"$rbh")"
+printf '# Verdict: 04-ci\n**Result:** FAIL\n**Commit:** %s\n\n## Assertions\n- VAL-M-001: FAIL — os list changed\n' "$dc" > .scratch/maint/verdicts/04-ci-code.md
+bash -c '. scripts/factory/lib.sh; compute_ticket_state maint; [[ " ${T_HAND[*]} " == *" 04-ci "* ]] && [[ " ${T_BUILD[*]} " != *" 04-ci "* ]]' \
+  && t "a failed review of a ticket delivered by hand goes back to the person, never to a worker" || fail "fix round by hand"
+rm -f .scratch/maint/verdicts/04-ci-code.md
+git rm -rq .scratch/maint/issues/04-ci.md .github; rm -f .scratch/maint/state/04-ci.*; mkdir -p .scratch/maint/issues; cp "$work/held"/*.md .scratch/maint/issues/
+git add -A .scratch/maint; git commit -qm "test: drop the person's ticket"
 git rm -q src/legacy.js .factory/lint-baseline.txt; printf 'FACTORY_LINT_CMD="true"\nFACTORY_TEST_CMD="test -f src/tools/a.js"\n' > .factory/commands.env
 git add -A; git commit -qm "test: back to the plain commands"
 

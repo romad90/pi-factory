@@ -323,6 +323,7 @@ If the merge left your branch's dependency versions, take the target's `package.
 | `scripts/factory/reset-ticket.sh <f> <ticket> [reason]` | rebuild a ticket from round 1 (verdict, round copies and integration marker removed, one commit) |
 | `/factory-rereview <f> <ticket> <why>` (`reset-ticket.sh <f> <ticket> --review "<why>"`) | review an integrated ticket again instead of rebuilding it: its code stands, the verdict is set aside, the round copies stay, an open question about it is closed (F4) |
 | `/factory-deps <mission> "<what>"` | You made a dependency change by hand (install, upgrade, lockfile) and committed it; workers never install (D124). Reviewers count its files as delivered, and test-on-base skips a base older than it. |
+| `/factory-deliver <mission> <ticket> "<what>"` | A ticket that changes only paths reserved for people (CI, hooks, the factory) waits for you (`STEP: hand`): make the change, commit it, run this. The commit becomes the ticket's integration and goes to review; a failed review comes back to you, never to a worker (B3). |
 | `scripts/factory/self-check.sh <f>` | from a worker's worktree: the checks integration will run (workers run it themselves) |
 | `scripts/factory/resolve.sh <f> <ticket> "<question>"` | would this question be auto-answered, and by which rule? |
 | `scripts/factory/health.sh baseline` | after setting `FACTORY_LINT_CMD`: records today's lint errors, so only new ones fail |
