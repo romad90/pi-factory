@@ -869,6 +869,26 @@ lout="$(HOME="$work/lhome" FACTORY_DATA_DIR="$rdata" node scripts/factory/learn.
 [ "$(grep -c '^## After the merge' "$saved")" = 1 ] && grep -q '^- \[miss\] @lead' "$saved" && grep -q '^- types: inferred' "$saved" \
   && grep -qE '\| demo \|.*\| 1/1 \| 1 \|' <<<"$lout" \
   && t "retro close again: one section, labels and escaped defects kept; learn counts review misses and escaped defects" || fail "retro close rerun" "$(cat "$saved")"$'\n'"$lout"
+# get-port-7: retro close refused a GitHub PR URL ("not a GitLab MR URL").
+cat > "$work/glab2/gh" <<GH
+#!/usr/bin/env bash
+case "\$1 \$2" in
+  "auth status") exit 0 ;;
+  "api repos/o/p/pulls/9") printf '{"html_url":"https://github.com/o/p/pull/9","state":"closed","merged_at":"2026-11-03T10:00:00Z","user":{"login":"me","type":"User"},"merged_by":{"login":"lead","type":"User"},"merge_commit_sha":"$mrsha","head":{"sha":"0"}}' ;;
+  "api --paginate") case "\$3" in
+    repos/o/p/pulls/9/comments) printf '{"id":11,"body":"Check the port range","created_at":"2026-11-02T09:00:00Z","user":{"login":"lead","type":"User"},"path":"lib/port.js","line":12}\n' ;;
+    repos/o/p/issues/9/comments) printf '{"id":12,"body":"bot says hi","user":{"login":"dependabot[bot]","type":"Bot"}}\n{"id":13,"body":"Why not the default export?","created_at":"2026-11-02T08:00:00Z","user":{"login":"lead","type":"User"}}\n' ;;
+  esac ;;
+  *) exit 1 ;;
+esac
+GH
+chmod +x "$work/glab2/gh"
+out="$(PATH="$work/glab2:$PATH" FACTORY_DATA_DIR="$rdata" FACTORY_MR_URL=https://github.com/o/p/pull/9 bash scripts/factory/retro.sh close demo 2>&1)" || fail "retro close github" "$out"
+grep -q '^- \[ \] @lead lib/port.js:12: Check the port range (note 11)' "$saved" && grep -q '^- \[ \] @lead: Why not the default export? (note 13)' "$saved" \
+  && ! grep -q 'bot says hi' "$saved" && grep -q 'MR: https://github.com/o/p/pull/9, merged on 2026-11-03 by lead' "$saved" \
+  && grep -q 'Reverts of the merged change: [0-9a-f]\{8\} "Revert the change"' "$saved" && grep -q '2 review comment(s) to label' <<<"$out" \
+  && t "retro close on a GitHub PR: review and issue comments with gh, bots left out, reverts of the merge commit (get-port-7)" || fail "retro close github" "$out"$'\n'"$(cat "$saved")"
+rm "$work/glab2/gh"
 git branch -q -D revert-probe
 rm -f $m/retro.md
 
