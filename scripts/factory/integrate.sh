@@ -27,6 +27,10 @@ fi
 if [ "$patch" = null ]; then patch="$(bash "$here/locate-patch.sh" "$feature" "$ticket" 2>/dev/null || true)"; fi
 dir="$(mission_dir "$feature")"
 [ -f "$dir/issues/$ticket.md" ] || die "unknown ticket $ticket in $dir/issues"
+# get-port-7: the lead ran next.sh beside this script; it read the state
+# before the commit and its marker existed, and said build again. next.sh
+# waits while this lock names a live process.
+lock="$(integrate_lock "$feature")"; mkdir -p "$(dirname "$lock")"; printf '%s %s\n' "$$" "$ticket" > "$lock"; trap 'rm -f "$lock"' EXIT
 [ -s "$patch" ] || die "patch $patch is missing or empty: record it with scripts/factory/record-no-patch.sh $feature $ticket"
 
 load_commands
@@ -38,7 +42,7 @@ dirty="$(git status --porcelain --untracked-files=no -- . ":(exclude)${FACTORY_D
 
 # D56: in a monorepo, every patch is made relative to the project first; a
 # patch that reaches outside the project is blocked like any unsafe patch.
-raw_patch="$patch"; patch="$(mktemp)"; hookless="$(mktemp)"; trap 'rm -f "$patch" "$hookless"' EXIT
+raw_patch="$patch"; patch="$(mktemp)"; hookless="$(mktemp)"; trap 'rm -f "$patch" "$hookless" "$lock"' EXIT
 # D87: the hook's dependency links and .env.factory are never part of a
 # change; a captured patch that still has them loses them here, not a round.
 if ! node "$here/patch-paths.mjs" strip-hook "$raw_patch" "$hookless" "${FACTORY_DEPS_LINKS:-node_modules .venv}" "$(basename "$FACTORY_DIR")" 2>"$hookless.log"; then

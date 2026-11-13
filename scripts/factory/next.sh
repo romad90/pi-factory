@@ -38,6 +38,13 @@ step() {                                  # <code> <human explanation>
 
 # D67: a misspelled name or a switched branch stops here, before any step.
 if ! why="$(mission_guard "$feature")"; then step blocked "$why"; fi
+# get-port-7: run beside integrate.sh, next.sh read the state before its
+# commit and said build again. Wait for it (a dead process's lock is ignored).
+lock="$(integrate_lock "$feature")"; waited=""
+while [ -f "$lock" ] && kill -0 "$(cut -d' ' -f1 "$lock" 2>/dev/null)" 2>/dev/null; do
+  [ -n "$waited" ] || { echo "waiting for integrate.sh ($(cut -d' ' -f2- "$lock" 2>/dev/null)) to finish" >&2; waited=1; }
+  sleep 1
+done
 # D111: plain writing, a warning on every step until its numbers say block.
 pn="$(bash "$here/prose.sh" "$feature" --count 2>/dev/null || echo 0)"
 [ "${pn:-0}" = 0 ] || STATUS+="Plain writing: $pn finding(s) by docs/agents/writing.md (scripts/factory/prose.sh $feature lists them)."$'\n'
@@ -284,6 +291,9 @@ if [ ${#T_ESCALATE[@]} -gt 0 ]; then
   step escalate "human: ${T_ESCALATE[*]} failed $FACTORY_ROUND_LIMIT rounds. Usually the contract or spec is wrong: consider 'workflow.sh contract' (amend)."
 fi
 if [ ${#T_BLOCKED[@]} -gt 0 ]; then
+  missing=""
+  for name in "${T_BLOCKED[@]}"; do [ -z "${T_MISSING[$name]:-}" ] || missing+="${missing:+; }$name names ticket ${T_MISSING[$name]}, which doesn't exist"; done
+  [ -z "$missing" ] || step blocked "human: $missing. Fix its '## Blocked by' (None when nothing blocks it)."
   step blocked "human: ${T_BLOCKED[*]} can't start. Check '## Blocked by' for cycles."
 fi
 

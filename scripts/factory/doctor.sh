@@ -41,8 +41,13 @@ if [ "${1:-}" = "--quick" ]; then
   fi
   load_commands
   [ -n "$FACTORY_TEST_CMD" ] && ok "tests configured" || bad "FACTORY_TEST_CMD empty in .factory/commands.env"
-  dirty="$(git status --porcelain --untracked-files=no -- . ":(exclude)${FACTORY_DIR}" 2>/dev/null)"
-  [ -z "$dirty" ] && ok "clean tree outside ${FACTORY_DIR}/" || bad "uncommitted changes outside ${FACTORY_DIR}/ (commit or stash)"
+  # Pi's worktrees (pi-subagents) refuse any change or untracked file in the
+  # whole repository but .pi/subagents/. get-port-7 passed "clean tree outside
+  # .scratch/" with another mission's untracked files, then the build wave was
+  # refused. The mission's own folder is committed before each wave.
+  dirty="$(git status --porcelain -- ':(top)' ':(top,exclude).pi/subagents' ${2:+":(exclude)$(mission_dir "$2")"} 2>/dev/null | cut -c4-)"
+  if [ -z "$dirty" ]; then ok "clean tree (Pi's worktrees refuse any change or untracked file)"
+  else bad "Pi's worktrees refuse a tree with changes or untracked files: $(head -5 <<<"$dirty" | paste -sd, - | sed 's/,/, /g')$( [ "$(grep -c . <<<"$dirty")" -le 5 ] || echo ' …') (commit, remove or git-ignore them)"; fi
   if node "$here/models-lint.mjs" >/dev/null 2>&1; then ok "models: one per role, families separated"
   else bad "models-lint fails (node scripts/factory/models-lint.mjs)"; fi
   # D102: tools, models without a version, production routes, TLS checks off.

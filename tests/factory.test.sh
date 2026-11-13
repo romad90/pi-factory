@@ -251,6 +251,10 @@ depq='Someone has to run npm install to upgrade tap and write package-lock.json:
 r="$(bash scripts/factory/resolve.sh maint 01-doc "$depq" || true)"; r2="$(bash scripts/factory/resolve.sh depsm 01-up "$depq" || true)"
 [ "${r%%$'\t'*}" = dependencies ] && [ -z "$r2" ] && t "resolver: installing goes to the person when the mission's scope names a manifest, else the rule says no (D124)" || fail "resolver deps" "$r / $r2"
 depbase="$(git rev-parse HEAD)"
+# get-port-7: "/factory-deps get-port-7" was refused twice with a bare usage line.
+if bash scripts/factory/human.sh deps depsm >"$work/deps.log" 2>&1; then fail "human.sh deps must refuse without what changed"; fi
+grep -q 'what you changed is required: .* e.g. human.sh deps depsm ' "$work/deps.log" && grep -qF '/factory-deps <mission> [<sha>] <what changed>' .pi/prompts/factory-deps.md \
+  && t "/factory-deps states its form, and human.sh deps says what changed is required, with an example (get-port-7)" || fail "deps form" "$(cat "$work/deps.log")"
 if bash scripts/factory/human.sh deps depsm "nothing changed" >"$work/deps.log" 2>&1; then fail "human.sh deps must refuse a commit with no manifest" "$(cat "$work/deps.log")"; fi
 mkdir -p vendor-demo; printf '{"devDependencies":{"tap":"^21.8.1"}}\n' > vendor-demo/package.json; printf '{"lockfileVersion":3}\n' > vendor-demo/package-lock.json
 git add vendor-demo; git commit -qm "chore(deps): tap 21 by hand"; depc="$(git rev-parse --short HEAD)"
@@ -447,6 +451,16 @@ bash scripts/factory/workflow.sh build-wave demo >"$work/wf.log"
 wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
 grep -q '"key": "01-hello"' "$wf" && ! grep -q '"key": "02-count"' "$wf" && t "build wave holds only unblocked tickets" || fail "build wave"
 grep -q 'patchOf' "$wf" && t "build wave returns patch paths" || fail "patchOf"
+# get-port-7: "None. It needs ... package.json line 35" blocked the ticket on a
+# ticket 35 that doesn't exist, and next.sh said to look for cycles.
+tb() { printf '# t\n## Blocked by\n%b\n## Notes\n12\n' "$1" > "$work/tb.md"; bash -c '. scripts/factory/lib.sh; ticket_blockers "$1" | paste -sd, -' _ "$work/tb.md"; }
+[ -z "$(tb 'None. It needs the hand commit: package.json line 35 still holds ^5.1.1')" ] && [ -z "$(tb 'It needs package.json line 35.')" ] \
+  && [ "$(tb '01, #2 and 03-slug')" = 01,02,03 ] && [ "$(tb '- 04: the parser\n1. `05-x`')" = 04,05 ] \
+  && t "Blocked by: None, or a number in prose, is no blocker; 01, #2, 03-slug and list items are (get-port-7)" || fail "ticket_blockers" "$(tb 'It needs line 35.')|$(tb '- 04: the parser\n1. `05-x`')"
+cp $m/issues/02-count.md "$work/02-count.md"; sed -i 's/^01$/01\n- 35: the parser/' $m/issues/02-count.md
+mt="$(bash -c '. scripts/factory/lib.sh; compute_ticket_state demo; echo "${T_MISSING[02-count]:-}|${T_BLOCKED[*]}"')"
+cp "$work/02-count.md" $m/issues/02-count.md
+[ "$mt" = "35|02-count" ] && t "a blocker naming a ticket that doesn't exist is reported as missing, not as a cycle (get-port-7)" || fail "missing blocker" "$mt"
 [ -z "$(git status --porcelain --untracked-files=all -- .scratch)" ] && t "generated workflow is committed (tree stays clean)" || fail "workflow file left untracked"
 
 # A provider error (429…) is not a round: the mission pauses (D58).
@@ -561,6 +575,15 @@ grep -q '^feat(demo): 01-hello' <<<"$(git log -1 --skip=1 --format=%s)" && t "in
   && [ "$(git log -1 --skip=0 --format=%an HEAD)" = pi-factory ] \
   && t "factory commits are authored by pi-factory and committed by the human (D100)" || fail "factory identity" "$(git log -3 --format='%an / %cn: %s')"
 expect_step review "integrated ticket waits for review"
+# get-port-7: the lead ran next.sh beside integrate.sh, and next.sh said
+# "build, round 0" before the commit and its marker existed.
+lk="$(bash -c '. scripts/factory/lib.sh; integrate_lock demo')"; mkdir -p "$(dirname "$lk")"
+mv $m/state/01-hello.integrated "$work/m01"; sleep 30 & sp=$!; printf '%s 01-hello\n' "$sp" > "$lk"
+( sleep 2; mv "$work/m01" $m/state/01-hello.integrated; rm -f "$lk"; kill "$sp" 2>/dev/null ) &
+out="$(timeout 20 bash scripts/factory/next.sh demo 2>&1)"; wait
+printf '999999 01-hello\n' > "$lk"; out2="$(timeout 5 bash scripts/factory/next.sh demo 2>&1)"; rm -f "$lk"
+grep -q 'waiting for integrate.sh (01-hello)' <<<"$out" && grep -q '^STEP: review' <<<"$out" && grep -q '^STEP: review' <<<"$out2" \
+  && t "next.sh waits for a running integrate.sh, and ignores a dead one's lock (get-port-7)" || fail "integrate lock" "$out / $out2"
 # Learning loop (E11): a review's verdict counts only once collect.sh has
 # recorded it as a round; the lead skipped it twice and the round counter froze.
 printf '# Verdict: 01-hello\n**Result:** FAIL\n**Commit:** %s\n\n## Issues\n- [blocking] x\n' "$c1" > $m/verdicts/01-hello-code.md
@@ -667,6 +690,10 @@ grep -q 'left out' "$work/ck.log" && grep -q 'review-01-r2' "$work/ck.log" && t 
 rm -rf "$cp_dir" "$m/tmp/stray" "$m/tmp/cache"
 grep -q 'tmp/copies/' <<<"$(bash scripts/factory/brief.sh reviewer demo 01-hello HEAD)" && grep -qxF '.scratch/*/tmp/copies/' .gitignore \
   && t "judges are told where a copy of the project goes, and the install ignores it" || fail "copies place" "$(grep scratch .gitignore)"
+# get-port-7: pr.md, retro.md and mr.url stayed untracked after the PR, and
+# the next mission's worktrees refused the tree (D138).
+[ "$(git check-ignore --no-index $m/pr.md $m/retro.md $m/mr.url | grep -c .)" = 3 ] && ! git check-ignore -q --no-index $m/spec.md \
+  && t "the install ignores a mission's pr.md, retro.md and mr.url, not its state (D138)" || fail "mission leftovers ignored" "$(grep scratch .gitignore)"
 
 # Ticket 02 asks a decision.
 bash scripts/factory/human.sh ask demo 02-count --stdin >/dev/null <<'Q'
@@ -855,6 +882,26 @@ lout="$(HOME="$work/lhome" FACTORY_DATA_DIR="$rdata" node scripts/factory/learn.
 [ "$(grep -c '^## After the merge' "$saved")" = 1 ] && grep -q '^- \[miss\] @lead' "$saved" && grep -q '^- types: inferred' "$saved" \
   && grep -qE '\| demo \|.*\| 1/1 \| 1 \|' <<<"$lout" \
   && t "retro close again: one section, labels and escaped defects kept; learn counts review misses and escaped defects" || fail "retro close rerun" "$(cat "$saved")"$'\n'"$lout"
+# get-port-7: retro close refused a GitHub PR URL ("not a GitLab MR URL").
+cat > "$work/glab2/gh" <<GH
+#!/usr/bin/env bash
+case "\$1 \$2" in
+  "auth status") exit 0 ;;
+  "api repos/o/p/pulls/9") printf '{"html_url":"https://github.com/o/p/pull/9","state":"closed","merged_at":"2026-11-03T10:00:00Z","user":{"login":"me","type":"User"},"merged_by":{"login":"lead","type":"User"},"merge_commit_sha":"$mrsha","head":{"sha":"0"}}' ;;
+  "api --paginate") case "\$3" in
+    repos/o/p/pulls/9/comments) printf '{"id":11,"body":"Check the port range","created_at":"2026-11-02T09:00:00Z","user":{"login":"lead","type":"User"},"path":"lib/port.js","line":12}\n' ;;
+    repos/o/p/issues/9/comments) printf '{"id":12,"body":"bot says hi","user":{"login":"dependabot[bot]","type":"Bot"}}\n{"id":13,"body":"Why not the default export?","created_at":"2026-11-02T08:00:00Z","user":{"login":"lead","type":"User"}}\n' ;;
+  esac ;;
+  *) exit 1 ;;
+esac
+GH
+chmod +x "$work/glab2/gh"
+out="$(PATH="$work/glab2:$PATH" FACTORY_DATA_DIR="$rdata" FACTORY_MR_URL=https://github.com/o/p/pull/9 bash scripts/factory/retro.sh close demo 2>&1)" || fail "retro close github" "$out"
+grep -q '^- \[ \] @lead lib/port.js:12: Check the port range (note 11)' "$saved" && grep -q '^- \[ \] @lead: Why not the default export? (note 13)' "$saved" \
+  && ! grep -q 'bot says hi' "$saved" && grep -q 'MR: https://github.com/o/p/pull/9, merged on 2026-11-03 by lead' "$saved" \
+  && grep -q 'Reverts of the merged change: [0-9a-f]\{8\} "Revert the change"' "$saved" && grep -q '2 review comment(s) to label' <<<"$out" \
+  && t "retro close on a GitHub PR: review and issue comments with gh, bots left out, reverts of the merge commit (get-port-7)" || fail "retro close github" "$out"$'\n'"$(cat "$saved")"
+rm "$work/glab2/gh"
 git branch -q -D revert-probe
 rm -f $m/retro.md
 
@@ -1059,7 +1106,8 @@ cp $m/spec.md "$work/spec.keep"; printf '\n## Frozen path\n- src/\n' >> $m/spec.
 out="$(bash scripts/factory/next.sh demo)"; cp "$work/spec.keep" $m/spec.md
 echo "$out" | grep -q '^STEP: blocked' && echo "$out" | grep -q 'must be exactly "## Frozen paths"' \
   && t "next.sh blocks a misspelled '## Frozen paths' heading (D88)" || fail "frozen heading" "$out"
-grep -q 'Tokens (usage.tsv, D85) | 1 runs' "$work/metrics.md" && grep -q 'workers 0.1M' "$work/metrics.md" && t "metrics: tokens from usage.tsv, workers summed by agent" || fail "metrics tokens" "$(grep -i token "$work/metrics.md")"
+grep -q 'Tokens (usage.tsv, D85) | 1 runs' "$work/metrics.md" && grep -q 'workers 0.1M' "$work/metrics.md" \
+  && grep -qF '0.2M in (43% cached)' "$work/metrics.md" && t "metrics: tokens from usage.tsv, workers summed by agent, the cached share of all input (get-port-7: 640%)" || fail "metrics tokens" "$(grep -i token "$work/metrics.md")"
 mj="$(bash scripts/factory/metrics.sh demo --json)"
 node -e 'const j=JSON.parse(process.argv[1]);process.exit(/^\d+\.\d+\.\d+/.test(j.factory||"")&&"models" in j?0:1)' "$mj" \
   && t "metrics --json records the factory version and models the mission ran with" || fail "metrics version" "$mj"
@@ -1354,6 +1402,12 @@ echo dirty >> src/tools/a.js
 if bash scripts/factory/doctor.sh --quick >"$work/pre.log" 2>&1; then fail "dirty tree must fail pre-flight"; fi
 t "pre-flight fails on a dirty tree"
 git checkout -q -- src/tools/a.js
+# get-port-7: another mission's untracked files passed "clean tree outside
+# .scratch/", then Pi's worktree admission refused the build wave.
+mkdir -p .scratch/old; echo notes > .scratch/old/notes.md
+if bash scripts/factory/doctor.sh --quick >"$work/pre.log" 2>&1; then fail "an untracked file must fail pre-flight"; fi
+grep -q "worktrees refuse .*\.scratch/old/" "$work/pre.log" && t "pre-flight fails on an untracked file anywhere, as Pi's worktrees do, and names it (get-port-7)" || fail "untracked preflight" "$(cat "$work/pre.log")"
+rm -rf .scratch/old
 printf '.scratch/\n' >> .gitignore
 if bash scripts/factory/doctor.sh --quick >"$work/pre.log" 2>&1; then fail "ignored .scratch must fail pre-flight"; fi
 grep -q "git-ignored" "$work/pre.log" && t "pre-flight fails when .scratch/ is git-ignored" || fail "gitignore check" "$(cat "$work/pre.log")"
@@ -1514,9 +1568,12 @@ git ls-remote --heads "$work/origin.git" "$cur" | grep -q . && grep -qx 'product
 ls "$work/data"/*/demo-*.tar.gz >/dev/null 2>&1 && tar -tzf "$work/data"/*/demo-*.tar.gz | grep -q 'demo/metrics.json' \
   && t "mr.sh keeps the mission's data: metrics next to its runs, one export in the machine's data folder (D103)" || fail "mission data" "$(ls -R "$work/data" 2>&1; cat "$work/mr.log")"
 # eslint-10: on a GitHub remote mr.sh printed GitLab token tips and a paste step.
+# get-port-7: with origin and an archived upstream, gh picked upstream.
 git remote set-url origin https://github.com/o/p.git; git remote set-url --push origin "$work/origin.git"; rm -f $m/mr.url
+git remote add upstream https://github.com/archived/p.git
 cat > "$work/bin/gh" <<'GH'
 #!/usr/bin/env bash
+[ "$1 $2" = "auth status" ] || printf '%s\n' "$*" >> "$GH_LOG.calls"
 case "$1 $2" in
   "auth status") exit 0 ;;
   "pr list") ;;
@@ -1530,13 +1587,14 @@ git branch -D production >/dev/null
 grep -qx -- '--body-file' "$work/gh.log" && grep -qx -- '--draft' "$work/gh.log" && grep -qx 'test(demo): characterize the hello tools' "$work/gh.log" \
   && grep -q '^## Summary' "$work/gh.log.body" && grep -q '^Merge with \*\*squash\*\*:' "$work/gh.log.body" && [ ! -e "$work/glab2.log" ] \
   && grep -q 'pull/9' $m/mr.url && ! grep -qi 'gitlab' "$work/mr.log" \
-  && t "mr.sh on a GitHub remote opens the PR with gh --body-file, no GitLab steps" || fail "mr gh create" "$(cat "$work/mr.log" "$work/gh.log")"
+  && [ "$(grep -c . "$work/gh.log.calls")" -ge 3 ] && ! grep -v -- '--repo o/p' "$work/gh.log.calls" | grep -q . \
+  && t "mr.sh on a GitHub remote opens the PR with gh --body-file, no GitLab steps, every gh call on origin's repository (get-port-7)" || fail "mr gh create" "$(cat "$work/mr.log" "$work/gh.log")"
 printf '#!/usr/bin/env bash\nexit 1\n' > "$work/bin/gh"   # installed, not logged in
 out="$(PATH="$work/bin:$PATH" FACTORY_DATA_DIR="$work/data" FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo 2>&1)" \
-  && grep -q 'gh pr create --base production' <<<"$out" && ! grep -qi 'gitlab' <<<"$out" \
+  && grep -q 'gh pr create --repo o/p --base production' <<<"$out" && ! grep -qi 'gitlab' <<<"$out" \
   && t "mr.sh on GitHub without a logged-in gh prints the GitHub steps" || fail "mr gh steps" "$out"
 rm "$work/bin/gh"
-git remote remove origin; rm -f $m/pr.md $m/mr.url
+git remote remove upstream; git remote remove origin; rm -f $m/pr.md $m/mr.url
 
 # D96: new tests must disagree with the code before the change, as the intent says.
 echo "Test on base (D96)"
@@ -2264,6 +2322,11 @@ for f in .factory/commands.env .factory/VERSION .factory/ci/factory.gitlab-ci.ym
   grep -q "$f" <<<"$changed" || fail "onboard: $f missing" "$changed"
 done
 t "onboard writes only the project's own files ($(wc -w <<<"$changed" | tr -d ' ') files)"
+# get-port-7: committed by hand on the base branch as "record pi-factory <version>".
+v="$(cat "$root/.factory/VERSION")"
+grep -qxF "  git switch -c chore/pi-factory-$v" "$work/onboard.log" && grep -qxF "  git commit -m \"chore(factory): onboard pi-factory $v\"" "$work/onboard.log" \
+  && grep -q '^  git add -- .*\.factory' "$work/onboard.log" && ! grep -q '<version>' "$work/onboard.log" \
+  && t "onboard prints the commit to make: its version, on a branch of its own (get-port-7)" || fail "onboard commit steps" "$(tail -15 "$work/onboard.log")"
 bash "$root/scripts/factory/onboard.sh" --no-setup >"$work/onboard2.log" 2>&1 || fail "onboard again" "$(cat "$work/onboard2.log")"
 [ "$(grep -cx 'instrument/results/' .gitignore)" = 1 ] && grep -qx coverage .gitignore \
   && t "onboard twice: a .gitignore without a final newline keeps its last line, nothing appended twice" || fail "gitignore append" "$(cat -A .gitignore)"

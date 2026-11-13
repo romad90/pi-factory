@@ -81,8 +81,10 @@ fi
 usage_line="-"
 if [ -s "$dir/usage.tsv" ]; then      # D85: tokens per run, from pi-subagents' metadata
   # No cached token at all is a gateway that doesn't report it, not a 0% hit
-  # rate (a gateway that caches may still return no cache fields).
-  usage_line="$(awk -F'\t' 'NR > 1 { r++; i += $5; o += $6; c += $7; t += $10; if ($3 ~ /worker/) w += $5 + $6 }
+  # rate (a gateway that caches may still return no cache fields). Input
+  # ($5) leaves out cache reads and writes ($7, $8): the tokens sent are
+  # their sum, and the cached share is of that sum (get-port-7 printed 640%).
+  usage_line="$(awk -F'\t' 'NR > 1 { r++; i += $5 + $7 + $8; o += $6; c += $7; t += $10; if ($3 ~ /worker/) w += $5 + $6 }
     END { cached = c ? sprintf("%.0f%% cached", 100 * c / i) : "cache not reported"
           printf "%d runs · %.1fM in (%s), %.1fk out · %d turns · workers %.1fM", r, i / 1e6, cached, o / 1e3, t, w / 1e6 }' "$dir/usage.tsv")"
 fi

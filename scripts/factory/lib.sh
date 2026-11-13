@@ -282,19 +282,47 @@ ticket_enabler_reason() {
     in_e && NF             { print; exit }' "$1"
 }
 
-# Ticket numbers listed under "## Blocked by". Accepts "01", "#1"-style
-# two-digit refs or "01-slug". Adjust if your to-tickets output differs.
+# Ticket numbers listed under "## Blocked by", two digits ("01"). A reference
+# is "01", "#1" or "01-slug": a line made only of references ("01, 02"), or one
+# at the start of a list item ("- 02: needs the parser"). A number inside prose
+# is not one: get-port-7 read "package.json line 35" as ticket 35. A section
+# whose first word is None has no blockers.
 ticket_blockers() {
   awk '
+    function ref(w) {
+      sub(/[.:;,]+$/, "", w)
+      if (w !~ /^#?[0-9][0-9]?(-[A-Za-z0-9._-]+)?$/) return ""
+      sub(/^#/, "", w); sub(/-.*/, "", w); return sprintf("%02d", w + 0)
+    }
     /^## Blocked by/ { in_b = 1; next }
     in_b && /^## /   { exit }
-    in_b {
-      while (match($0, /[0-9][0-9]/)) {
-        print substr($0, RSTART, RLENGTH)
-        $0 = substr($0, RSTART + RLENGTH)
+    in_b && NF && !seen++ && tolower($1) ~ /^none/ { exit }
+    in_b && NF {
+      line = $0; gsub(/[`*]/, "", line)
+      sub(/^[ \t]*([-+*]|[0-9]+[.)])[ \t]+/, "", line)
+      n = split(line, w, /[ \t,]+/); refs = ""; only = 1; first = ""
+      for (i = 1; i <= n; i++) {
+        if (w[i] == "" || w[i] == "and") continue
+        r = ref(w[i]); if (first == "") first = (r == "" ? "-" : r)
+        if (r == "") only = 0; else refs = refs " " r
       }
+      if (only) { m = split(refs, rs, " "); for (i = 1; i <= m; i++) print rs[i] }
+      else if (first != "-") print first
     }' "$1" | sort -u
 }
+
+# owner/name of origin when it is on github.com, else nothing. gh guesses the
+# repository from the remotes: with origin and an archived upstream it opened
+# the PR on upstream (get-port-7), so every gh call passes --repo with this.
+github_repo() {
+  local u; u="$(git config --get remote.origin.url || true)"
+  [[ "$u" =~ ^(https?://([^@/]+@)?|(ssh://)?git@)github\.com[:/]([^/]+/[^/]+)$ ]] || return 0
+  printf '%s\n' "${BASH_REMATCH[4]%.git}"
+}
+
+# Held while integrate.sh runs, outside the tree (a checkpoint would commit
+# it): "<pid> <ticket>". next.sh waits for it to go (get-port-7).
+integrate_lock() { printf '%s/pi-factory/integrating-%s' "$(git rev-parse --path-format=absolute --git-common-dir)" "$1"; }
 
 # The repository's name, the same from every worktree of it: the folder that
 # holds the shared git folder. A worktree's own folder name (api-next, say)
@@ -1040,18 +1068,21 @@ ticket_marker() {
 }
 
 # Fills globals: T_PASSED (assoc num→1), T_BUILD, T_HAND, T_REVIEW, T_ESCALATE,
-# T_BLOCKED (arrays of ticket names), T_ROUND (assoc name→last verdict round).
+# T_BLOCKED (arrays of ticket names), T_ROUND (assoc name→last verdict round),
+# T_MISSING (assoc name→blockers it names that no ticket file has).
 # T_HAND: tickets a person builds (state/<ticket>.by-hand, B3), never a worker.
 compute_ticket_state() {
   local feature="$1" dir t name num v r n marker vc b ready
   dir="$(mission_dir "$feature")"
-  declare -gA T_PASSED=() T_ROUND=()
+  declare -gA T_PASSED=() T_ROUND=() T_MISSING=()
+  local -A exists=()
   T_BUILD=(); T_HAND=(); T_REVIEW=(); T_ESCALATE=(); T_BLOCKED=()
   shopt -s nullglob
   for t in "$dir"/issues/*.md; do
     name="$(ticket_name "$t")"; num="$(ticket_num "$t")"; v="$dir/verdicts/${name}-code.md"
     r="$(verdict_field "$v" Result)"; n="$(verdict_round "$v")"; T_ROUND[$name]="${n:-0}"
     [ "$r" = "PASS" ] && T_PASSED[$num]=1
+    exists[$num]=1
   done
   for t in "$dir"/issues/*.md; do
     name="$(ticket_name "$t")"; num="$(ticket_num "$t")"
@@ -1065,6 +1096,7 @@ compute_ticket_state() {
     ready=1
     for b in $(ticket_blockers "$t"); do
       [ "$b" = "$num" ] && continue
+      [ -n "${exists[$b]:-}" ] || T_MISSING[$name]+="${T_MISSING[$name]:+, }$b"
       [ -n "${T_PASSED[$b]:-}" ] || ready=0
     done
     if [ "$ready" -eq 0 ]; then T_BLOCKED+=("$name")

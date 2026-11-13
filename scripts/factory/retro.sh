@@ -4,7 +4,7 @@
 # Usage: scripts/factory/retro.sh pack <mission>   the raw record, as Markdown, on stdout
 #        scripts/factory/retro.sh save <mission>   copy .scratch/<mission>/retro.md to this
 #                                                  machine's data folder, outside every repository
-#        scripts/factory/retro.sh close <mission>  after the merge: the MR's review comments as
+#        scripts/factory/retro.sh close <mission>  after the merge (GitLab MR or GitHub PR): its review comments as
 #                                                  candidate misses to label, reverts of the merged
 #                                                  change, escaped defects (P23); run it again to update
 #
@@ -98,11 +98,29 @@ case "$cmd" in
     [ -s "$saved" ] || die "no saved retro at $saved: retro.sh save $feature first"
     url="${FACTORY_MR_URL:-$(head -1 "$dir/mr.url" 2>/dev/null || true)}"
     [ -n "$url" ] || die "no MR for $feature: $dir/mr.url is missing (mr.sh writes it; or set FACTORY_MR_URL)"
+    tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+    gre='^https://github\.com/([^/]+/[^/]+)/pull/([0-9]+)'
     re='^https?://([^/]+)/(.+)/-/merge_requests/([0-9]+)'
-    [[ "$url" =~ $re ]] || die "not a GitLab MR URL: $url"
+    if [[ "$url" =~ $gre ]]; then
+      # GitHub (get-port-7): the PR, its review and issue comments, read with gh
+      # on the PR's own repository, in the shapes retro-close.mjs reads from GitLab.
+      repo="${BASH_REMATCH[1]}"; num="${BASH_REMATCH[2]}"
+      command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1 || die "no way to read the PR: log in with gh (gh auth login)"
+      gh api "repos/$repo/pulls/$num" > "$tmp/pr.json" 2>/dev/null || die "could not read $url with gh"
+      { gh api --paginate "repos/$repo/pulls/$num/comments" --jq '.[]' && gh api --paginate "repos/$repo/issues/$num/comments" --jq '.[]'; } > "$tmp/comments.ndjson" 2>/dev/null \
+        || die "could not read the comments of $url with gh"
+      node -e '
+        const fs = require("fs"), [dir] = process.argv.slice(1), p = JSON.parse(fs.readFileSync(dir + "/pr.json", "utf8"));
+        const who = (u) => u ? { username: u.login, bot: u.type === "Bot" } : null;
+        fs.writeFileSync(dir + "/mr.json", JSON.stringify({ web_url: p.html_url, state: p.merged_at ? "merged" : p.state, merged_at: p.merged_at,
+          merged_by: who(p.merged_by), author: who(p.user), merge_commit_sha: p.merge_commit_sha, sha: p.head && p.head.sha }));
+        const notes = fs.readFileSync(dir + "/comments.ndjson", "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)).map((c) => ({
+          id: c.id, body: c.body, created_at: c.created_at, system: false, author: who(c.user),
+          position: c.path ? { new_path: c.path, new_line: c.line || c.original_line } : undefined }));
+        fs.writeFileSync(dir + "/notes.json", JSON.stringify(notes));' "$tmp"
+    elif [[ "$url" =~ $re ]]; then
     host="${BASH_REMATCH[1]}"; path="${BASH_REMATCH[2]}"; iid="${BASH_REMATCH[3]}"
     enc="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "$path")"
-    tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
     ep="projects/$enc/merge_requests/$iid"
     if command -v glab >/dev/null 2>&1 && glab auth status >/dev/null 2>&1; then
       glab api "$ep" > "$tmp/mr.json" 2>/dev/null || true
@@ -118,6 +136,8 @@ case "$cmd" in
           const r = await fetch(base + p, { headers: h }); if (!r.ok) { console.error(`GitLab ${r.status}`); process.exit(1); }
           require("fs").writeFileSync(out + "/" + f, await r.text()); } })().catch((e) => { console.error(e.message); process.exit(1); });' \
         "${api%/}/$ep" "$tmp" || die "could not read $url from the GitLab API"
+    fi
+    else die "not a GitLab MR or GitHub PR URL: $url"
     fi
     [ -s "$tmp/mr.json" ] || die "could not read $url"
     # Reverts: commits whose message says they revert the merged change (merge or squash commit).
