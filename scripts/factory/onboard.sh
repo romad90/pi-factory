@@ -122,10 +122,21 @@ else
 the commands that passed into .factory/commands.env; run it again after each
 decision),"
 fi
+# get-port-7: the person committed this by hand on the base branch, as
+# "chore(factory): record pi-factory <version>", and the local base branch
+# no longer matched its remote once the mission's PR was squash-merged.
+# The exact commands: the version filled in, on a branch of its own.
+files="$(git status --short -- . | cut -c4- | while IFS= read -r f; do printf ' %q' "$f"; done)"
+if [ -z "$files" ]; then commit_steps="Nothing to commit: the project already records pi-factory $version."
+else commit_steps="Review, then commit on a branch of its own, never on the base branch, and open its MR (D48):
+$(git status --short -- . | sed 's/^/  /')
+  git switch -c chore/pi-factory-$version
+  git add --$files
+  git commit -m \"chore(factory): onboard pi-factory $version\""
+fi
 cat <<MSG
 
-Nothing committed$( [ "$migrate" -eq 1 ] && printf ' (the removals of the copied files are staged)'). Review, commit on its own branch, MR (D48):
-$(git status --short -- . | sed 's/^/  /')
+$( [ -z "$files" ] || printf 'Nothing committed%s. ' "$( [ "$migrate" -eq 1 ] && printf ' (the removals of the copied files are staged)')")$commit_steps
 Then: ${setup_next:+$setup_next }the CI variable FACTORY_PACKAGE_GIT
 (the URL your CI may fetch pi-factory from, no default), the CI include
   include: [{ local: ${prefix:+$prefix/}.factory/ci/factory.gitlab-ci.yml }]

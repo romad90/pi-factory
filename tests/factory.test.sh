@@ -2322,6 +2322,11 @@ for f in .factory/commands.env .factory/VERSION .factory/ci/factory.gitlab-ci.ym
   grep -q "$f" <<<"$changed" || fail "onboard: $f missing" "$changed"
 done
 t "onboard writes only the project's own files ($(wc -w <<<"$changed" | tr -d ' ') files)"
+# get-port-7: committed by hand on the base branch as "record pi-factory <version>".
+v="$(cat "$root/.factory/VERSION")"
+grep -qxF "  git switch -c chore/pi-factory-$v" "$work/onboard.log" && grep -qxF "  git commit -m \"chore(factory): onboard pi-factory $v\"" "$work/onboard.log" \
+  && grep -q '^  git add -- .*\.factory' "$work/onboard.log" && ! grep -q '<version>' "$work/onboard.log" \
+  && t "onboard prints the commit to make: its version, on a branch of its own (get-port-7)" || fail "onboard commit steps" "$(tail -15 "$work/onboard.log")"
 bash "$root/scripts/factory/onboard.sh" --no-setup >"$work/onboard2.log" 2>&1 || fail "onboard again" "$(cat "$work/onboard2.log")"
 [ "$(grep -cx 'instrument/results/' .gitignore)" = 1 ] && grep -qx coverage .gitignore \
   && t "onboard twice: a .gitignore without a final newline keeps its last line, nothing appended twice" || fail "gitignore append" "$(cat -A .gitignore)"
