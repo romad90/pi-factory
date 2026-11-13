@@ -690,6 +690,10 @@ grep -q 'left out' "$work/ck.log" && grep -q 'review-01-r2' "$work/ck.log" && t 
 rm -rf "$cp_dir" "$m/tmp/stray" "$m/tmp/cache"
 grep -q 'tmp/copies/' <<<"$(bash scripts/factory/brief.sh reviewer demo 01-hello HEAD)" && grep -qxF '.scratch/*/tmp/copies/' .gitignore \
   && t "judges are told where a copy of the project goes, and the install ignores it" || fail "copies place" "$(grep scratch .gitignore)"
+# get-port-7: pr.md, retro.md and mr.url stayed untracked after the PR, and
+# the next mission's worktrees refused the tree (D138).
+[ "$(git check-ignore --no-index $m/pr.md $m/retro.md $m/mr.url | grep -c .)" = 3 ] && ! git check-ignore -q --no-index $m/spec.md \
+  && t "the install ignores a mission's pr.md, retro.md and mr.url, not its state (D138)" || fail "mission leftovers ignored" "$(grep scratch .gitignore)"
 
 # Ticket 02 asks a decision.
 bash scripts/factory/human.sh ask demo 02-count --stdin >/dev/null <<'Q'

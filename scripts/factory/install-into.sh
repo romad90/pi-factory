@@ -113,7 +113,8 @@ touch "$dst/.gitignore"
 # A last line without its newline would swallow the first appended line
 # ("coverageinstrument/results/"), breaking both, and the next run appends again.
 [ -n "$(tail -c1 "$dst/.gitignore")" ] && printf '\n' >> "$dst/.gitignore"
-for line in "instrument/results/" ".env.factory" ".pi-subagents/" ".scratch/*/tmp/copies/"; do
+# D138: a mission's PR body, private retro and MR link stay out of git.
+for line in "instrument/results/" ".env.factory" ".pi-subagents/" ".scratch/*/tmp/copies/" ".scratch/*/pr.md" ".scratch/*/retro.md" ".scratch/*/mr.url"; do
   grep -qxF "$line" "$dst/.gitignore" || { printf '%s\n' "$line" >> "$dst/.gitignore"; note ".gitignore += $line"; }
 done
 
