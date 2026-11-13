@@ -1402,9 +1402,9 @@ echo dirty >> src/tools/a.js
 if bash scripts/factory/doctor.sh --quick >"$work/pre.log" 2>&1; then fail "dirty tree must fail pre-flight"; fi
 t "pre-flight fails on a dirty tree"
 git checkout -q -- src/tools/a.js
-# get-port-7: another mission's untracked pr.md passed "clean tree outside
+# get-port-7: another mission's untracked files passed "clean tree outside
 # .scratch/", then Pi's worktree admission refused the build wave.
-mkdir -p .scratch/old; echo body > .scratch/old/pr.md
+mkdir -p .scratch/old; echo notes > .scratch/old/notes.md
 if bash scripts/factory/doctor.sh --quick >"$work/pre.log" 2>&1; then fail "an untracked file must fail pre-flight"; fi
 grep -q "worktrees refuse .*\.scratch/old/" "$work/pre.log" && t "pre-flight fails on an untracked file anywhere, as Pi's worktrees do, and names it (get-port-7)" || fail "untracked preflight" "$(cat "$work/pre.log")"
 rm -rf .scratch/old
