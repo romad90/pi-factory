@@ -822,6 +822,35 @@ deps_commits() {                               # <feature> [<base>]: "<hash>\t<f
   done
 }
 
+# B3: the commits a person recorded as a ticket's delivery (human.sh deliver).
+delivered_commits() {                          # <feature> <ticket>
+  local f; f="$(mission_dir "$1")/decisions.tsv"
+  [ -f "$f" ] || return 0
+  awk -F'\t' -v t="$2" 'NR > 1 && $3 == "deliver" && $2 == t { print $5 }' "$f" \
+    | sed -n 's/^commit \([0-9a-f]\{7,40\}\):.*/\1/p' | while read -r c; do git rev-parse -q --verify "$c^{commit}" 2>/dev/null || true; done
+}
+
+# B3: paths the patch guard reserves for people (D51): the factory, CI and
+# hooks. A ticket that changes only these is a person's, not a worker's.
+PEOPLE_PATHS_RE='^(\.factory/|scripts/factory/|\.pi/|\.github/|\.gitlab-ci\.yml$|\.husky/|\.pre-commit-config\.yaml$|lefthook\.yml$|\.git/)'
+
+# The files a ticket names in backticks (as G2 reads them, D125), outside its
+# Covers and Blocked by sections, once each.
+ticket_files() {                               # <ticket file>
+  awk '/^## (Covers|Blocked by)/ { skip = 1; next } /^## / { skip = 0 } !skip' "$1" \
+    | grep -oE '`([A-Za-z0-9_.][A-Za-z0-9_./-]*/[A-Za-z0-9_.-]+\.[A-Za-z0-9]+|\.gitlab-ci\.yml|lefthook\.yml|\.pre-commit-config\.yaml)`' \
+    | tr -d '`' | sed 's#^\./##' | sort -u || true
+}
+
+# Its files, comma-separated, when a ticket names some and every one is
+# reserved for people; fails otherwise.
+ticket_for_people() {                          # <ticket file>
+  local files f; files="$(ticket_files "$1")"
+  [ -n "$files" ] || return 1
+  while IFS= read -r f; do [[ "$f" =~ $PEOPLE_PATHS_RE ]] || return 1; done <<<"$files"
+  paste -sd, - <<<"$files" | sed 's/,/, /g'
+}
+
 # B2: the commits that built a ticket up to <commit>, oldest first: its
 # integrations (integrate.sh's "<type>(<feature>): <ticket>" with the
 # Factory-Script trailer) and the dependency commits a person recorded (D124).
@@ -829,7 +858,7 @@ ticket_commits() {                             # <feature> <ticket> <commit>
   local mb own c; mb="$(mission_base "$1")"
   own="$( { git log --format='%H%x09%s' --grep='^Factory-Script: integrate$' "$mb..$3" -- 2>/dev/null \
               | awk -F'\t' -v t="): $2" 'length($2) >= length(t) && substr($2, length($2) - length(t) + 1) == t { print $1 }'
-            deps_commits "$1" "$mb" | cut -f1 | while read -r c; do
+            { deps_commits "$1" "$mb" | cut -f1; delivered_commits "$1" "$2"; } | while read -r c; do
               git merge-base --is-ancestor "$c" "$3" 2>/dev/null && git rev-parse "$c"; done; } | sort -u)"
   [ -n "$own" ] || return 0
   git rev-list --reverse "$mb..$3" | grep -Fx -f <(printf '%s\n' "$own") || true
@@ -1034,15 +1063,16 @@ ticket_marker() {
   if [ -f "$f" ]; then cat "$f"; fi
 }
 
-# Fills globals: T_PASSED (assoc num→1), T_BUILD, T_REVIEW, T_ESCALATE,
+# Fills globals: T_PASSED (assoc num→1), T_BUILD, T_HAND, T_REVIEW, T_ESCALATE,
 # T_BLOCKED (arrays of ticket names), T_ROUND (assoc name→last verdict round),
 # T_MISSING (assoc name→blockers it names that no ticket file has).
+# T_HAND: tickets a person builds (state/<ticket>.by-hand, B3), never a worker.
 compute_ticket_state() {
   local feature="$1" dir t name num v r n marker vc b ready
   dir="$(mission_dir "$feature")"
   declare -gA T_PASSED=() T_ROUND=() T_MISSING=()
   local -A exists=()
-  T_BUILD=(); T_REVIEW=(); T_ESCALATE=(); T_BLOCKED=()
+  T_BUILD=(); T_HAND=(); T_REVIEW=(); T_ESCALATE=(); T_BLOCKED=()
   shopt -s nullglob
   for t in "$dir"/issues/*.md; do
     name="$(ticket_name "$t")"; num="$(ticket_num "$t")"; v="$dir/verdicts/${name}-code.md"
@@ -1065,7 +1095,9 @@ compute_ticket_state() {
       [ -n "${exists[$b]:-}" ] || T_MISSING[$name]+="${T_MISSING[$name]:+, }$b"
       [ -n "${T_PASSED[$b]:-}" ] || ready=0
     done
-    if [ "$ready" -eq 1 ]; then T_BUILD+=("$name"); else T_BLOCKED+=("$name"); fi
+    if [ "$ready" -eq 0 ]; then T_BLOCKED+=("$name")
+    elif [ -f "$dir/state/$name.by-hand" ]; then T_HAND+=("$name")
+    else T_BUILD+=("$name"); fi
   done
 }
 

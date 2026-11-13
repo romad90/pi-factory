@@ -8,7 +8,7 @@
 #   factory version                               the installed factory and what this project expects
 #   factory setup [--write]                       find and rehearse this project's commands (D102)
 #   factory report [--full]                       one redacted text with what a diagnosis needs (D102)
-#   factory tokens <mission> [--budget N|--shape] request sizes per run and what fills them (P20)
+#   factory tokens <mission> [--budget N|--run-budget role=N,...|--shape] request sizes per run, what fills them, input per run against its role's budget (P20)
 #   factory frictions <mission> [--json]          failed, repeated and refused tool calls, by cause (P23)
 #   factory measure <job>                         a job's measurements: shape, tests, churn, mutation, risks (D105)
 #   factory verify <mission>                      run the done condition's commands, no model (D106)

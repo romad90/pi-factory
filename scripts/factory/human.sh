@@ -19,12 +19,13 @@
 #   human.sh amend             <feature> <change...>
 #   human.sh accept-unverified <feature> <VAL-…,VAL-…|ALL> <why...>
 #   human.sh deps              <feature> [<commit>] <what you changed...>   D124: record a dependency change made by hand (or --stdin)
+#   human.sh deliver           <feature> <ticket> [<commit>] <what you did...>   B3: record a person's commit as a ticket's integration (or --stdin)
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib.sh
 . "$here/lib.sh"
 
-cmd="${1:?usage: human.sh <job|approve|ask|decide|amend|accept-unverified|deps> <feature> ...}"
+cmd="${1:?usage: human.sh <job|approve|ask|decide|amend|accept-unverified|deps|deliver> <feature> ...}"
 text_arg_early() { if [ "${1:-}" = --stdin ]; then tr '\n' ' ' | sed 's/  */ /g; s/^ //; s/ $//'; else printf '%s' "$*"; fi; }
 feature="${2:?usage: human.sh $cmd <feature> ...}"
 shift 2
@@ -96,8 +97,22 @@ case "$cmd" in
       rm -f "$dir/state/tickets.pending"
       shopt -s nullglob; list=("$dir"/issues/*.md)
       decision_log "$feature" - approve-tickets "Approve the tickets ($task)" "approved: ${#list[@]} ticket(s)" tickets
+      # B3: a ticket that changes only paths the patch guard reserves for people
+      # (CI, hooks, the factory) would go to a worker bound to be refused
+      # (deps-node-22 ticket 03). It goes to the person instead.
+      hand=()
+      for t in "${list[@]}"; do
+        name="$(ticket_name "$t")"
+        [ ! -f "$dir/state/$name.integrated" ] && files="$(ticket_for_people "$t")" || continue
+        mkdir -p "$dir/state"
+        printf '**Files:** %s\n**Why:** only paths reserved for people (the patch guard refuses them to workers)\n' "$files" > "$dir/state/$name.by-hand"
+        hand+=("$name: $files")
+      done
       bash "$here/checkpoint.sh" "$feature" >/dev/null
       echo "Tickets approved (${#list[@]} in issues/). Coverage (G2) runs next."
+      for h in ${hand[@]+"${hand[@]}"}; do
+        echo "${h%%: *} changes only paths reserved for people (${h#*: }): no worker builds it. Make the change, commit it, then /factory-deliver $feature ${h%%: *} \"<what you did>\"."
+      done
       exit 0
     fi
     if [ "${1:-}" = conclusion ]; then
@@ -227,6 +242,38 @@ case "$cmd" in
        && [ -z "$(git ls-files package-lock.json npm-shrinkwrap.json yarn.lock pnpm-lock.yaml)" ]; then
       echo "Note: package.json changed and no lockfile is tracked.$(grep -qs '^package-lock *= *false' .npmrc && echo ' .npmrc has package-lock=false, so npm writes none.')"
     fi
+    ;;
+
+  deliver)
+    # B3: a ticket a person built (a path reserved for people, or by choice).
+    # Its commit becomes the ticket's integration, as integrate.sh records one,
+    # so the reviewer judges it; the ticket stays the person's in later rounds.
+    usage_d="usage: human.sh deliver <feature> <ticket> [<commit>] <what you did...> (or --stdin)"
+    tk="${1:?$usage_d}"; shift
+    tf="$dir/issues/$tk.md"
+    if [ ! -f "$tf" ]; then
+      shopt -s nullglob; m=("$dir/issues/$tk"-*.md); shopt -u nullglob
+      [ ${#m[@]} -eq 1 ] || die "no ticket $tk in $dir/issues"
+      tf="${m[0]}"
+    fi
+    tk="$(ticket_name "$tf")"
+    commit=HEAD
+    if [ $# -gt 1 ] && git cat-file -e "$1^{commit}" 2>/dev/null; then commit="$1"; shift; fi
+    what="$(text_arg "$@")"
+    [ -n "$what" ] || die "$usage_d"
+    c="$(git rev-parse --short "$commit")"
+    named="$(ticket_files "$tf")"
+    [ -n "$named" ] || die "$tk names no file in backticks, so no commit can be matched to it: name its files in the ticket, then run this again"
+    hit="$(git show --name-only --relative --format= "$commit" | grep -Fx -f <(printf '%s\n' "$named") | paste -sd, - | sed 's/,/, /g' || true)"
+    [ -n "$hit" ] || die "commit $c touches none of the files $tk names ($(paste -sd' ' <<<"$named")): commit the ticket's change, then run this (or name that commit)"
+    mkdir -p "$dir/state"
+    git rev-parse "$commit" > "$dir/state/$tk.integrated"
+    [ -f "$dir/state/$tk.by-hand" ] || printf '**Files:** %s\n**Why:** delivered by hand (human.sh deliver)\n' "$hit" > "$dir/state/$tk.by-hand"
+    decision_log "$feature" "$tk" deliver "Ticket delivered by hand (B3)" "commit $c: $hit — $what" ticket
+    if [ -f "$q" ] && [ "$(verdict_field "$q" Ticket)" = "$tk" ]; then
+      if git ls-files --error-unmatch -- "$q" >/dev/null 2>&1; then git rm -q -- "$q"; else rm -f -- "$q"; fi
+    fi
+    echo "Recorded: $tk delivered by hand in $c ($hit). It goes to review on that commit; if the review fails, it comes back to you, never to a worker."
     ;;
 
   *) die "unknown command: $cmd" ;;

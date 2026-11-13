@@ -6,7 +6,7 @@
 #   measure architect strategy-critic approve-strategy* mission job-done*   (a job, P22)
 #   paused* grill* context-sync investigate approve-conclusion* handoff* report*
 #   contract approve* design approve-design* decide* tickets approve-tickets* coverage*
-#   setup* build review escalate* blocked* validate behavior-fix
+#   setup* build hand* review escalate* blocked* validate behavior-fix
 #   behavior-stale health health-fix steward unverified* verify verify-failed* pr*
 #
 # Usage: scripts/factory/next.sh <feature>
@@ -24,7 +24,7 @@ UNRECORDED="The approval line has no /factory-approve record in decisions.tsv (w
 STATUS=""
 shopt -s nullglob
 
-HUMAN_STEPS=" paused grill approve-strategy job-done verify-failed approve-conclusion handoff report approve approve-design decide approve-tickets coverage setup escalate blocked unverified pr "
+HUMAN_STEPS=" paused grill approve-strategy job-done verify-failed approve-conclusion handoff report approve approve-design decide approve-tickets coverage setup hand escalate blocked unverified pr "
 
 step() {                                  # <code> <human explanation>
   local code="$1"; shift
@@ -258,6 +258,7 @@ for t in "${tickets[@]}"; do
   in_list "$name" "${T_REVIEW[@]}"   && state="review"
   in_list "$name" "${T_ESCALATE[@]}" && state="ESCALATE"
   in_list "$name" "${T_BLOCKED[@]}"  && state="blocked"
+  in_list "$name" "${T_HAND[@]}"     && state="by hand"
   STATUS+="$(printf '  %-36s %-9s round %s' "$name" "$state" "${T_ROUND[$name]:-0}")"$'\n'
 done
 
@@ -271,7 +272,13 @@ if [ ${#T_BUILD[@]} -gt 0 ]; then
   # The table may show ESCALATE or blocked tickets: they wait for the human
   # after this step, they don't stop it.
   [ ${#T_ESCALATE[@]} -gt 0 ] && extra+="; ${T_ESCALATE[*]} wait for the human afterwards, run this step now"
+  [ ${#T_HAND[@]} -gt 0 ] && extra+="; ${T_HAND[*]} wait for a person's commit (by hand), run this step now"
   step build "scripts/factory/workflow.sh build-wave $feature (${#T_BUILD[@]} ticket(s)$extra), then integrate.sh per patch"
+fi
+# B3: a ticket only a person may change (CI, hooks, the factory): never a worker.
+if [ ${#T_HAND[@]} -gt 0 ]; then
+  cmds="$(for n in "${T_HAND[@]}"; do printf '/factory-deliver %s %s "<what you did>"; ' "$feature" "$n"; done)"
+  step hand "human: ${T_HAND[*]} change(s) only paths reserved for people ($(for n in "${T_HAND[@]}"; do sed -n 's/^\*\*Files:\*\* //p' "$dir/state/$n.by-hand"; done | paste -sd';' - | sed 's/;/; /g')). Make the change, commit it, then ${cmds%; }."
 fi
 if [ ${#T_ESCALATE[@]} -gt 0 ]; then
   step escalate "human: ${T_ESCALATE[*]} failed $FACTORY_ROUND_LIMIT rounds. Usually the contract or spec is wrong: consider 'workflow.sh contract' (amend)."
