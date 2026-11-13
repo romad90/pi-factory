@@ -53,7 +53,7 @@ block() { reasons+=("$1"); }
 # never whitespace, so an empty side stays an empty field).
 touched="$(node "$here/patch-paths.mjs" list "$patch")"
 
-protected="^(${FACTORY_INSTRUMENT_DIR}/|\\.factory/|scripts/factory/|\\.pi/|\\.github/|\\.gitlab-ci\\.yml$|\\.husky/|\\.pre-commit-config\\.yaml$|lefthook\\.yml$|\\.git/)"
+protected="^${FACTORY_INSTRUMENT_DIR}/|$PEOPLE_PATHS_RE"   # the list lives in lib.sh (B3 routes tickets by it)
 check_path() {                          # <path>
   local f="$1"
   [ -n "$f" ] || return 0

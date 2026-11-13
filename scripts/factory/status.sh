@@ -50,6 +50,7 @@ mission_lines() {
   for name in "${T_ESCALATE[@]}"; do st[$name]=escalate; done
   for name in "${T_BLOCKED[@]}"; do st[$name]=blocked; done
   for name in "${T_BUILD[@]}"; do st[$name]=build; done
+  for name in "${T_HAND[@]}"; do st[$name]=hand; done
   for t in "${tickets[@]}"; do
     name="$(ticket_name "$t")"; num="$(ticket_num "$t")"
     state="${st[$name]:-build}"; [ -n "${T_PASSED[$num]:-}" ] && state=pass
