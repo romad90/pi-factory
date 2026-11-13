@@ -575,6 +575,15 @@ grep -q '^feat(demo): 01-hello' <<<"$(git log -1 --skip=1 --format=%s)" && t "in
   && [ "$(git log -1 --skip=0 --format=%an HEAD)" = pi-factory ] \
   && t "factory commits are authored by pi-factory and committed by the human (D100)" || fail "factory identity" "$(git log -3 --format='%an / %cn: %s')"
 expect_step review "integrated ticket waits for review"
+# get-port-7: the lead ran next.sh beside integrate.sh, and next.sh said
+# "build, round 0" before the commit and its marker existed.
+lk="$(bash -c '. scripts/factory/lib.sh; integrate_lock demo')"; mkdir -p "$(dirname "$lk")"
+mv $m/state/01-hello.integrated "$work/m01"; sleep 30 & sp=$!; printf '%s 01-hello\n' "$sp" > "$lk"
+( sleep 2; mv "$work/m01" $m/state/01-hello.integrated; rm -f "$lk"; kill "$sp" 2>/dev/null ) &
+out="$(timeout 20 bash scripts/factory/next.sh demo 2>&1)"; wait
+printf '999999 01-hello\n' > "$lk"; out2="$(timeout 5 bash scripts/factory/next.sh demo 2>&1)"; rm -f "$lk"
+grep -q 'waiting for integrate.sh (01-hello)' <<<"$out" && grep -q '^STEP: review' <<<"$out" && grep -q '^STEP: review' <<<"$out2" \
+  && t "next.sh waits for a running integrate.sh, and ignores a dead one's lock (get-port-7)" || fail "integrate lock" "$out / $out2"
 # Learning loop (E11): a review's verdict counts only once collect.sh has
 # recorded it as a round; the lead skipped it twice and the round counter froze.
 printf '# Verdict: 01-hello\n**Result:** FAIL\n**Commit:** %s\n\n## Issues\n- [blocking] x\n' "$c1" > $m/verdicts/01-hello-code.md

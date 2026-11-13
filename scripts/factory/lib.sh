@@ -320,6 +320,10 @@ github_repo() {
   printf '%s\n' "${BASH_REMATCH[4]%.git}"
 }
 
+# Held while integrate.sh runs, outside the tree (a checkpoint would commit
+# it): "<pid> <ticket>". next.sh waits for it to go (get-port-7).
+integrate_lock() { printf '%s/pi-factory/integrating-%s' "$(git rev-parse --path-format=absolute --git-common-dir)" "$1"; }
+
 # The repository's name, the same from every worktree of it: the folder that
 # holds the shared git folder. A worktree's own folder name (api-next, say)
 # would file a mission's data apart from the repository's other missions.
