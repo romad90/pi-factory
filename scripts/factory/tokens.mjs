@@ -5,7 +5,9 @@
 // per-request or per-window token limit is hit by what accumulates: files
 // read, test and lint logs, subagent reports. This names them.
 //
-// Usage: node tokens.mjs <archive-dir-of-a-mission> [--budget N] [--top N] [--json | --shape]
+// Usage: node tokens.mjs <archive-dir-of-a-mission> [--budget N] [--run-budget role=N,...] [--top N] [--json | --shape]
+//   --run-budget (or FACTORY_RUN_BUDGET): input tokens one run of a role may read
+//   in all its turns (B4); each run reports against its role's budget.
 //   (scripts/factory/archive.sh tokens <mission> collects first, then calls this)
 //
 // Reads each run's run.json and transcript.jsonl (pi-subagents' child
@@ -21,9 +23,12 @@ import { join } from "node:path";
 
 const argv = process.argv.slice(2);
 const opt = (name, dflt) => { const i = argv.indexOf(name); return i >= 0 && argv[i + 1] ? argv[i + 1] : dflt; };
-const dir = argv.find((a, i) => !a.startsWith("--") && !["--budget", "--top"].includes(argv[i - 1]));
+const dir = argv.find((a, i) => !a.startsWith("--") && !["--budget", "--top", "--run-budget"].includes(argv[i - 1]));
 const budget = Number(opt("--budget", process.env.FACTORY_CONTEXT_BUDGET || 0)) || 0;
 const top = Number(opt("--top", 10)) || 10;
+// B4: a budget per role on a run's whole input ("worker-heavy=600000,reviewer=400000").
+const runBudgets = Object.fromEntries(String(opt("--run-budget", process.env.FACTORY_RUN_BUDGET || "")).split(",")
+  .map((x) => x.trim().split("=")).filter(([r, n]) => r && Number(n) > 0).map(([r, n]) => [r.replace(/^factory-/, ""), Number(n)]));
 const asJson = argv.includes("--json");
 if (!dir || !existsSync(dir)) { console.error(`tokens: no archive at ${dir || "(none)"} (run archive.sh collect <mission> first)`); process.exit(2); }
 
@@ -60,7 +65,7 @@ function requestSize(u) {
   return parts || Math.max(0, num(u, "totalTokens", "total_tokens") - num(u, "output", "outputTokens", "output_tokens", "completion_tokens"));
 }
 const est = (s) => Math.ceil(String(s || "").length / 4);
-const k = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
+const k = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
 const readJson = (f) => { try { return JSON.parse(readFileSync(f, "utf8")); } catch { return null; } };
 
 const runs = [];
@@ -109,8 +114,16 @@ for (const name of readdirSync(dir).sort()) {
   const out = (meta.usage && meta.usage.output) || 0;
   const peak = turns.length ? Math.max(...turns) : fixed + toolTokens + out;
   const next = turns.length && since ? lastReq + lastOut + since : 0;
+  // B4: the run's whole input, as the provider billed it (run.json), else the
+  // sum of its requests; and whether any of it came from the cache.
+  const u = meta.usage || {};
+  const input = (num(u, "input") + num(u, "cacheRead") + num(u, "cacheWrite")) || turns.reduce((a, b) => a + b, 0);
+  const role = String(meta.agent || "?").replace(/^factory-/, "");
+  const runBudget = runBudgets[role] || null;
+  const noCache = !!meta.usage && num(u, "input") > 0 && num(u, "cacheRead") === 0;
   runs.push({ run: meta.run || name, agent: meta.agent || "?", model: meta.model || "", ticket: meta.ticket || "",
-    turns: turns.length || (meta.usage && meta.usage.turns) || 0, fixed, peak, next, estimated, error, results, toolTokens });
+    turns: turns.length || (meta.usage && meta.usage.turns) || 0, fixed, peak, next, estimated, error, results, toolTokens,
+    input, role, runBudget, overRunBudget: !!runBudget && input > runBudget, noCache });
 }
 
 if (asJson) { console.log(JSON.stringify({ budget, runs: runs.map(({ results, ...r }) => ({ ...r, largest: results.sort((a, b) => b.tokens - a.tokens).slice(0, top) })) }, null, 2)); process.exit(0); }
@@ -126,6 +139,25 @@ for (const r of runs) {
 }
 console.log("fixed: system prompt and brief, sent with every request. * next: the request after the run's last tool results, the one a size limit refuses.");
 if (runs.some((r) => r.estimated)) console.log("~ estimated (no usage per turn in these transcripts): the last request = fixed + every tool result + the run's output, at 4 characters a token.");
+
+// B4: a run is billed for every request it sends, and each resends the whole
+// conversation: turns times what accumulated, not one large request.
+if (runs.some((r) => r.input)) {
+  const named = Object.keys(runBudgets).length;
+  console.log(`\nInput per run, by role (input + cache read + cache write, every turn; budget: ${named ? "FACTORY_RUN_BUDGET or --run-budget" : "none set, FACTORY_RUN_BUDGET=role=N,..."})`);
+  console.log(["  role".padEnd(18), "runs".padStart(5), "largest".padStart(9), "total".padStart(9), "budget".padStart(8), " over"].join(" "));
+  const byRole = {};
+  for (const r of runs) (byRole[r.role] ??= []).push(r);
+  for (const [role, rs] of Object.entries(byRole).sort((a, b) => Math.max(...b[1].map((r) => r.input)) - Math.max(...a[1].map((r) => r.input)))) {
+    const b = runBudgets[role];
+    console.log([`  ${role}`.slice(0, 18).padEnd(18), String(rs.length).padStart(5), k(Math.max(...rs.map((r) => r.input))).padStart(9),
+      k(rs.reduce((a, r) => a + r.input, 0)).padStart(9), (b ? k(b) : "-").padStart(8), ` ${b ? `${rs.filter((r) => r.overRunBudget).length} over` : "-"}`].join(" "));
+  }
+  for (const r of [...runs].sort((a, b) => b.input - a.input)) {
+    if (!r.overRunBudget && !(r.noCache && r.input >= 100000)) continue;
+    console.log(`  ${r.run.slice(0, 10).padEnd(10)} ${r.role.slice(0, 16).padEnd(16)} ${k(r.input)}${r.overRunBudget ? ` over its budget (${k(r.runBudget)})` : ""}, ${r.turns} turns${r.noCache ? ", no cache read: every turn paid the whole conversation at the full input price" : ""}`);
+  }
+}
 
 const all = runs.flatMap((r) => r.results.map((x) => ({ ...x, agent: r.agent, ticket: r.ticket })));
 const total = all.reduce((a, b) => a + b.tokens, 0);

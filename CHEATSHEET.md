@@ -304,7 +304,7 @@ If the merge left your branch's dependency versions, take the target's `package.
 | `scripts/factory/doctor.sh [--quick]` | after install or a model change / before a run |
 | `factory setup [--write]` | after onboarding or a change to the test setup: commands found, rehearsed offline, written (D102) |
 | `factory report [--full]` | something is wrong and you need help: one redacted text with what a diagnosis needs (D102) |
-| `factory tokens <f> [--budget N]` | a provider refused a request on tokens, or a mission costs too much: each run's request sizes and the tool results that fill them (P20) |
+| `factory tokens <f> [--budget N] [--run-budget role=N,...]` | a provider refused a request on tokens, or a mission costs too much: each run's request sizes and the tool results that fill them (P20), and each run's whole input against its role's budget (`FACTORY_RUN_BUDGET`), with the runs that read nothing from the cache (B4) |
 | `factory frictions <f>` | agents spin their wheels: failed, repeated (3+ times in a run) and guard-refused tool calls, grouped by cause across runs, read from the transcripts (P23) |
 | `factory verify <f>` | the mission's done condition: runs each command in backticks under `## Done when` in its spec, records `verify.md` (D106) |
 | `factory measure <job>` | a job's measurements, no model: shape, tests, churn, importers, mutation scores, risks (D105) |

@@ -950,6 +950,18 @@ JSON.stringify({recordType:"message",role:"toolResult",toolName:"read",text:t,me
 out="$(node scripts/factory/tokens.mjs "$work/tokens-archive3" --budget 30000)"
 grep -qE 'factory-reviewer +9 +22.0k +~34.0k OVER' <<<"$out" && grep -q '^~ estimated' <<<"$out" \
   && t "tokens: without usage per turn, the last request is estimated from the fixed part, the tool results and the output" || fail "tokens estimate" "$out"
+# B4 (P20): in deps-node-22 one heavy-worker run read 1.82M input tokens ($3.92,
+# 72% of the mission's cost) in 51 turns, within its turn cap, with no cache
+# read: nothing said so until a person added up usage.tsv. Each run's input
+# now reports against its role's budget (FACTORY_RUN_BUDGET or --run-budget).
+mkdir -p "$work/tokens-archive4/r4" "$work/tokens-archive4/r5"
+printf '{"run":"6a664ff4","agent":"factory-worker-heavy","usage":{"input":1819615,"output":28575,"cacheRead":0,"cacheWrite":0,"cost":3.92,"turns":51}}' > "$work/tokens-archive4/r4/run.json"
+printf '{"run":"cef860ba","agent":"factory-worker","usage":{"input":40000,"output":2000,"cacheRead":300000,"cacheWrite":0,"turns":32}}' > "$work/tokens-archive4/r5/run.json"
+out="$(FACTORY_RUN_BUDGET='worker-heavy=600000,worker=600000' node scripts/factory/tokens.mjs "$work/tokens-archive4")"
+grep -qE '^ +worker-heavy +1 +1\.82M +1\.82M +600\.0k +1 over' <<<"$out" && grep -qE '^ +worker +1 +340\.0k +340\.0k +600\.0k +0 over' <<<"$out" \
+  && grep -qE '6a664ff4 +worker-heavy +1\.82M over its budget \(600\.0k\), 51 turns, no cache read' <<<"$out" \
+  && [ "$(node scripts/factory/tokens.mjs "$work/tokens-archive4" --run-budget worker-heavy=2000000 --json | node -e 'const j=JSON.parse(require("fs").readFileSync(0,"utf8"));const r=j.runs.find(x=>x.run==="6a664ff4");console.log(r.input, r.runBudget, r.overRunBudget)')" = "1819615 2000000 false" ] \
+  && t "tokens: each run's input reports against its role's budget, and a run with no cache read is named (B4, P20)" || fail "tokens run budget" "$out"
 bash scripts/factory/archive.sh export demo "$work/demo-archive.tar.gz" >/dev/null && rm -rf "$arch" \
   && bash scripts/factory/archive.sh import "$work/demo-archive.tar.gz" >/dev/null && [ -f "$arch/run.json" ] \
   && bash scripts/factory/archive.sh list demo | grep -q '^r1abc	factory-worker	gw/maker-1	01-hello' \
