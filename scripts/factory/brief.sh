@@ -109,22 +109,22 @@ if [[ "$text" == *"{{BY_HAND}}"* ]]; then
   [ -z "$bh" ] || bh="Exception: these files were changed by hand, as dependency changes must be (D124), in${bh%;}. They are delivered: check them with git show <commit>, never FAIL them as missing from the reviewed commit."
   text="${text//"{{BY_HAND}}"/"$bh"}"
 fi
-# B2: a ticket built over several rounds is judged on its whole diff, not on
-# its last commit (deps-node-22 ticket 01, rounds 2 and 4).
+# B2, D141: the reviewer judges the mission's whole diff from its base, never
+# the last integrated commit (deps-node-22 ticket 01, pin-destroy-during-search
+# VAL-CROSS-001): a deliverable an earlier commit made is delivered.
 if [[ "$text" == *"{{TICKET_DIFF}}"* ]]; then
   short() { git rev-parse --short "$1"; }
   own=(); while IFS= read -r c; do [ -n "$c" ] && own+=("$c"); done < <(ticket_commits "$feature" "$ticket" "$commit")
-  if [ ${#own[@]} -eq 0 ]; then
-    td="The change under review: git show $commit. Fixed point for the code-review skill: $commit^."
-  else
-    tb="$(git rev-parse --short "${own[0]}^")"; tc="$(short "$commit")"
+  mb="$(mission_base "$feature")"; tb="$(short "$mb")"; tc="$(short "$commit")"
+  td="The change under review is the mission's whole diff from its base, not the last integrated commit: \`git diff $tb $tc -- . ':(exclude)$FACTORY_DIR' ':(exclude).factory'\`. A file or deliverable that diff has is delivered, whichever commit made it."
+  if [ ${#own[@]} -gt 0 ]; then
     list="$(for c in "${own[@]}"; do short "$c"; done | paste -sd' ' - | sed 's/ /, /g')"
-    others="$(git log --reverse --format=%H "$tb..$commit" -- . ":(exclude)$FACTORY_DIR" ':(exclude).factory' \
-      | { grep -Fxv -f <(printf '%s\n' "${own[@]}") || true; } | while read -r c; do short "$c"; done | paste -sd' ' - | sed 's/ /, /g')"
-    td="The change under review is the ticket's whole diff, not its last commit: \`git diff $tb $tc -- . ':(exclude)$FACTORY_DIR' ':(exclude).factory'\`. The ticket was built in $list (its integrations and the dependency commits recorded by hand, oldest first); the last is the reviewed commit. A file or deliverable that diff has is delivered, whichever of these commits made it."
-    [ -z "$others" ] || td+=" Commits in that range that are not this ticket's: $others. Leave their changes out of this review (git show <hash> shows each)."
-    td+=" Fixed point for the code-review skill: $tb."
+    td+=" This ticket was built in $list (its integrations and the dependency commits recorded, oldest first); the last is the reviewed commit."
   fi
+  others="$(git log --reverse --format=%H "$mb..$commit" -- . ":(exclude)$FACTORY_DIR" ':(exclude).factory' \
+    | { grep -Fxv -f <(printf '%s\n' ${own[@]+"${own[@]}"}) || true; } | while read -r c; do short "$c"; done | paste -sd' ' - | sed 's/ /, /g')"
+  [ -z "$others" ] || td+=" Commits in that range that are not this ticket's: $others. Judge this ticket's assertions on the whole diff; leave those commits' own changes out of this review (git show <hash> shows each)."
+  td+=" Fixed point for the code-review skill: $tb."
   text="${text//"{{TICKET_DIFF}}"/"$td"}"
 fi
 if [[ "$text" == *"{{TEST_FILES_CMD}}"* ]]; then

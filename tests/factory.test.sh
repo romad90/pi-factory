@@ -292,9 +292,13 @@ git commit -q -m "feat(depsm): 02-other" -m "Integrated by the factory after lin
 echo 'module.exports = 3' > vendor-demo/lib/a.js; git add vendor-demo
 git commit -q -m "chore(depsm): 01-up" -m "Integrated by the factory after lint and tests passed." -m "Factory-Script: integrate"; i2="$(git rev-parse HEAD)"
 rbt="$(bash scripts/factory/brief.sh reviewer depsm 01-up "$i2")"
-grep -qF "git diff $(git rev-parse --short "$depbase") $(git rev-parse --short "$i2")" <<<"$rbt" \
+grep -qF "git diff $(git rev-parse --short "$(bash -c '. scripts/factory/lib.sh; mission_base depsm')") $(git rev-parse --short "$i2")" <<<"$rbt" \
   && grep -qF "$(git rev-parse --short "$i1")" <<<"$rbt" && grep -qF "not this ticket's: $o2" <<<"$rbt" && ! grep -q "git show $i2\b" <<<"$rbt" \
-  && t "the reviewer judges the ticket's whole diff, its integrations and hand commits, not its last commit (B2)" || fail "brief ticket diff" "$(sed -n 1,4p <<<"$rbt")"
+  && grep -q "the mission's whole diff from its base, not the last integrated commit" <<<"$rbt" \
+  && t "the reviewer judges the mission's whole diff from its base, naming the ticket's commits and the others' (B2, D141)" || fail "brief ticket diff" "$(sed -n 1,4p <<<"$rbt")"
+rbn="$(bash scripts/factory/brief.sh reviewer depsm 09-none "$i2")"
+grep -qF "git diff $(git rev-parse --short "$(bash -c '. scripts/factory/lib.sh; mission_base depsm')") $(git rev-parse --short "$i2")" <<<"$rbn" && ! grep -q 'The change under review: git show' <<<"$rbn" \
+  && t "a ticket with no commit of its own is still judged on the mission's diff from its base, never on one commit (D141)" || fail "brief no own commits" "$(sed -n 1,4p <<<"$rbn")"
 git reset -q --hard "$pre_b2"
 git checkout -q -- .scratch/depsm
 git rm -rq .scratch/depsm vendor-demo; git commit -qm "test: drop the dependency mission"
@@ -617,6 +621,14 @@ grep -q 'judged too little again' <<<"$out" && [ -f $m/state/01-hello.stuck ] &&
   && [ "$(bash scripts/factory/next.sh demo 2>&1 | head -1)" = "STEP: escalate" ] && [ ! -f $m/verdicts/01-hello-code.r3.md ] \
   && t "a second review in a row that judged too little (1 pass, 2 unverified) escalates, with the reviewer's reasons (D117)" || fail "review not run twice" "$out $(cat $m/state/01-hello.stuck 2>&1)"
 rm -f $m/state/01-hello.stuck $m/state/01-hello.not-run $m/state/01-hello.not-run-verdict.md $m/verdicts/01-hello-code.md
+# D141 (end-issue-845, server-survives-bad-input): an integrated fix failed on
+# evidence no worker can produce, went back to build, and lost two rounds.
+printf '# Verdict: 01-hello\n**Result:** FAIL\n**Commit:** %s\n**Cause:** process\n\n## Assertions\n- VAL-HELLO-001: FAIL — the log line only the validator sees is missing\n- VAL-HELLO-002: PASS — x\n\n## Issues\n- [process] evidence no change to the code can produce\n' "$c1" > $m/verdicts/01-hello-code.md
+out="$(bash scripts/factory/collect.sh demo)"
+grep -q 'failed on the process, not the code (\*\*Cause:\*\* process): not a round' <<<"$out" && [ ! -f $m/verdicts/01-hello-code.r3.md ] \
+  && [ "$(bash scripts/factory/next.sh demo 2>&1 | head -1)" = "STEP: review" ] && grep -q '`\*\*Cause:\*\* process`' <<<"$(brief_text="$(bash scripts/factory/brief.sh reviewer demo 01-hello "$c1")"; echo "$brief_text")" \
+  && t "a FAIL whose reviewer wrote **Cause:** process is not a build round: the ticket goes back to review (D141)" || fail "process cause" "$out $(ls $m/verdicts $m/state)"
+rm -f $m/state/01-hello.not-run $m/state/01-hello.not-run-verdict.md $m/verdicts/01-hello-code.md
 # P25 (1): a review run that leaves no file is not a verdict: back to review once, then escalated.
 out="$(bash scripts/factory/collect.sh demo)"
 grep -q '01-hello-code.md .*no verdict file at /.*/verdicts/01-hello-code.md: the review run left none' <<<"$out" && [ ! -f $m/state/01-hello.stuck ] \
@@ -696,10 +708,18 @@ grep -q 'tmp/copies/' <<<"$(bash scripts/factory/brief.sh reviewer demo 01-hello
   && t "the install ignores a mission's pr.md, retro.md and mr.url, not its state (D138)" || fail "mission leftovers ignored" "$(grep scratch .gitignore)"
 
 # Ticket 02 asks a decision.
-bash scripts/factory/human.sh ask demo 02-count --stdin >/dev/null <<'Q'
+bash scripts/factory/human.sh ask demo 02-count --stdin > "$work/ask.log" <<'Q'
 Delete old counts in production? A) yes B) no
 Q
-expect_step decide "open question stops the mission"
+grep -q '^HELD: 02-count waits for an answer' "$work/ask.log" && [ -f $m/state/02-count.asked ] && [ ! -f $m/state/open-question.md ] \
+  && t "a ticket's question holds that ticket only (D141)" || fail "held question" "$(cat "$work/ask.log")"
+printf '# 03 extra\n**Size:** S\n## Covers\nVAL-HELLO-001\n' > $m/issues/03-extra.md
+out="$(bash scripts/factory/next.sh demo 2>&1)"
+[ "$(head -1 <<<"$out")" = "STEP: build" ] && grep -q '02-count wait for an answer, asked once nothing else can run' <<<"$out" \
+  && grep -qE '02-count +asked' <<<"$out" && [ -f $m/state/02-count.asked ] \
+  && t "while 02 waits on its question, another ticket still builds (D141)" || fail "held, others run" "$out"
+rm $m/issues/03-extra.md
+expect_step decide "nothing else can run: the held question goes to the person (D141)"
 grep -q 'irreversib\|production' <<<"$(cat $m/state/open-question.md)" && t "a production question is never auto-answered" || fail "resolver let a production question through"
 # D68: the text goes through a quoted heredoc: backticks, $ and quotes stay text.
 bash scripts/factory/human.sh decide demo --stdin >/dev/null <<'A'
@@ -724,13 +744,14 @@ grep -q '^AUTO-ANSWERED (deliverable)' "$work/ask.log" && t "resolver: a missing
 ask 'Can I add an eslint-disable comment for this line?'
 grep -q '^AUTO-ANSWERED (silence)' "$work/ask.log" && t "resolver: silencing a check is refused by the rule" || fail "resolver silence" "$(cat "$work/ask.log")"
 ask 'Should I install vitest as a dev dependency? A) yes B) no'
-grep -q '^ASKED' "$work/ask.log" && t "resolver: the same question after an auto-answer goes to the human" || fail "resolver repeat" "$(cat "$work/ask.log")"
+grep -q '^HELD' "$work/ask.log" && t "resolver: the same question after an auto-answer goes to the human" || fail "resolver repeat" "$(cat "$work/ask.log")"
+expect_step decide "the repeated question is asked once nothing else runs"
 grep -q '^Question 6 on 02-count' $m/state/open-question.md && t "a later question on a ticket suggests shrinking or resetting it" || fail "question count" "$(cat $m/state/open-question.md)"
 bash scripts/factory/human.sh decide demo --stdin >/dev/null <<<'B, vitest is already there'
 grep -q $'02-count\tdecide\tShould I install vitest as a dev dependency? A) yes B) no\tB, vitest' $m/decisions.tsv \
   && t "decide reads only the question, not the hint" || fail "decide question" "$(tail -1 $m/decisions.tsv)"
 printf 'Keep the old count format? A) yes B) no\n' > "$work/q"
-bash scripts/factory/human.sh ask demo 01-hello --stdin < "$work/q" >/dev/null; bash scripts/factory/human.sh decide demo --stdin >/dev/null <<<'A'
+bash scripts/factory/human.sh ask demo - --stdin < "$work/q" >/dev/null; bash scripts/factory/human.sh decide demo --stdin >/dev/null <<<'A'
 bash scripts/factory/human.sh ask demo 02-count --stdin < "$work/q" > "$work/ask.log"
 grep -q '^AUTO-ANSWERED (earlier): A (the human' "$work/ask.log" && t "resolver: a question the human already answered gets that answer" || fail "resolver earlier" "$(cat "$work/ask.log")"
 bash scripts/factory/workflow.sh build-wave demo >"$work/wf.log"
@@ -1385,8 +1406,9 @@ LEAD
   && bash -c '. scripts/factory/lib.sh; compute_ticket_state maint; [[ " ${T_REVIEW[*]} " == *" 04-ci "* ]]' \
   && t "human.sh deliver records the person's commit as the ticket's integration, logs it, closes its question; the ticket goes to review (B3)" || fail "deliver" "$(cat "$work/dl.log" .scratch/maint/decisions.tsv; ls .scratch/maint/state)"
 rbh="$(bash scripts/factory/brief.sh reviewer maint 04-ci "$dc")"
-grep -qF "git diff $(git rev-parse --short "$dc^") $(git rev-parse --short "$dc")" <<<"$rbh" \
-  && t "the reviewer judges the person's commit as the ticket's diff" || fail "brief deliver" "$(grep -n 'change under review' <<<"$rbh")"
+grep -qF "git diff $(git rev-parse --short "$(bash -c '. scripts/factory/lib.sh; mission_base maint')") $(git rev-parse --short "$dc")" <<<"$rbh" \
+  && grep -qF "This ticket was built in $(git rev-parse --short "$dc")" <<<"$rbh" \
+  && t "the reviewer judges the mission's diff, naming the person's commit as the ticket's (B3, D141)" || fail "brief deliver" "$(grep -n 'change under review' <<<"$rbh")"
 printf '# Verdict: 04-ci\n**Result:** FAIL\n**Commit:** %s\n\n## Assertions\n- VAL-M-001: FAIL — os list changed\n' "$dc" > .scratch/maint/verdicts/04-ci-code.md
 bash -c '. scripts/factory/lib.sh; compute_ticket_state maint; [[ " ${T_HAND[*]} " == *" 04-ci "* ]] && [[ " ${T_BUILD[*]} " != *" 04-ci "* ]]' \
   && t "a failed review of a ticket delivered by hand goes back to the person, never to a worker" || fail "fix round by hand"

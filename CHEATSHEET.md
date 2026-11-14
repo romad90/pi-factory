@@ -216,7 +216,7 @@ Keep specs to roughly 12 stories or fewer; split anything bigger into two missio
 | `approve` | you | G1 | `/factory-approve <f>` or `/factory-amend` |
 | `design` | lead | feature or refactor (or `**Design:** yes`), G1 approved, no `design.md` | runs the designer |
 | `approve-design` | you | G1b: `design.md` not approved | read it, `/factory-approve <f> design` |
-| `decide` | you | a worker or reviewer asked something | `/factory-decide` |
+| `decide` | you | an agent ended with `DECISION NEEDED:`; a ticket's question waits until nothing else can run (D141) | `/factory-decide` |
 | `tickets` | lead | no tickets | ticket writer drafts them |
 | `approve-tickets` | you | tickets or fix tickets proposed | review `issues/`, `/factory-approve <f> tickets` |
 | `coverage` | you | G2: an assertion uncovered or a ticket unjustified | fix `## Covers`, or amend |

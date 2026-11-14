@@ -266,6 +266,7 @@ for t in "${tickets[@]}"; do
   in_list "$name" "${T_ESCALATE[@]}" && state="ESCALATE"
   in_list "$name" "${T_BLOCKED[@]}"  && state="blocked"
   in_list "$name" "${T_HAND[@]}"     && state="by hand"
+  in_list "$name" "${T_ASKED[@]}"    && state="asked"
   STATUS+="$(printf '  %-36s %-9s round %s' "$name" "$state" "${T_ROUND[$name]:-0}")"$'\n'
 done
 
@@ -280,7 +281,18 @@ if [ ${#T_BUILD[@]} -gt 0 ]; then
   # after this step, they don't stop it.
   [ ${#T_ESCALATE[@]} -gt 0 ] && extra+="; ${T_ESCALATE[*]} wait for the human afterwards, run this step now"
   [ ${#T_HAND[@]} -gt 0 ] && extra+="; ${T_HAND[*]} wait for a person's commit (by hand), run this step now"
+  [ ${#T_ASKED[@]} -gt 0 ] && extra+="; ${T_ASKED[*]} wait for an answer, asked once nothing else can run (D141)"
   step build "scripts/factory/workflow.sh build-wave $feature (${#T_BUILD[@]} ticket(s)$extra), then integrate.sh per patch"
+fi
+# D141: nothing else can build or review: the oldest held question goes to the
+# person, as open-question.md (one at a time: /factory-decide answers it).
+if [ ${#T_ASKED[@]} -gt 0 ]; then
+  first="$(for n in "${T_ASKED[@]}"; do printf '%s\t%s\n' "$(sed -n 's/^\*\*Asked:\*\* //p' "$dir/state/$n.asked" | head -1)" "$n"; done | sort | head -1 | cut -f2)"
+  if git ls-files --error-unmatch -- "$dir/state/$first.asked" >/dev/null 2>&1; then git mv -f -- "$dir/state/$first.asked" "$dir/state/open-question.md"
+  else mv -f -- "$dir/state/$first.asked" "$dir/state/open-question.md"; fi
+  bash "$here/checkpoint.sh" "$feature" >/dev/null
+  notify "Factory: $feature needs a decision" "$(awk 'NR > 3' "$dir/state/open-question.md" | head -3)"
+  exec bash "$0" "$feature"
 fi
 # B3: a ticket only a person may change (CI, hooks, the factory): never a worker.
 if [ ${#T_HAND[@]} -gt 0 ]; then
