@@ -88,9 +88,13 @@ The codebase is what the team uses to bring value to customers, so every mission
 | Mechanism | Why |
 |---|---|
 | One-word gates: approve, decide, amend, accept-unverified, approve tickets (D43) | Approvals typed by hand into files got skipped or mangled; a command writes the line, logs it, checkpoints. |
+| The contract converges without you: the author applies the critic's blocking findings, 2 critic rounds at most; a dependency mission installs and commits first (D140) | In four measured missions each critic round stopped at G1 until a person typed `/factory-amend`, and a person ran every dependency install by hand (D124). |
+| Gates approve themselves when clean, per project (`FACTORY_AUTO_APPROVE`): G1 when the critic's last round has no blocking finding or its rounds are used, tickets when their Covers equal the contract IDs; the PR opens as a draft; each approval is a `decisions.tsv` row by `factory (auto)` (D141) | About 44 of 50 measured hours were the mission waiting for a person, mostly at approvals whose outcome the record already showed. The draft PR keeps the merge with you. |
+| One way to ask: any agent ends with `DECISION NEEDED:`; a ticket's question is held while other work can run, and asked only when nothing else can (D142) | Agents that asked the supervisor inside a workflow got "Supervisor unavailable" (5 of 8 retros), and one ticket's question stopped the whole mission. |
 | `decisions.tsv`, read by every role (D43) | In mission 1, decisions lived only in chat; agents now read your answers and they win over agent judgement. |
 | Irreversible choices never default (D47) | A worker timed out on a question and picked the option the spec had ruled out. Deletes, secrets, production behavior and the contract now stop the mission until you answer. |
 | Notifications on every human step, pause and resume (D45) | Long waves were watched by hand; a VPN cut or a full context forced restarts from memory. |
+| The reviewer judges the mission's diff from the mission base; a FAIL the reviewer marks `**Cause:** process` is not a build round and goes back to review (D142) | A reviewer failed a file a later round had edited, and a review that couldn't finish cost a ticket one of its three rounds (6 of 8 retros). |
 | Pre-flight and automatic checkpoints (D46) | A dropped VPN produced seven errors instead of one message; checkpoints were typed about ten times per mission. |
 
 The full table of what is manual, what is automatic and why is in [the cheat sheet §1](../CHEATSHEET.md#1-who-does-what-manual-automatic-and-why).

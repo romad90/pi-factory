@@ -74,7 +74,7 @@ The measure that sorts them, on the gym: $3.93 of model cost per MR, 11 logged d
 
 | Next mission | Question it answers |
 |---|---|
-| get-port 5 to 7 | a third dependency mission: does the deps lane hold, and is P31 worth its guard decision? |
+| get-port 5 to 7 | a third dependency mission: does the scripted install (D140) hold? |
 | a bug fix in `lib/` | gates on product code: first-pass rate, the reviewer's yield (P30) |
 | docs against code on the gym | P34's project drift, by hand, before anything is built |
 | any of them, run with `run.sh` | P2: does a scripted lead change the decision count? |
@@ -89,7 +89,7 @@ The nightly loop keeps fixing factory bugs from the records (its backlog is in t
 | P30 gate yield, P32 hand touches as events | early: they are the measure the rest waits on; the hand-commit count is fixed first |
 | P34 drift report (was C10) | early for mission drift: two stale values are on the gym's master |
 | P29 ticket scope check | 10 flags |
-| P31 scripted install | Rode's guard decision |
+| P31 scripted install | steps 1 and 2 built for npm (D140); the clean-copy proof and audit wait on a dependency mission that needs them |
 | P23 seeded-fault bench (with X2) | 3 more missions |
 | P20 token budget | a mission that stops on a token limit |
 | P1 fallback chain | a mission that stops on a provider with another one free |

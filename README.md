@@ -110,25 +110,27 @@ flowchart TD
     AR --> SC[check by script, then critic of another family]
     SC -- blocking --> AR
     SC --> AS{Human, once: /factory-approve job strategy}
-    AS --> B
-    A[Or by hand: /grill-with-docs, /to-spec] --> B[contract wave: author, then critic]
-    B --> G1{G1: /factory-approve}
+    AS --> IN
+    A[Or by hand: /grill-with-docs, /to-spec] --> IN[install.sh, when the spec lists npm dependencies: installed and committed, no model]
+    IN --> B[contract wave: author, then critic, up to 2 rounds]
+    B --> G1{G1: /factory-approve, or itself when nothing blocks or the critic's rounds are used}
     G1 -- amend --> B
     G1 --> DS[designer: program design for feature and refactor]
     DS --> G1b{G1b: /factory-approve design}
     G1b --> T[ticket writer drafts tickets]
-    T --> TA{Human: /factory-approve tickets}
+    T --> TA{Human: /factory-approve tickets, or itself when Covers equal the contract IDs}
     TA --> G2{G2: coverage, tests configured}
     G2 --> W[build wave: up to 4 workers in parallel worktrees]
     W -- patch --> I[integrate.sh: patch guard, lint, tests, extra]
     W -- no patch --> R[recorded failed round]
-    W -- DECISION NEEDED --> D[Human: /factory-decide]
+    W -- DECISION NEEDED --> D[Human: /factory-decide, asked when nothing else can run]
     D --> W
     I -- red --> R
     R -- round 2+ --> W
     I -- green commit --> V[review wave: fresh reviewers, other family]
     V --> C[collect.sh: round from history, configured model]
     C -- FAIL --> W
+    C -- FAIL on the process, not a round --> V
     C -- PASS all --> VAL[validate: validator runs the instrument]
     VAL --> G4{G4: proven or accepted, still fresh}
     G4 -- findings --> F[ticket writer: fix tickets]
@@ -138,11 +140,13 @@ flowchart TD
     H --> S[code steward: whole diff vs quality bar]
     S --> G5{G5: bar met, every file explained}
     G5 -- findings --> F
-    G5 --> PR[metrics, /pr, mr.sh opens the MR, CI gate]
+    G5 --> PR[metrics, /pr, mr.sh opens the MR or a draft PR, CI gate]
     PR --> RT[retro: pack, save; after the merge, close]
 ```
 
 You type `/factory <mission>` once. The lead loops on `scripts/factory/next.sh`, which prints a `STEP:` code. Machine steps run on their own, and human steps stop the loop and notify you. A ticket that fails three rounds escalates to you; the cause is usually a wrong contract or a ticket that is too big.
+
+**Hands off until the draft PR (D140–D142).** The contract author applies the critic's blocking findings itself, for up to 2 critic rounds. With auto-approval on (`FACTORY_AUTO_APPROVE=on` in `.factory/commands.env`, or `flag` and the spec line `**Auto-approve:** yes`), G1 approves itself when the critic's last round has nothing blocking or its rounds are used, ticket approval approves itself when the tickets' Covers equal the contract IDs, and `mr.sh` opens a draft PR. Each of these is a `decisions.tsv` row by `factory (auto)`. A ticket's question waits while other tickets can still run; you are asked only when nothing else can. The merge stays yours.
 
 ## The roles
 

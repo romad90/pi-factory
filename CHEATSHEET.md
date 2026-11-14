@@ -183,18 +183,20 @@ Each mission's `spec.md` is written from it; `/factory tidy-api` runs them in or
 |---|---|---|
 | 1 | Optional, for anything bigger than a fix: `/skill:deep-prompt` → `.scratch/<f>/depth.md` (expert moves, raw material, methods, the outside check). Then `/grill-with-docs` on that file, then `/to-spec` → `.scratch/<f>/spec.md` (start with `**Intent:** feature`) | |
 | 2 | `/factory <f>`, from the branch its MR goes into (no `git checkout -b`) | the mission moves to its own branch `mission/<f>` (a job's: `job/<job>/<f>`), then pre-flight, contract author, then critic |
-| 3 | Read the contract + critique. `/factory-approve <f>`, or `/factory-amend <f> "<change>"` | amend reruns author + critic |
+| 3 | Read the contract + critique. `/factory-approve <f>`, or `/factory-amend <f> "<change>"`. With auto-approval on, only when the critic still blocks after its rounds | a blocking finding goes back to the author on its own, 2 critic rounds at most (`FACTORY_CONTRACT_ROUNDS`, D140); amend reruns author + critic |
 | 3b | Feature or refactor: read `design.md` (with the MR's reviewer if the spec names one), then `/factory-approve <f> design`, or edit it | designer drafts it after G1 |
 | 4 | | ticket writer proposes tickets, as vertical slices |
-| 5 | Read `issues/` (edit, split, delete freely), then `/factory-approve <f> tickets` | coverage check |
+| 5 | Read `issues/` (edit, split, delete freely), then `/factory-approve <f> tickets`. With auto-approval on, only when the tickets' Covers differ from the contract IDs | coverage check |
 | 6 | | build waves, integration, reviews, validation |
-| 7 | Answer when notified: `/factory-decide <f> <your answer, and why>` (any text: quotes and backticks are safe) | logged in `decisions.tsv`, read by every role. Questions a rule or an earlier answer settles never reach you: logged as `auto` |
+| 7 | Answer when notified: `/factory-decide <f> <your answer, and why>` (any text: quotes and backticks are safe) | logged in `decisions.tsv`, read by every role. Questions a rule or an earlier answer settles never reach you: logged as `auto`. A ticket's question (`human.sh ask`, it prints `HELD`) waits in `state/<ticket>.asked` and reaches you only when nothing else can build or review (D142) |
 | 8 | At `STEP: unverified`: prove it, or `/factory-accept-unverified <f> <ids\|ALL> "<why>"` | listed as Known limits |
 | 9 | Approve fix tickets when behavior or health finds something | fixes built, re-validated |
 | 10 | | health ratchet, then code steward (G5) |
-| 11 | At `STEP: pr`: `/pr`, then `scripts/factory/mr.sh <mission>` (add `--draft` for a draft), then `/skill:mission-retro` | metrics printed; retro saved to `~/.pi-factory/data/<project>/retros/` |
+| 11 | At `STEP: pr`: `/pr`, then `scripts/factory/mr.sh <mission>` (add `--draft` for a draft), then `/skill:mission-retro`. With auto-approval on, the lead opens a draft PR itself (`STEP: pr-draft`); you review and merge | metrics printed; retro saved to `~/.pi-factory/data/<project>/retros/` |
 
 Keep specs to roughly 12 stories or fewer; split anything bigger into two missions.
+
+**Hands off until the draft PR (D140, D141).** Set `FACTORY_AUTO_APPROVE` in `.factory/commands.env`: `on` for every mission, `off` for none, `flag` (the default) for missions whose spec has the line `**Auto-approve:** yes`. Each approval it makes is a `decisions.tsv` row by `factory (auto)`, so `metrics.sh` and the retro show it. A spec that lists `npm i <name>@<version>` commands in backticks under `## Dependencies` gets them installed (install scripts off) and committed before the contract, logged as a `deps` row by `factory (auto)`.
 
 ## 7. STEP codes
 

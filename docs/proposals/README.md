@@ -35,7 +35,7 @@ Status: **draft** (open for discussion) · **accepted** (in the roadmap) · **re
 | P28 | [Checklist packs: what a good contract looks like for a kind of change, asked in round 1](P28-checklist-packs.md) | draft, first | — |
 | P29 | [A patch stays inside its ticket: a scope check in code, flagged first](P29-ticket-scope-check.md) | draft | D125 |
 | P30 | [Gate yield: what each gate catches, gets wrong, and costs the person](P30-gate-yield.md) | draft, early | D97, P23 |
-| P31 | [Dependency bumps without hands: a scripted install step, outside the agents](P31-scripted-install.md) | draft | D124, P19 |
+| P31 | [Dependency bumps without hands: a scripted install step, outside the agents](P31-scripted-install.md) | steps 1 and 2 built (D140) | D124, P19 |
 | P32 | [Every hand touch is a learning event](P32-hand-touches-are-events.md) | draft, early | D114, D89 |
 | P33 | [Several angles on the contract at once: an adversary, a grounding check, a naive reader](P33-contract-angles.md) | draft | P28 |
 | P34 | [Drift report: the spec says what was decided, the docs say what the code does](P34-drift-report.md) | draft, early for mission drift | C10, P17 |
