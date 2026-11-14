@@ -226,6 +226,8 @@ Keep specs to roughly 12 stories or fewer; split anything bigger into two missio
 | `setup` | you | `FACTORY_TEST_CMD` empty | `factory setup --write` (D102), or fill `.factory/commands.env` yourself; commit |
 | `build` | lead | tickets ready | build wave → integrate each patch |
 | `review` | lead | integrated tickets | review wave → `collect.sh` |
+| `collect` | lead | a code verdict is written but not recorded as a round | `collect.sh <f>`, then `next.sh` again |
+| `hand` | you | a ticket changes only paths reserved for people (CI, hooks, the factory) | make the change, commit it, then `/factory-deliver <f> <ticket> "<what you did>"` |
 | `escalate` | you | 3 failed rounds | usually: split the ticket, amend the contract, or rethink the design |
 | `blocked` | you | `## Blocked by` can't resolve, a misspelled mission, or the checkout is on another branch | check for cycles; use the name it suggests; `git switch` to the branch it names |
 | `validate` | lead | all tickets pass, or fixes built since a failing verdict | validator → `collect.sh` |
@@ -305,6 +307,7 @@ If the merge left your branch's dependency versions, take the target's `package.
 | Command | When |
 |---|---|
 | `scripts/factory/next.sh <f>` | where is this mission? |
+| `/factory-pause <f> ["<reason>"]` | stop now and pick up later: writes `PAUSED.md`; `/factory <f>` in a new session resumes |
 | `scripts/factory/doctor.sh [--quick]` | after install or a model change / before a run |
 | `factory setup [--write]` | after onboarding or a change to the test setup: commands found, rehearsed offline, written (D102) |
 | `factory report [--full]` | something is wrong and you need help: one redacted text with what a diagnosis needs (D102) |

@@ -110,6 +110,23 @@ for (const m of s.matchAll(/\]\(([^)#\s]+)(?:#[^)]*)?\)/g)) if (!/^https?:/.test
 for (const m of s.matchAll(/`((?:scripts|docs|\.pi|\.factory|packs|templates|tests|instrument)\/[^`\s<*]*)`/g)) if (!fs.existsSync(m[1].replace(/\/$/, ""))) bad.push(m[1]);
 console.log(bad.join(" "))')"
 [ -z "$missing" ] && t "README: every linked file and named path exists" || fail "README paths" "$missing"
+# The docs keep up with the code (a ratchet): every STEP code and every prompt is in the cheat sheet,
+# and every FACTORY_* setting the code reads is named in a user doc or listed in tests/docs-undocumented.txt.
+drift="$(cd "$root" && node -e '
+const fs = require("fs"), path = require("path"), bad = [];
+const ls = (d, re) => fs.readdirSync(d).filter(f => re.test(f)).map(f => path.join(d, f));
+const read = fs => fs.map(f => require("fs").readFileSync(f, "utf8")).join("\n");
+const cheat = fs.readFileSync("CHEATSHEET.md", "utf8"), steps = cheat.split("## 7. STEP codes")[1].split("\n## ")[0], next = fs.readFileSync("scripts/factory/next.sh", "utf8");
+for (const c of new Set([...next.matchAll(/\bstep ([a-z0-9-]+) "/g)].map(m => m[1]))) if (!new RegExp("^\\| [^|]*`" + c + "`", "m").test(steps)) bad.push("STEP " + c + " has no row in CHEATSHEET §7");
+for (const p of ls(".pi/prompts", /\.md$/)) { const n = "/" + path.basename(p, ".md"); if (!new RegExp(n.replace(/[-/]/g, "\\$&") + "(?![-\\w])").test(cheat)) bad.push(n + " is not in CHEATSHEET"); }
+const code = read([...ls("scripts/factory", /\.(sh|mjs)$/), ...ls(".pi/extensions", /\.ts$/)]);
+const docs = read(["README.md", "CHEATSHEET.md", ...ls("docs", /\.md$/), ...ls("docs/agents", /\.md$/)]);
+const listed = new Set(fs.readFileSync("tests/docs-undocumented.txt", "utf8").split("\n").filter(l => l && !l.startsWith("#")));
+const vars = new Set(code.match(/\bFACTORY_[A-Z0-9_]*[A-Z0-9]\b/g));
+for (const v of vars) { const documented = new RegExp("\\b" + v + "\\b").test(docs); if (!documented && !listed.has(v)) bad.push(v + " is read by the code but named in no doc"); if (documented && listed.has(v)) bad.push(v + " is documented now: remove it from tests/docs-undocumented.txt"); }
+for (const v of listed) if (!vars.has(v)) bad.push(v + " is gone from the code: remove it from tests/docs-undocumented.txt");
+console.log(bad.join("\n"))')"
+[ -z "$drift" ] && t "docs keep up with the code: STEP codes, prompts, FACTORY_* settings" || fail "docs drift" "$drift"
 rc=0; out="$(cd "$root" && node scripts/factory/models-lint.mjs 2>&1)" || rc=$?
 [ "$rc" = 2 ] && grep -q "the factory's own folder, not a project" <<<"$out" \
   && t "models-lint in the factory's own folder says so instead of false failures" || fail "lint in factory folder" "rc=$rc $out"
