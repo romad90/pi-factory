@@ -295,10 +295,10 @@ rbt="$(bash scripts/factory/brief.sh reviewer depsm 01-up "$i2")"
 grep -qF "git diff $(git rev-parse --short "$(bash -c '. scripts/factory/lib.sh; mission_base depsm')") $(git rev-parse --short "$i2")" <<<"$rbt" \
   && grep -qF "$(git rev-parse --short "$i1")" <<<"$rbt" && grep -qF "not this ticket's: $o2" <<<"$rbt" && ! grep -q "git show $i2\b" <<<"$rbt" \
   && grep -q "the mission's whole diff from its base, not the last integrated commit" <<<"$rbt" \
-  && t "the reviewer judges the mission's whole diff from its base, naming the ticket's commits and the others' (B2, D141)" || fail "brief ticket diff" "$(sed -n 1,4p <<<"$rbt")"
+  && t "the reviewer judges the mission's whole diff from its base, naming the ticket's commits and the others' (B2, D142)" || fail "brief ticket diff" "$(sed -n 1,4p <<<"$rbt")"
 rbn="$(bash scripts/factory/brief.sh reviewer depsm 09-none "$i2")"
 grep -qF "git diff $(git rev-parse --short "$(bash -c '. scripts/factory/lib.sh; mission_base depsm')") $(git rev-parse --short "$i2")" <<<"$rbn" && ! grep -q 'The change under review: git show' <<<"$rbn" \
-  && t "a ticket with no commit of its own is still judged on the mission's diff from its base, never on one commit (D141)" || fail "brief no own commits" "$(sed -n 1,4p <<<"$rbn")"
+  && t "a ticket with no commit of its own is still judged on the mission's diff from its base, never on one commit (D142)" || fail "brief no own commits" "$(sed -n 1,4p <<<"$rbn")"
 git reset -q --hard "$pre_b2"
 git checkout -q -- .scratch/depsm
 git rm -rq .scratch/depsm vendor-demo; git commit -qm "test: drop the dependency mission"
@@ -621,13 +621,13 @@ grep -q 'judged too little again' <<<"$out" && [ -f $m/state/01-hello.stuck ] &&
   && [ "$(bash scripts/factory/next.sh demo 2>&1 | head -1)" = "STEP: escalate" ] && [ ! -f $m/verdicts/01-hello-code.r3.md ] \
   && t "a second review in a row that judged too little (1 pass, 2 unverified) escalates, with the reviewer's reasons (D117)" || fail "review not run twice" "$out $(cat $m/state/01-hello.stuck 2>&1)"
 rm -f $m/state/01-hello.stuck $m/state/01-hello.not-run $m/state/01-hello.not-run-verdict.md $m/verdicts/01-hello-code.md
-# D141 (end-issue-845, server-survives-bad-input): an integrated fix failed on
+# D142 (end-issue-845, server-survives-bad-input): an integrated fix failed on
 # evidence no worker can produce, went back to build, and lost two rounds.
 printf '# Verdict: 01-hello\n**Result:** FAIL\n**Commit:** %s\n**Cause:** process\n\n## Assertions\n- VAL-HELLO-001: FAIL — the log line only the validator sees is missing\n- VAL-HELLO-002: PASS — x\n\n## Issues\n- [process] evidence no change to the code can produce\n' "$c1" > $m/verdicts/01-hello-code.md
 out="$(bash scripts/factory/collect.sh demo)"
 grep -q 'failed on the process, not the code (\*\*Cause:\*\* process): not a round' <<<"$out" && [ ! -f $m/verdicts/01-hello-code.r3.md ] \
   && [ "$(bash scripts/factory/next.sh demo 2>&1 | head -1)" = "STEP: review" ] && grep -q '`\*\*Cause:\*\* process`' <<<"$(brief_text="$(bash scripts/factory/brief.sh reviewer demo 01-hello "$c1")"; echo "$brief_text")" \
-  && t "a FAIL whose reviewer wrote **Cause:** process is not a build round: the ticket goes back to review (D141)" || fail "process cause" "$out $(ls $m/verdicts $m/state)"
+  && t "a FAIL whose reviewer wrote **Cause:** process is not a build round: the ticket goes back to review (D142)" || fail "process cause" "$out $(ls $m/verdicts $m/state)"
 rm -f $m/state/01-hello.not-run $m/state/01-hello.not-run-verdict.md $m/verdicts/01-hello-code.md
 # P25 (1): a review run that leaves no file is not a verdict: back to review once, then escalated.
 out="$(bash scripts/factory/collect.sh demo)"
@@ -712,14 +712,14 @@ bash scripts/factory/human.sh ask demo 02-count --stdin > "$work/ask.log" <<'Q'
 Delete old counts in production? A) yes B) no
 Q
 grep -q '^HELD: 02-count waits for an answer' "$work/ask.log" && [ -f $m/state/02-count.asked ] && [ ! -f $m/state/open-question.md ] \
-  && t "a ticket's question holds that ticket only (D141)" || fail "held question" "$(cat "$work/ask.log")"
+  && t "a ticket's question holds that ticket only (D142)" || fail "held question" "$(cat "$work/ask.log")"
 printf '# 03 extra\n**Size:** S\n## Covers\nVAL-HELLO-001\n' > $m/issues/03-extra.md
 out="$(bash scripts/factory/next.sh demo 2>&1)"
 [ "$(head -1 <<<"$out")" = "STEP: build" ] && grep -q '02-count wait for an answer, asked once nothing else can run' <<<"$out" \
   && grep -qE '02-count +asked' <<<"$out" && [ -f $m/state/02-count.asked ] \
-  && t "while 02 waits on its question, another ticket still builds (D141)" || fail "held, others run" "$out"
+  && t "while 02 waits on its question, another ticket still builds (D142)" || fail "held, others run" "$out"
 rm $m/issues/03-extra.md
-expect_step decide "nothing else can run: the held question goes to the person (D141)"
+expect_step decide "nothing else can run: the held question goes to the person (D142)"
 grep -q 'irreversib\|production' <<<"$(cat $m/state/open-question.md)" && t "a production question is never auto-answered" || fail "resolver let a production question through"
 # D68: the text goes through a quoted heredoc: backticks, $ and quotes stay text.
 bash scripts/factory/human.sh decide demo --stdin >/dev/null <<'A'
@@ -981,6 +981,15 @@ touch -d "@$(( $(date +%s) - 5 ))" "$work/usage/run/c9ctr_factory-contract-autho
 out="$(FACTORY_USAGE_DIRS="$work/usage" bash scripts/factory/archive.sh collect demo)"
 [ -f "$(dirname "$arch")/c9ctr_factory-contract-author/run.json" ] \
   && t "archive: a contract run before an amendment's rewrite of spec.md is still archived (F10)" || fail "archive contract run" "$out / $(ls "$(dirname "$arch")")"
+# search-attrs-case: usage.tsv held 6 runs of the 11 runs.tsv lists; every
+# contract run and the ticket writer finished before the last spec.md write.
+mkdir -p "$work/usage/other"
+printf '{"model":"gw/author-1","usage":{"input":5,"output":1,"cost":0,"turns":1},"durationMs":1000,"cwd":"/elsewhere/clone"}' > "$work/usage/other/f0rgn_factory-contract-author_meta.json"
+touch -d "@$(( $(date +%s) - 5 ))" "$work/usage/other/f0rgn_factory-contract-author_meta.json"
+FACTORY_USAGE_DIRS="$work/usage" bash scripts/factory/usage.sh demo >/dev/null
+grep -q 'c9ctr' $m/usage.tsv && ! grep -q 'f0rgn' $m/usage.tsv \
+  && t "usage: a contract run before an amendment's rewrite of spec.md is counted; another clone's run is not (search-attrs-case)" || fail "usage contract run" "$(cat $m/usage.tsv)"
+rm -rf "$work/usage/other"
 touch -r "$work/spec.mtime" "$m/spec.md"
 # P20: request sizes from the child transcript (pi-subagents' records): the
 # a 25k-token test log takes the reviewer's request from 10k to 35k; the next one would be 36.2k.
@@ -1073,10 +1082,11 @@ FACTORY_JUDGE_BIN="$work/judge-bad.sh" FACTORY_JUDGE_MODELS="gw/judge-1" bash sc
 [ "$(wc -l < $m/scores.tsv)" = "$n0" ] && t "score: a run is judged once per dimension; a malformed answer is never guessed" || fail "score dedupe" "$(cat "$work/score2.log")"
 FACTORY_JUDGE_BIN="$work/judge.sh" FACTORY_JUDGE_MODELS="gw/maker-2" bash scripts/factory/score.sh demo --dimension context-waste >"$work/score3.log" 2>&1
 grep -q 'without a judge of another family' "$work/score3.log" && t "score: no judge of the run's own family" || fail "score family" "$(cat "$work/score3.log")"
+# Two runs: the worker and the contract author that ran before spec.md last changed (search-attrs-case).
 echo 'https://gitlab.example/g/p/-/merge_requests/9' > $m/mr.url
 bash scripts/factory/metrics.sh --all > "$work/all.md"; bash scripts/factory/metrics.sh --all --json > "$work/all.json"
 grep -q '^| demo | ' "$work/all.md" && grep -q '^| \*\*Total\*\*' "$work/all.md" && grep -q 'Cost per MR' "$work/all.md" \
-  && node -e 'const j=require(process.argv[1]); const d=j.missions.find(m=>m.mission==="demo"); process.exit(d && d.runs===1 && d.tokensIn===120000 && d.scored>=2 && d.scoreFails>=1 && d.mr && j.total.mrs===1 ? 0 : 1)' "$work/all.json" \
+  && node -e 'const j=require(process.argv[1]); const d=j.missions.find(m=>m.mission==="demo"); process.exit(d && d.runs===2 && d.tokensIn===121000 && d.scored>=2 && d.scoreFails>=1 && d.mr && j.total.mrs===1 ? 0 : 1)' "$work/all.json" \
   && grep -q 'Scored runs (scores.tsv, D97) | .*fail' <<<"$(bash scripts/factory/metrics.sh demo)" \
   && t "metrics --all: every mission and the total, with cost per MR and scores (D97)" || fail "metrics all" "$(cat "$work/all.md" "$work/all.json")"
 rm -f $m/mr.url $m/scores.tsv
@@ -1408,7 +1418,7 @@ LEAD
 rbh="$(bash scripts/factory/brief.sh reviewer maint 04-ci "$dc")"
 grep -qF "git diff $(git rev-parse --short "$(bash -c '. scripts/factory/lib.sh; mission_base maint')") $(git rev-parse --short "$dc")" <<<"$rbh" \
   && grep -qF "This ticket was built in $(git rev-parse --short "$dc")" <<<"$rbh" \
-  && t "the reviewer judges the mission's diff, naming the person's commit as the ticket's (B3, D141)" || fail "brief deliver" "$(grep -n 'change under review' <<<"$rbh")"
+  && t "the reviewer judges the mission's diff, naming the person's commit as the ticket's (B3, D142)" || fail "brief deliver" "$(grep -n 'change under review' <<<"$rbh")"
 printf '# Verdict: 04-ci\n**Result:** FAIL\n**Commit:** %s\n\n## Assertions\n- VAL-M-001: FAIL — os list changed\n' "$dc" > .scratch/maint/verdicts/04-ci-code.md
 bash -c '. scripts/factory/lib.sh; compute_ticket_state maint; [[ " ${T_HAND[*]} " == *" 04-ci "* ]] && [[ " ${T_BUILD[*]} " != *" 04-ci "* ]]' \
   && t "a failed review of a ticket delivered by hand goes back to the person, never to a worker" || fail "fix round by hand"
@@ -1611,6 +1621,11 @@ grep -qx -- '--body-file' "$work/gh.log" && grep -qx -- '--draft' "$work/gh.log"
   && grep -q 'pull/9' $m/mr.url && ! grep -qi 'gitlab' "$work/mr.log" \
   && [ "$(grep -c . "$work/gh.log.calls")" -ge 3 ] && ! grep -v -- '--repo o/p' "$work/gh.log.calls" | grep -q . \
   && t "mr.sh on a GitHub remote opens the PR with gh --body-file, no GitLab steps, every gh call on origin's repository (get-port-7)" || fail "mr gh create" "$(cat "$work/mr.log" "$work/gh.log")"
+# search-attrs-case: the archived metrics.json said "mr": null; mr.url was written 6 s after it.
+amj="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/archive/demo/metrics.json"
+node -e 'process.exit(/pull\/9/.test(require(process.argv[1]).mr || "") ? 0 : 1)' "$amj" \
+  && tar -xzOf "$(ls -t "$work/data"/*/demo-*.tar.gz | head -1)" demo/metrics.json | grep -q 'pull/9' \
+  && t "mr.sh: the archived metrics and the export carry the PR it just opened (search-attrs-case)" || fail "metrics mr" "$(cat "$amj" 2>&1)"
 printf '#!/usr/bin/env bash\nexit 1\n' > "$work/bin/gh"   # installed, not logged in
 out="$(PATH="$work/bin:$PATH" FACTORY_DATA_DIR="$work/data" FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo 2>&1)" \
   && grep -q 'gh pr create --repo o/p --base production' <<<"$out" && ! grep -qi 'gitlab' <<<"$out" \

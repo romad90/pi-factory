@@ -394,7 +394,7 @@ export function check({ tool, input = {}, cwd = process.cwd() }) {
   if (tool === "contact_supervisor" && process.env.FACTORY_BENCH === "1" && input.reason !== "progress_update") {
     return { rule: "bench", reason: "no supervisor in a bench run: nobody will reply, so don't ask again. Finish the ticket with what the files settle, or stop and say in your final answer what you needed: blocked by the factory guard" };
   }
-  // D141: in a factory project the lead waits in an async:false workflow, so a
+  // D142: in a factory project the lead waits in an async:false workflow, so a
   // question to the supervisor fails ("Supervisor unavailable") in 5 of 8 retros.
   if (tool === "contact_supervisor" && input.reason !== "progress_update" && projectRoot(cwd)) {
     return { rule: "decision", reason: "nobody answers the supervisor inside a factory workflow: end your final answer with one line `DECISION NEEDED: <the question, with options>` and stop; the lead records it and the rest of the mission runs on: blocked by the factory guard" };

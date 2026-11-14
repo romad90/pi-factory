@@ -295,7 +295,7 @@ test("D101: bench agents are workers", () => {
 
 test("bench: no supervisor to wait for", () => {
   const ask = { reason: "need_decision", message: "which name?" };
-  // D141: nobody answers inside a factory workflow: the agent ends with DECISION NEEDED instead.
+  // D142: nobody answers inside a factory workflow: the agent ends with DECISION NEEDED instead.
   assert.equal(check({ tool: "contact_supervisor", input: ask, cwd: main })?.rule, "decision");
   assert.match(check({ tool: "contact_supervisor", input: ask, cwd: main }).reason, /DECISION NEEDED: /);
   assert.equal(check({ tool: "contact_supervisor", input: { reason: "progress_update", message: "x" }, cwd: main }), null, "progress expects no reply");

@@ -281,10 +281,10 @@ if [ ${#T_BUILD[@]} -gt 0 ]; then
   # after this step, they don't stop it.
   [ ${#T_ESCALATE[@]} -gt 0 ] && extra+="; ${T_ESCALATE[*]} wait for the human afterwards, run this step now"
   [ ${#T_HAND[@]} -gt 0 ] && extra+="; ${T_HAND[*]} wait for a person's commit (by hand), run this step now"
-  [ ${#T_ASKED[@]} -gt 0 ] && extra+="; ${T_ASKED[*]} wait for an answer, asked once nothing else can run (D141)"
+  [ ${#T_ASKED[@]} -gt 0 ] && extra+="; ${T_ASKED[*]} wait for an answer, asked once nothing else can run (D142)"
   step build "scripts/factory/workflow.sh build-wave $feature (${#T_BUILD[@]} ticket(s)$extra), then integrate.sh per patch"
 fi
-# D141: nothing else can build or review: the oldest held question goes to the
+# D142: nothing else can build or review: the oldest held question goes to the
 # person, as open-question.md (one at a time: /factory-decide answers it).
 if [ ${#T_ASKED[@]} -gt 0 ]; then
   first="$(for n in "${T_ASKED[@]}"; do printf '%s\t%s\n' "$(sed -n 's/^\*\*Asked:\*\* //p' "$dir/state/$n.asked" | head -1)" "$n"; done | sort | head -1 | cut -f2)"

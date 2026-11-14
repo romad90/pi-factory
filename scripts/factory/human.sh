@@ -174,7 +174,7 @@ case "$cmd" in
       echo "Logged in $(mission_dir "$feature")/decisions.tsv as auto, unreviewed. Continue: the ticket rebuilds with the answer."
       exit 0
     fi
-    # D141: a ticket's question holds that ticket only; every other ticket
+    # D142: a ticket's question holds that ticket only; every other ticket
     # and step runs on, and next.sh asks the person once nothing else can run.
     held=""; [ -z "$light" ] && [ -f "$dir/issues/$ticket.md" ] && held="$dir/state/$ticket.asked"
     asked=0

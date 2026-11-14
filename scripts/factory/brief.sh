@@ -109,7 +109,7 @@ if [[ "$text" == *"{{BY_HAND}}"* ]]; then
   [ -z "$bh" ] || bh="Exception: these files were changed by hand, as dependency changes must be (D124), in${bh%;}. They are delivered: check them with git show <commit>, never FAIL them as missing from the reviewed commit."
   text="${text//"{{BY_HAND}}"/"$bh"}"
 fi
-# B2, D141: the reviewer judges the mission's whole diff from its base, never
+# B2, D142: the reviewer judges the mission's whole diff from its base, never
 # the last integrated commit (deps-node-22 ticket 01, pin-destroy-during-search
 # VAL-CROSS-001): a deliverable an earlier commit made is delivered.
 if [[ "$text" == *"{{TICKET_DIFF}}"* ]]; then

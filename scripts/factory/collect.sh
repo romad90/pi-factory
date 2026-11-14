@@ -93,7 +93,7 @@ for v in "$dir"/verdicts/*-code.md; do
   # is no finding on the code. Rebuilding would redo working code against
   # nothing. Set aside, not a round, reviewed again; a second one in a row
   # escalates with the reviewer's reasons, a factory incident for a person.
-  # D141: so does a FAIL whose reviewer wrote **Cause:** process (the review
+  # D142: so does a FAIL whose reviewer wrote **Cause:** process (the review
   # couldn't finish, evidence no worker can produce): not a build round.
   if [ -n "$marker" ] && [ "$(verdict_field "$v" Result)" = FAIL ] \
      && { [ "$n" -eq 0 ] || ! cmp -s "$v" "${v%.md}.r$n.md"; }; then
