@@ -133,7 +133,7 @@ err="$(mktemp)"
 if ! out="$(mission_switch "$feature" "$spec" 2>"$err")"; then rm -f "$err"; step blocked "$out"; fi
 sw="$(cat "$err")"; rm -f "$err"; [ -z "$sw" ] || STATUS+="${sw#factory: }"$'\n'
 
-# D139 (P31): a dependency mission's install runs before the contract, by a
+# D140 (P31): a dependency mission's install runs before the contract, by a
 # script, so the author can run the new version. A person's hand commit
 # recorded with /factory-deps (D124) does the same and skips this step.
 if [ -n "$(install_commands "$spec")" ] && ! grep -q $'\tdeps\t' "$dir/decisions.tsv" 2>/dev/null; then
@@ -192,7 +192,7 @@ open_amendments=()
 for a in "$dir"/amendments/*.md; do
   [ -f "$a" ] && amendment_open "$a" "$spec" && open_amendments+=("$a")
 done
-# D139: the critic's [blocking] findings go back to the author in the next
+# D140: the critic's [blocking] findings go back to the author in the next
 # round, with no person between, until the critic has had its rounds.
 crounds="$(contract_rounds "$dir")"; reround=""
 if has_contract "$spec" && [ -f "$critique" ] && [ ${#open_amendments[@]} -eq 0 ] && ! contract_approved "$spec" \
@@ -211,7 +211,7 @@ if ! has_contract "$spec" || [ ! -f "$critique" ] || [ ${#open_amendments[@]} -g
 fi
 if ! contract_approved "$spec"; then
   hint=""
-  grep -q '\[blocking\]' "$critique" && hint=" The critic used its $FACTORY_CONTRACT_ROUNDS rounds and still lists [blocking] findings (D139): approve with them on the record, or /factory-amend $feature \"<change>\" for another round."
+  grep -q '\[blocking\]' "$critique" && hint=" The critic used its $FACTORY_CONTRACT_ROUNDS rounds and still lists [blocking] findings (D140): approve with them on the record, or /factory-amend $feature \"<change>\" for another round."
   # D126: from the third round on, say which blocking findings name a wrong
   # change that would pass (deps-node-22: 6 critiques, 5 amendments, 63 min).
   shopt -s nullglob; am=("$(dirname "$spec")"/amendments/*.md); shopt -u nullglob

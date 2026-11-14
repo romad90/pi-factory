@@ -300,7 +300,7 @@ git checkout -q -- .scratch/depsm
 git rm -rq .scratch/depsm vendor-demo; git commit -qm "test: drop the dependency mission"
 git checkout -q "$cmds0" -- .factory/commands.env; git commit -qm "test: reset commands"
 
-echo "Install before the contract (D139)"
+echo "Install before the contract (D140)"
 inst0="$(git rev-parse HEAD)"; mkdir -p .scratch/inst "$work/fakebin"
 printf '# Inst\n**Intent:** maintenance\n\n## Dependencies\n\n- `npm i -D left-pad@^1.3.0`\n\n## Scope\n\n`package.json`\n' > .scratch/inst/spec.md
 cat > "$work/fakebin/npm" <<'NPM'
@@ -311,12 +311,12 @@ NPM
 chmod +x "$work/fakebin/npm"; git add .scratch/inst; git commit -qm "test: a dependency mission with its install named"
 out="$(bash scripts/factory/next.sh inst 2>&1)"
 [ "$(head -1 <<<"$out")" = "STEP: install" ] && grep -q 'scripts/factory/install.sh inst' <<<"$out" \
-  && t "a spec naming its npm install under ## Dependencies gets STEP: install before the contract (D139)" || fail "install step" "$out"
+  && t "a spec naming its npm install under ## Dependencies gets STEP: install before the contract (D140)" || fail "install step" "$out"
 PATH="$work/fakebin:$PATH" NPM_LOG="$work/npm.log" bash scripts/factory/install.sh inst >"$work/install-deps.log" 2>&1 || fail "install.sh" "$(cat "$work/install-deps.log")"
 ic="$(git log --format='%h %s' --grep='^Factory-Script: install$' -1)"
 [ "$(cat "$work/npm.log")" = "i -D left-pad@^1.3.0 --ignore-scripts" ] && grep -q 'build(inst): npm i -D left-pad@^1.3.0' <<<"$ic" \
   && [ "$(git show --name-only --relative --format= "${ic%% *}" | sort | paste -sd' ' -)" = "package-lock.json package.json" ] \
-  && grep -qF "$(printf 'deps\tDependencies installed by the factory (D139)\tcommit %s: package-lock.json, package.json' "${ic%% *}")" .scratch/inst/decisions.tsv \
+  && grep -qF "$(printf 'deps\tDependencies installed by the factory (D140)\tcommit %s: package-lock.json, package.json' "${ic%% *}")" .scratch/inst/decisions.tsv \
   && grep -q $'\tfactory (auto)\tunreviewed$' .scratch/inst/decisions.tsv && [ -z "$(git status --porcelain)" ] \
   && t "install.sh runs the named command with install scripts off, commits manifest and lockfile, logs a deps row by factory (auto)" || fail "install.sh result" "$(cat "$work/install-deps.log" "$work/npm.log" .scratch/inst/decisions.tsv; git log --oneline -3)"
 expect_inst() { local o; o="$(bash scripts/factory/next.sh inst 2>&1)"; [ "$(head -1 <<<"$o")" = "STEP: $1" ] && t "$2" || fail "$2" "$o"; }
@@ -355,23 +355,23 @@ echo "No findings. Critique result: approve" > $m/contract-critique.md
 expect_step approve "critique present, not approved"
 # D126: from the third round, next.sh says which blocking findings name a wrong
 # change that would pass (deps-node-22: 6 critiques, 5 amendments, 63 min at G1).
-# D139: a [blocking] finding goes back to the author, with no person between,
+# D140: a [blocking] finding goes back to the author, with no person between,
 # until the critic has had its 2 rounds; a [non-blocking] one doesn't.
 mkdir -p $m/workflows; touch $m/workflows/20260101-000000-contract.js
 printf '**Critique result:** FINDINGS\n\n- [non-blocking] wording\n' > $m/contract-critique.md
-expect_step approve "a critique with only [non-blocking] findings goes to G1 (D139)"
+expect_step approve "a critique with only [non-blocking] findings goes to G1 (D140)"
 printf '**Critique result:** FINDINGS\n\n- [blocking] VAL-HELLO-001: a hole.\n  Passes wrongly: a bot that never greets.\n' > $m/contract-critique.md
 out="$(bash scripts/factory/next.sh demo 2>&1)"
 [ "$(head -1 <<<"$out")" = "STEP: contract" ] && grep -q 'Critic round 1 of 2 left \[blocking\] findings: the author applies them in round 2, no person needed' <<<"$out" \
-  && t "critic round 1's [blocking] findings go back to the author without /factory-amend (D139)" || fail "auto round" "$out"
+  && t "critic round 1's [blocking] findings go back to the author without /factory-amend (D140)" || fail "auto round" "$out"
 cb="$(bash scripts/factory/brief.sh contract-critic demo)"; ab="$(bash scripts/factory/brief.sh contract-author demo)"
 grep -q 'This is critic round 2 of 2\.' <<<"$cb" && grep -q 'From round 2 on, a wrong change that nobody wrote or saw is only imagined' <<<"$cb" \
   && grep -q 'Apply every \[blocking\] finding of the critique yourself' <<<"$ab" \
-  && t "the critic's brief carries its round and the round-2 rule; the author's says to apply the findings (D139)" || fail "round briefs" "$cb"
+  && t "the critic's brief carries its round and the round-2 rule; the author's says to apply the findings (D140)" || fail "round briefs" "$cb"
 touch $m/workflows/20260101-000001-contract.js
 out="$(bash scripts/factory/next.sh demo 2>&1)"
 [ "$(head -1 <<<"$out")" = "STEP: approve" ] && grep -q 'The critic used its 2 rounds and still lists \[blocking\] findings' <<<"$out" \
-  && t "after the critic's 2 rounds, open [blocking] findings go to G1, on the record (D139)" || fail "round cap" "$out"
+  && t "after the critic's 2 rounds, open [blocking] findings go to G1, on the record (D140)" || fail "round cap" "$out"
 mkdir -p $m/amendments; printf '# Amendment request\n**Status:** done\n' | tee $m/amendments/a1.md > $m/amendments/a2.md
 printf '**Critique result:** FINDINGS\n\n### F1 — [blocking] a\n\nx\n\nPasses wrongly: a job that ignores the matrix.\n\n### F2 — b\n\n- [blocking] y\n' > $m/contract-critique.md
 out="$(bash scripts/factory/next.sh demo 2>&1)"
@@ -1006,6 +1006,15 @@ touch -d "@$(( $(date +%s) - 5 ))" "$work/usage/run/c9ctr_factory-contract-autho
 out="$(FACTORY_USAGE_DIRS="$work/usage" bash scripts/factory/archive.sh collect demo)"
 [ -f "$(dirname "$arch")/c9ctr_factory-contract-author/run.json" ] \
   && t "archive: a contract run before an amendment's rewrite of spec.md is still archived (F10)" || fail "archive contract run" "$out / $(ls "$(dirname "$arch")")"
+# search-attrs-case: usage.tsv held 6 runs of the 11 runs.tsv lists; every
+# contract run and the ticket writer finished before the last spec.md write.
+mkdir -p "$work/usage/other"
+printf '{"model":"gw/author-1","usage":{"input":5,"output":1,"cost":0,"turns":1},"durationMs":1000,"cwd":"/elsewhere/clone"}' > "$work/usage/other/f0rgn_factory-contract-author_meta.json"
+touch -d "@$(( $(date +%s) - 5 ))" "$work/usage/other/f0rgn_factory-contract-author_meta.json"
+FACTORY_USAGE_DIRS="$work/usage" bash scripts/factory/usage.sh demo >/dev/null
+grep -q 'c9ctr' $m/usage.tsv && ! grep -q 'f0rgn' $m/usage.tsv \
+  && t "usage: a contract run before an amendment's rewrite of spec.md is counted; another clone's run is not (search-attrs-case)" || fail "usage contract run" "$(cat $m/usage.tsv)"
+rm -rf "$work/usage/other"
 touch -r "$work/spec.mtime" "$m/spec.md"
 # P20: request sizes from the child transcript (pi-subagents' records): the
 # a 25k-token test log takes the reviewer's request from 10k to 35k; the next one would be 36.2k.
@@ -1098,10 +1107,11 @@ FACTORY_JUDGE_BIN="$work/judge-bad.sh" FACTORY_JUDGE_MODELS="gw/judge-1" bash sc
 [ "$(wc -l < $m/scores.tsv)" = "$n0" ] && t "score: a run is judged once per dimension; a malformed answer is never guessed" || fail "score dedupe" "$(cat "$work/score2.log")"
 FACTORY_JUDGE_BIN="$work/judge.sh" FACTORY_JUDGE_MODELS="gw/maker-2" bash scripts/factory/score.sh demo --dimension context-waste >"$work/score3.log" 2>&1
 grep -q 'without a judge of another family' "$work/score3.log" && t "score: no judge of the run's own family" || fail "score family" "$(cat "$work/score3.log")"
+# Two runs: the worker and the contract author that ran before spec.md last changed (search-attrs-case).
 echo 'https://gitlab.example/g/p/-/merge_requests/9' > $m/mr.url
 bash scripts/factory/metrics.sh --all > "$work/all.md"; bash scripts/factory/metrics.sh --all --json > "$work/all.json"
 grep -q '^| demo | ' "$work/all.md" && grep -q '^| \*\*Total\*\*' "$work/all.md" && grep -q 'Cost per MR' "$work/all.md" \
-  && node -e 'const j=require(process.argv[1]); const d=j.missions.find(m=>m.mission==="demo"); process.exit(d && d.runs===1 && d.tokensIn===120000 && d.scored>=2 && d.scoreFails>=1 && d.mr && j.total.mrs===1 ? 0 : 1)' "$work/all.json" \
+  && node -e 'const j=require(process.argv[1]); const d=j.missions.find(m=>m.mission==="demo"); process.exit(d && d.runs===2 && d.tokensIn===121000 && d.scored>=2 && d.scoreFails>=1 && d.mr && j.total.mrs===1 ? 0 : 1)' "$work/all.json" \
   && grep -q 'Scored runs (scores.tsv, D97) | .*fail' <<<"$(bash scripts/factory/metrics.sh demo)" \
   && t "metrics --all: every mission and the total, with cost per MR and scores (D97)" || fail "metrics all" "$(cat "$work/all.md" "$work/all.json")"
 rm -f $m/mr.url $m/scores.tsv
@@ -1635,6 +1645,11 @@ grep -qx -- '--body-file' "$work/gh.log" && grep -qx -- '--draft' "$work/gh.log"
   && grep -q 'pull/9' $m/mr.url && ! grep -qi 'gitlab' "$work/mr.log" \
   && [ "$(grep -c . "$work/gh.log.calls")" -ge 3 ] && ! grep -v -- '--repo o/p' "$work/gh.log.calls" | grep -q . \
   && t "mr.sh on a GitHub remote opens the PR with gh --body-file, no GitLab steps, every gh call on origin's repository (get-port-7)" || fail "mr gh create" "$(cat "$work/mr.log" "$work/gh.log")"
+# search-attrs-case: the archived metrics.json said "mr": null; mr.url was written 6 s after it.
+amj="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/archive/demo/metrics.json"
+node -e 'process.exit(/pull\/9/.test(require(process.argv[1]).mr || "") ? 0 : 1)' "$amj" \
+  && tar -xzOf "$(ls -t "$work/data"/*/demo-*.tar.gz | head -1)" demo/metrics.json | grep -q 'pull/9' \
+  && t "mr.sh: the archived metrics and the export carry the PR it just opened (search-attrs-case)" || fail "metrics mr" "$(cat "$amj" 2>&1)"
 printf '#!/usr/bin/env bash\nexit 1\n' > "$work/bin/gh"   # installed, not logged in
 out="$(PATH="$work/bin:$PATH" FACTORY_DATA_DIR="$work/data" FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo 2>&1)" \
   && grep -q 'gh pr create --repo o/p --base production' <<<"$out" && ! grep -qi 'gitlab' <<<"$out" \

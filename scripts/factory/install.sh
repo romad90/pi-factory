@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# D139 (P31): a dependency mission's install, run by the factory before the
+# D140 (P31): a dependency mission's install, run by the factory before the
 # contract, so the contract author and the workers work on the new version.
 # Workers still never install (D65, D100): this script, not an agent, runs
 # the npm commands the spec names under "## Dependencies" (in backticks), with
@@ -44,6 +44,6 @@ mapfile -t fl <<<"$files"
 git add -- "${fl[@]}"
 git commit -q --author="$FACTORY_AUTHOR" -m "build($feature): $(paste -sd';' <<<"$cmds" | sed 's/;/; /g')" -m "Factory-Script: install" -- "${fl[@]}"
 c="$(git rev-parse --short HEAD)"; list="$(paste -sd, <<<"$files" | sed 's/,/, /g')"
-decision_log "$feature" - deps "Dependencies installed by the factory (D139)" "commit $c: $list — $(paste -sd';' <<<"$cmds" | sed 's/;/; /g') (--ignore-scripts)" mission "factory (auto)"
+decision_log "$feature" - deps "Dependencies installed by the factory (D140)" "commit $c: $list — $(paste -sd';' <<<"$cmds" | sed 's/;/; /g') (--ignore-scripts)" mission "factory (auto)"
 bash "$here/checkpoint.sh" "$feature" >/dev/null
 echo "Installed and committed in $c ($list). Reviewers count these files as delivered (D124); test-on-base skips a base older than $c."
