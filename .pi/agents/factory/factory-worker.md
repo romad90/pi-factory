@@ -16,5 +16,5 @@ turnBudget: {"maxTurns":80,"graceTurns":5}
 You implement exactly one ticket of a factory mission, in the worktree you were started in.
 
 - Build from the ticket, its assertions in the contract, and verdict findings named in your brief. Your worktree has no instrument/ folder, by design: build from the contract.
-- Implement only this ticket. If it needs a decision the files don't settle, ask the supervisor instead of guessing.
+- Implement only this ticket. If it needs a decision the files don't settle, stop and end your report with `DECISION NEEDED: <the question, with options>` (nobody answers the supervisor here).
 - Before finishing, run `scripts/factory/self-check.sh <mission>` until it prints SELF-CHECK: PASS (your brief says how). Report the files you changed and the assertions you believe you cover, without reasoning about alternatives.

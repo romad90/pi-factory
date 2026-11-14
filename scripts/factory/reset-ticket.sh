@@ -37,6 +37,7 @@ if [ "${3:-}" = "--review" ]; then
   mkdir -p "$dir/state"
   if git ls-files --error-unmatch -- "$v" >/dev/null 2>&1; then git mv -f -- "$v" "$dir/state/$ticket.superseded-verdict.md"; else mv -f -- "$v" "$dir/state/$ticket.superseded-verdict.md"; fi
   rm -f "$dir/state/$ticket.stuck" "$dir/state/$ticket.not-run" "$dir/state/$ticket.sent-back"
+  if [ -f "$dir/state/$ticket.asked" ]; then git rm -q --ignore-unmatch -- "$dir/state/$ticket.asked"; rm -f -- "$dir/state/$ticket.asked"; fi
   q="$dir/state/open-question.md"
   if [ -f "$q" ] && grep -q "^\*\*Ticket:\*\* $ticket\$" "$q"; then
     if git ls-files --error-unmatch -- "$q" >/dev/null 2>&1; then git rm -q -- "$q"; else rm -f -- "$q"; fi
