@@ -149,7 +149,9 @@ echo "    body:  $body_file"
 if [ -n "$dry" ]; then echo "(dry run: nothing pushed)"; exit 0; fi
 
 url_file="$dir/mr.url"
-record() { [ -n "$1" ] || return 0; printf '%s\n' "$1" > "$url_file"; echo "MR: $1"; }
+# The mission data again once mr.url is written, so the archived metrics and
+# the export carry the MR (search-attrs-case: "mr": null, mr.url 6 s later).
+record() { [ -n "$1" ] || return 0; printf '%s\n' "$1" > "$url_file"; echo "MR: $1"; mission_data; }
 # D103: the mission's data, kept without anyone asking: the last runs go into
 # the archive, the metrics next to them, and one export per mission lands in
 # this machine's data folder (FACTORY_DATA_DIR, default ~/.pi-factory/data),

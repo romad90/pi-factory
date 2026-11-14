@@ -20,8 +20,19 @@ read -r -a roots <<<"${FACTORY_USAGE_DIRS:-.pi/subagents $HOME/.pi/agent ${TMPDI
 existing=()
 for r in "${roots[@]}"; do [ -d "$r" ] && existing+=("$r"); done
 [ ${#existing[@]} -gt 0 ] || exit 0
-find "${existing[@]}" -maxdepth 7 -type f -name '*_meta.json' -newer "$dir/spec.md" 2>/dev/null \
-  | node -e '
+# Runs newer than spec.md, as before; and the runs since the mission began that
+# this checkout owns (D101): every amendment rewrites spec.md, so the contract
+# author, critic and ticket writer before it were never counted
+# (search-attrs-case: 6 runs in usage.tsv, 11 in runs.tsv).
+metas() {
+  find "${existing[@]}" -maxdepth 7 -type f -name '*_meta.json' -newer "$dir/spec.md" 2>/dev/null || true
+  local since owned=()
+  since="$(mission_since "$dir")" || return 0
+  while IFS= read -r w; do owned+=("$w"); done < <(checkout_roots)
+  find "${existing[@]}" -maxdepth 7 -type f -name '*_meta.json' -newermt "$since" ! -newer "$dir/spec.md" 2>/dev/null \
+    | node "$here/archive.mjs" owned "$dir" "${owned[@]}" || true
+}
+metas | node -e '
 const fs = require("fs"); const out = process.argv[1];
 const files = fs.readFileSync(0, "utf8").split("\n").filter(Boolean);
 const seen = new Set();

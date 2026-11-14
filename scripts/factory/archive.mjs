@@ -2,6 +2,7 @@
 // Helpers for archive.sh (D97). No dependencies.
 //   node archive.mjs collect <out-dir> <mission-dir> <head> [guard.log] [root...]   (meta paths on stdin)
 //     root: this checkout's folders (top level, worktrees, git common dir)
+//   node archive.mjs owned <mission-dir> [root...]   (meta paths on stdin → the ones this checkout owns)
 //   node archive.mjs list <out-dir>
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, realpathSync } from "node:fs";
 import { join, dirname, basename, isAbsolute, resolve } from "node:path";
@@ -59,6 +60,13 @@ function sessionOwned(paths, roots) {
     const m = p.match(/\/sessions\/(--[^/]*--)\//);
     return !!m && (exact.has(m[1]) || prefixes.some((x) => m[1].startsWith(x)));
   });
+}
+// One run's meta (path and parsed JSON) is ours by its paths or its brief id.
+function owned(meta, j, roots, recorded) {
+  const input = read(join(dirname(meta), `${basename(meta).replace(/_meta\.json$/, "")}_input.md`)) || "";
+  const id = (input.match(/^brief-id:\s*(\S+)/m) || [])[1] || "";
+  return under(meta, roots) || pathsIn(j).some((p) => under(p, roots)) || sessionOwned([meta, ...pathsIn(j)], roots)
+    || (id.length >= 6 && recorded.includes(id));
 }
 function pathsIn(v, out = []) {
   if (typeof v === "string") { if (isAbsolute(v)) out.push(v); }
@@ -137,13 +145,7 @@ if (cmd === "collect") {
     const runId = String(j.runId || (i > 0 ? base.slice(0, i) : base));
     const agent = String(j.agent || (i > 0 ? base.slice(i + 1) : "?")).replace(/_\d+$/, "");
     if (!agent.startsWith("factory-")) continue;
-    if (roots.length) {
-      const input = read(join(dirname(meta), `${basename(meta).replace(/_meta\.json$/, "")}_input.md`)) || "";
-      const id = (input.match(/^brief-id:\s*(\S+)/m) || [])[1] || "";
-      const ours = under(meta, roots) || pathsIn(j).some((p) => under(p, roots)) || sessionOwned([meta, ...pathsIn(j)], roots)
-        || (id.length >= 6 && recorded.includes(id));
-      if (!ours) { foreign++; continue; }
-    }
+    if (roots.length && !owned(meta, j, roots, recorded)) { foreign++; continue; }
     const key = `${runId}_${agent}`.replace(/[^\w.-]/g, "_");
     const dest = join(out, key);
     const known = existsSync(join(dest, "run.json"));   // archived before: add what was missing, refresh the outcome
@@ -182,6 +184,15 @@ if (cmd === "collect") {
     if (!known) added++;
   }
   console.log(`archive: ${added} run(s) added to ${out}${redacted ? ` (${redacted} file(s) redacted)` : ""}${foreign ? `; ${foreign} run(s) of another checkout ignored` : ""}`);
+} else if (cmd === "owned") {
+  // usage.sh: of the meta paths on stdin, print the ones this checkout owns (D101).
+  const [missionDir, ...rootArgs] = args;
+  const roots = [...new Set(rootArgs.filter(Boolean).flatMap((r) => [resolve(r), real(r)]))];
+  const recorded = missionText(missionDir).join("\n");
+  for (const meta of readFileSync(0, "utf8").split("\n").filter(Boolean)) {
+    let j; try { j = JSON.parse(readFileSync(meta, "utf8")); } catch { continue; }
+    if (owned(meta, j, roots, recorded)) console.log(meta);
+  }
 } else if (cmd === "refresh") {
   // Runs archived before their times, tool calls or refusals were read from
   // the transcript: fill what's missing from the archived transcript and
