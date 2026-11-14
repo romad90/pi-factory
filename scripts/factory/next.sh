@@ -4,7 +4,7 @@
 #   STEP: <code>
 # Codes (human steps marked *, they notify you):
 #   measure architect strategy-critic approve-strategy* mission job-done*   (a job, P22)
-#   paused* grill* context-sync investigate approve-conclusion* handoff* report*
+#   paused* grill* install context-sync investigate approve-conclusion* handoff* report*
 #   contract approve* design approve-design* decide* tickets approve-tickets* coverage*
 #   setup* build hand* review escalate* blocked* validate behavior-fix
 #   behavior-stale health health-fix steward unverified* verify verify-failed* pr*
@@ -133,6 +133,12 @@ err="$(mktemp)"
 if ! out="$(mission_switch "$feature" "$spec" 2>"$err")"; then rm -f "$err"; step blocked "$out"; fi
 sw="$(cat "$err")"; rm -f "$err"; [ -z "$sw" ] || STATUS+="${sw#factory: }"$'\n'
 
+# D139 (P31): a dependency mission's install runs before the contract, by a
+# script, so the author can run the new version. A person's hand commit
+# recorded with /factory-deps (D124) does the same and skips this step.
+if [ -n "$(install_commands "$spec")" ] && ! grep -q $'\tdeps\t' "$dir/decisions.tsv" 2>/dev/null; then
+  step install "scripts/factory/install.sh $feature (the npm commands under ## Dependencies, install scripts off; commits the manifest and lockfile; no model)"
+fi
 # D99: a bug between services is investigated before any contract. Context
 # repos are cloned read-only; explorers map one repo each, fresh; the
 # investigator concludes where the fix belongs and how to reproduce it.
@@ -186,7 +192,15 @@ open_amendments=()
 for a in "$dir"/amendments/*.md; do
   [ -f "$a" ] && amendment_open "$a" "$spec" && open_amendments+=("$a")
 done
-if ! has_contract "$spec" || [ ! -f "$critique" ] || [ ${#open_amendments[@]} -gt 0 ]; then
+# D139: the critic's [blocking] findings go back to the author in the next
+# round, with no person between, until the critic has had its rounds.
+crounds="$(contract_rounds "$dir")"; reround=""
+if has_contract "$spec" && [ -f "$critique" ] && [ ${#open_amendments[@]} -eq 0 ] && ! contract_approved "$spec" \
+   && grep -q '\[blocking\]' "$critique" && [ "$crounds" -lt "$FACTORY_CONTRACT_ROUNDS" ]; then
+  reround=1
+  STATUS="Critic round $crounds of $FACTORY_CONTRACT_ROUNDS left [blocking] findings: the author applies them in round $((crounds + 1)), no person needed."$'\n'
+fi
+if ! has_contract "$spec" || [ ! -f "$critique" ] || [ ${#open_amendments[@]} -gt 0 ] || [ -n "$reround" ]; then
   unsent=""
   for a in "${open_amendments[@]}"; do
     grep -q '^\*\*Status:\*\* pending' "$a" && continue
@@ -197,7 +211,7 @@ if ! has_contract "$spec" || [ ! -f "$critique" ] || [ ${#open_amendments[@]} -g
 fi
 if ! contract_approved "$spec"; then
   hint=""
-  grep -q '\[blocking\]' "$critique" && hint=" The critique has [blocking] findings: rerun 'workflow.sh contract' to amend, then re-read."
+  grep -q '\[blocking\]' "$critique" && hint=" The critic used its $FACTORY_CONTRACT_ROUNDS rounds and still lists [blocking] findings (D139): approve with them on the record, or /factory-amend $feature \"<change>\" for another round."
   # D126: from the third round on, say which blocking findings name a wrong
   # change that would pass (deps-node-22: 6 critiques, 5 amendments, 63 min).
   shopt -s nullglob; am=("$(dirname "$spec")"/amendments/*.md); shopt -u nullglob
