@@ -941,6 +941,11 @@ contract_sha() { grep -v '^\*\*Contract approved:\*\*' "$1" | sha256 | cut -c1-1
 # workflow.sh wrote (workflows/<date>-contract.js, one per wave). The author
 # applies the critic's [blocking] findings in the next round with no person
 # between; after FACTORY_CONTRACT_ROUNDS critic rounds the contract goes to G1.
+# Environment first, then .factory/commands.env, else 2 (next.sh needs it
+# before load_commands runs).
+if [ -z "${FACTORY_CONTRACT_ROUNDS:-}" ] && [ -f .factory/commands.env ]; then
+  FACTORY_CONTRACT_ROUNDS="$(sed -n 's/^[[:space:]]*\(export[[:space:]]*\)\{0,1\}FACTORY_CONTRACT_ROUNDS=["'"'"']\{0,1\}\([0-9][0-9]*\).*/\2/p' .factory/commands.env | tail -1)"
+fi
 FACTORY_CONTRACT_ROUNDS="${FACTORY_CONTRACT_ROUNDS:-2}"
 contract_rounds() {         # contract_rounds <mission dir>
   local f n=0

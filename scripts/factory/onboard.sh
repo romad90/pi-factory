@@ -61,6 +61,26 @@ put() {                                   # <relative path> [source path in the 
   mkdir -p "$(dirname "$rel")"; cp "$from" "$rel"; note "+ $rel"
 }
 put .factory/commands.env
+# A project onboarded on an older factory never saw the settings added since:
+# append the template's block (blank-line separated) for each setting its
+# commands.env doesn't name yet, commented, so nothing changes until set.
+have=" $(grep -oE 'FACTORY_[A-Z0-9_]+' .factory/commands.env | sort -u | tr '\n' ' ')"
+blocks="$(awk -v have="$have" 'BEGIN { RS = "" } {
+  new = ""; n = split($0, l, "\n")
+  for (i = 1; i <= n; i++) if (match(l[i], /^#?[ \t]*(export[ \t]+)?FACTORY_[A-Z0-9_]+=/)) {
+    s = substr(l[i], RSTART, RLENGTH); sub(/^#?[ \t]*(export[ \t]+)?/, "", s); sub(/=$/, "", s)
+    if (index(have, " " s " ") == 0 && index(new, " " s " ") == 0) new = new " " s " "
+  }
+  if (new == "") next
+  names = names new; printf "\n"
+  for (i = 1; i <= n; i++) print (l[i] ~ /^#/ ? l[i] : "# " l[i])
+} END { gsub(/  +/, " ", names); if (names != "") printf "NAMES:%s\n", names }' "$pkg/.factory/commands.env")"
+if [ -n "$blocks" ]; then
+  [ -z "$(tail -c1 .factory/commands.env)" ] || printf '\n' >> .factory/commands.env
+  { printf '\n# Added by factory onboard (pi-factory %s): settings this file did not name yet, all commented.\n' "$version"
+    sed '$d' <<<"$blocks"; } >> .factory/commands.env
+  note ".factory/commands.env += commented:$(tail -1 <<<"$blocks" | sed 's/^NAMES://; s/ $//')"
+fi
 put .factory/behavior-paths
 put .factory/model-families.json
 put docs/agents/quality-bar.md
