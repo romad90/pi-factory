@@ -826,6 +826,13 @@ deps_commits() {                               # <feature> [<base>]: "<hash>\t<f
   done
 }
 
+# D139 (P31): the npm install commands a spec's "## Dependencies" section
+# names in backticks, one per line. install.sh runs them before the contract.
+install_commands() {                           # <spec>
+  [ -f "$1" ] || return 0
+  sed -n '/^## Dependencies/,/^## /p' "$1" | { grep -oE '`npm (i|install|add)( [^`]*)?`' || true; } | tr -d '`'
+}
+
 # B3: the commits a person recorded as a ticket's delivery (human.sh deliver).
 delivered_commits() {                          # <feature> <ticket>
   local f; f="$(mission_dir "$1")/decisions.tsv"

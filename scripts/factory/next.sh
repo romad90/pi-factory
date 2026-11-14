@@ -4,7 +4,7 @@
 #   STEP: <code>
 # Codes (human steps marked *, they notify you):
 #   measure architect strategy-critic approve-strategy* mission job-done*   (a job, P22)
-#   paused* grill* context-sync investigate approve-conclusion* handoff* report*
+#   paused* grill* install context-sync investigate approve-conclusion* handoff* report*
 #   contract approve* design approve-design* decide* tickets approve-tickets* coverage*
 #   setup* build hand* review escalate* blocked* validate behavior-fix
 #   behavior-stale health health-fix steward unverified* verify verify-failed* pr*
@@ -133,6 +133,12 @@ err="$(mktemp)"
 if ! out="$(mission_switch "$feature" "$spec" 2>"$err")"; then rm -f "$err"; step blocked "$out"; fi
 sw="$(cat "$err")"; rm -f "$err"; [ -z "$sw" ] || STATUS+="${sw#factory: }"$'\n'
 
+# D139 (P31): a dependency mission's install runs before the contract, by a
+# script, so the author can run the new version. A person's hand commit
+# recorded with /factory-deps (D124) does the same and skips this step.
+if [ -n "$(install_commands "$spec")" ] && ! grep -q $'\tdeps\t' "$dir/decisions.tsv" 2>/dev/null; then
+  step install "scripts/factory/install.sh $feature (the npm commands under ## Dependencies, install scripts off; commits the manifest and lockfile; no model)"
+fi
 # D99: a bug between services is investigated before any contract. Context
 # repos are cloned read-only; explorers map one repo each, fresh; the
 # investigator concludes where the fix belongs and how to reproduce it.

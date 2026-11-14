@@ -179,6 +179,8 @@ $nxt"
       printf '%s\n' "$nxt"; stop 3 "the mission paused itself" ;;
     grill|approve|approve-design|decide|approve-tickets|coverage|setup|escalate|blocked|unverified|approve-conclusion|handoff|report)
       printf '%s\n' "$nxt"; echo "WAITING: human ($step)"; exit 0 ;;
+    install)
+      must install.sh "$feature" ;;
     context-sync)
       must context.sh sync "$feature" ;;
     investigate)

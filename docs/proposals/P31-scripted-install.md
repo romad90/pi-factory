@@ -1,6 +1,6 @@
 # P31. Dependency bumps without hands: a scripted install step, outside the agents
 
-**Status:** draft: a guard decision for Rode (see the [November assessment](assessment-2026-11.md)) · **Effort:** M · **Depends on:** D124 (dependency lane), D65; first use is P19 row 1 (dependency and vulnerability bumps)
+**Status:** steps 1 and 2 done for npm, before the contract (D139); the clean-copy proof and audit are not (see the [November assessment](assessment-2026-11.md)) · **Effort:** M · **Depends on:** D124 (dependency lane), D65; first use is P19 row 1 (dependency and vulnerability bumps)
 
 ## Problem
 
