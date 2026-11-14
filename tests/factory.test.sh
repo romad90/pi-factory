@@ -2465,6 +2465,23 @@ grep -qxF "  git switch -c chore/pi-factory-$v" "$work/onboard.log" && grep -qxF
 bash "$root/scripts/factory/onboard.sh" --no-setup >"$work/onboard2.log" 2>&1 || fail "onboard again" "$(cat "$work/onboard2.log")"
 [ "$(grep -cx 'instrument/results/' .gitignore)" = 1 ] && grep -qx coverage .gitignore \
   && t "onboard twice: a .gitignore without a final newline keeps its last line, nothing appended twice" || fail "gitignore append" "$(cat -A .gitignore)"
+# A commands.env from an older factory: no D140/D141 settings, a value set.
+awk 'BEGIN { RS = ""; ORS = "\n\n" } !/FACTORY_(AUTO_APPROVE|CONTRACT_ROUNDS)=/' .factory/commands.env | sed 's/^FACTORY_TEST_CMD=""/FACTORY_TEST_CMD="npm test"/' > "$work/env.old"
+cp "$work/env.old" .factory/commands.env
+bash "$root/scripts/factory/onboard.sh" --no-setup >"$work/onboard3.log" 2>&1 || fail "onboard on an old commands.env" "$(cat "$work/onboard3.log")"
+cp .factory/commands.env "$work/env.new"
+bash "$root/scripts/factory/onboard.sh" --no-setup >/dev/null 2>&1
+grep -qx 'FACTORY_TEST_CMD="npm test"' .factory/commands.env && grep -qx '# FACTORY_AUTO_APPROVE=flag' .factory/commands.env \
+  && grep -qx '# FACTORY_CONTRACT_ROUNDS=2' .factory/commands.env && ! grep -qE '^FACTORY_(AUTO_APPROVE|CONTRACT_ROUNDS)=' .factory/commands.env \
+  && [ "$(grep -c '^# Added by factory onboard' .factory/commands.env)" = 1 ] && cmp -s "$work/env.new" .factory/commands.env \
+  && grep -q 'commands.env += commented: FACTORY_CONTRACT_ROUNDS FACTORY_AUTO_APPROVE' "$work/onboard3.log" \
+  && [ "$(head -c "$(wc -c < "$work/env.old")" .factory/commands.env | cmp -s - "$work/env.old" && echo same)" = same ] \
+  && t "onboard adds the settings an older commands.env lacks, commented, once; the person's values stay" || fail "commands.env new settings" "$(diff "$work/env.old" .factory/commands.env; cat "$work/onboard3.log")"
+printf 'FACTORY_CONTRACT_ROUNDS=3\n' >> .factory/commands.env
+[ "$(env -u FACTORY_CONTRACT_ROUNDS bash -c '. scripts/factory/lib.sh >/dev/null 2>&1; echo "$FACTORY_CONTRACT_ROUNDS"')" = 3 ] \
+  && [ "$(FACTORY_CONTRACT_ROUNDS=1 bash -c '. scripts/factory/lib.sh >/dev/null 2>&1; echo "$FACTORY_CONTRACT_ROUNDS"')" = 1 ] \
+  && t "critic rounds: the environment, then commands.env, else 2 (D140)" || fail "contract rounds from commands.env" "$(tail -3 .factory/commands.env)"
+cp "$work/env.new" .factory/commands.env
 
 [ "$(readlink scripts/factory)" = "$root/scripts/factory" ] && [ "$(readlink docs/agents/factory.md)" = "$root/docs/agents/factory.md" ] \
   && grep -qx '/apps/svc/scripts/factory' "$pk/.git/info/exclude" && bash scripts/factory/link.sh --check >/dev/null \
