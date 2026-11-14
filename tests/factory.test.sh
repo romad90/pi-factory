@@ -365,7 +365,7 @@ out="$(bash scripts/factory/next.sh demo 2>&1)"
 [ "$(head -1 <<<"$out")" = "STEP: contract" ] && grep -q 'Critic round 1 of 2 left \[blocking\] findings: the author applies them in round 2, no person needed' <<<"$out" \
   && t "critic round 1's [blocking] findings go back to the author without /factory-amend (D139)" || fail "auto round" "$out"
 cb="$(bash scripts/factory/brief.sh contract-critic demo)"; ab="$(bash scripts/factory/brief.sh contract-author demo)"
-grep -q 'This is critic round 2 of 2\.' <<<"$cb" && grep -q 'From round 2 on, a finding whose wrong change is only imagined' <<<"$cb" \
+grep -q 'This is critic round 2 of 2\.' <<<"$cb" && grep -q 'From round 2 on, a wrong change that nobody wrote or saw is only imagined' <<<"$cb" \
   && grep -q 'Apply every \[blocking\] finding of the critique yourself' <<<"$ab" \
   && t "the critic's brief carries its round and the round-2 rule; the author's says to apply the findings (D139)" || fail "round briefs" "$cb"
 touch $m/workflows/20260101-000001-contract.js
