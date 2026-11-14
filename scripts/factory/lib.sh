@@ -1071,12 +1071,13 @@ ticket_marker() {
 # T_BLOCKED (arrays of ticket names), T_ROUND (assoc name→last verdict round),
 # T_MISSING (assoc name→blockers it names that no ticket file has).
 # T_HAND: tickets a person builds (state/<ticket>.by-hand, B3), never a worker.
+# T_ASKED: tickets held on their own question (state/<ticket>.asked, D141).
 compute_ticket_state() {
   local feature="$1" dir t name num v r n marker vc b ready
   dir="$(mission_dir "$feature")"
   declare -gA T_PASSED=() T_ROUND=() T_MISSING=()
   local -A exists=()
-  T_BUILD=(); T_HAND=(); T_REVIEW=(); T_ESCALATE=(); T_BLOCKED=()
+  T_BUILD=(); T_HAND=(); T_REVIEW=(); T_ESCALATE=(); T_BLOCKED=(); T_ASKED=()
   shopt -s nullglob
   for t in "$dir"/issues/*.md; do
     name="$(ticket_name "$t")"; num="$(ticket_num "$t")"; v="$dir/verdicts/${name}-code.md"
@@ -1091,6 +1092,7 @@ compute_ticket_state() {
     vc="$(verdict_field "$v" Commit)"; n="${T_ROUND[$name]}"
     # A stuck ticket escalates even when it waits for review (P25: two review runs without a file).
     if [ -f "$dir/state/$name.stuck" ]; then T_ESCALATE+=("$name"); continue; fi
+    if [ -f "$dir/state/$name.asked" ]; then T_ASKED+=("$name"); continue; fi
     if [ -n "$marker" ] && [ "$vc" != "$marker" ]; then T_REVIEW+=("$name"); continue; fi
     if [ "$n" -ge "$FACTORY_ROUND_LIMIT" ] || [ -f "$dir/state/$name.stuck" ]; then T_ESCALATE+=("$name"); continue; fi
     ready=1

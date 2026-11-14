@@ -174,6 +174,9 @@ case "$cmd" in
       echo "Logged in $(mission_dir "$feature")/decisions.tsv as auto, unreviewed. Continue: the ticket rebuilds with the answer."
       exit 0
     fi
+    # D141: a ticket's question holds that ticket only; every other ticket
+    # and step runs on, and next.sh asks the person once nothing else can run.
+    held=""; [ -z "$light" ] && [ -f "$dir/issues/$ticket.md" ] && held="$dir/state/$ticket.asked"
     asked=0
     [ -f "$dir/decisions.tsv" ] && asked="$(awk -F'\t' -v t="$ticket" 'NR > 1 && $2 == t && ($3 == "decide" || $3 == "auto")' "$dir/decisions.tsv" | wc -l | tr -d ' ')"
     mkdir -p "$dir/state"
@@ -181,9 +184,13 @@ case "$cmd" in
       if [ "$asked" -ge 2 ]; then
         printf '\nQuestion %s on %s. Several questions on one ticket usually mean it is too big or underspecified: you can also answer by shrinking it (split it, or move assertions to another ticket), or reset it (scripts/factory/reset-ticket.sh %s %s).\n' \
           "$((asked + 1))" "$ticket" "$feature" "$ticket"
-      fi; } > "$q"
-    notify "Factory: $feature needs a decision" "$question"
-    echo "ASKED: question recorded in $q. Answer with: /factory-decide ${light:-$feature} <your answer, and why>"
+      fi; } > "${held:-$q}"
+    if [ -n "$held" ]; then
+      echo "HELD: $ticket waits for an answer (state/$ticket.asked); continue the loop: every ticket and step that doesn't need it runs on, and next.sh asks the person when nothing else can run."
+    else
+      notify "Factory: $feature needs a decision" "$question"
+      echo "ASKED: question recorded in $q. Answer with: /factory-decide ${light:-$feature} <your answer, and why>"
+    fi
     ;;
 
   decide)
@@ -270,9 +277,10 @@ case "$cmd" in
     git rev-parse "$commit" > "$dir/state/$tk.integrated"
     [ -f "$dir/state/$tk.by-hand" ] || printf '**Files:** %s\n**Why:** delivered by hand (human.sh deliver)\n' "$hit" > "$dir/state/$tk.by-hand"
     decision_log "$feature" "$tk" deliver "Ticket delivered by hand (B3)" "commit $c: $hit — $what" ticket
-    if [ -f "$q" ] && [ "$(verdict_field "$q" Ticket)" = "$tk" ]; then
-      if git ls-files --error-unmatch -- "$q" >/dev/null 2>&1; then git rm -q -- "$q"; else rm -f -- "$q"; fi
-    fi
+    for f in "$q" "$dir/state/$tk.asked"; do
+      [ -f "$f" ] && [ "$(verdict_field "$f" Ticket)" = "$tk" ] || continue
+      if git ls-files --error-unmatch -- "$f" >/dev/null 2>&1; then git rm -q -- "$f"; else rm -f -- "$f"; fi
+    done
     echo "Recorded: $tk delivered by hand in $c ($hit). It goes to review on that commit; if the review fails, it comes back to you, never to a worker."
     ;;
 

@@ -14,6 +14,7 @@ Written by `/code-review` (per ticket), `/verify-behavior` (per mission) and lig
 **Result:** PASS | FAIL
 **Commit:** <full SHA reviewed or run against>
 **Brief:** <the brief-id line from your task>
+**Cause:** process   (optional, on a per-ticket FAIL only: the review itself couldn't finish, or the failure is evidence no change to the code can produce; D141)
 
 ## Assertions
 - VAL-ROUTE-001: PASS — <evidence: test name, log line, result file>

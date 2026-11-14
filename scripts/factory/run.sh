@@ -147,8 +147,9 @@ build() {
         || stop 2 "human.sh ask failed for $t: $(cat "$logs/ask-$t.log")"
       cat "$logs/ask-$t.log"
       if grep -q 'AUTO-ANSWERED' "$logs/ask-$t.log"; then :
+      elif grep -q '^HELD' "$logs/ask-$t.log"; then :      # D141: only that ticket waits
       elif grep -q 'ASKED' "$logs/ask-$t.log"; then ASKED=1
-      else stop 2 "human.sh ask for $t said neither ASKED nor AUTO-ANSWERED"; fi
+      else stop 2 "human.sh ask for $t said neither ASKED, HELD nor AUTO-ANSWERED"; fi
       continue
     fi
     [ -n "$patch" ] || patch="$(bash "$here/locate-patch.sh" "$feature" "$t" 2>/dev/null)" || patch=""

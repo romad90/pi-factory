@@ -25,7 +25,7 @@ Loop:
      - `patch` is null: `scripts/factory/locate-patch.sh $1 <ticket>`; if it prints a path, integrate it; if not, `scripts/factory/record-no-patch.sh $1 <ticket>`.
      - The workflow itself failed with "timed out": the workers' work is still in their worktrees. Run `scripts/factory/integrate.sh $1 <ticket> null` for each ticket of the wave (it rebuilds the patch from the worktree), then continue.
      - The worker's run shows a provider error (429, rate limit, quota, 5xx, overloaded, timeout) instead of a report: `scripts/factory/record-no-patch.sh $1 <ticket> --provider "<the error line, verbatim>"`, then stop and show its output. It is not a round, and retrying now burns nothing but the same limit.
-     - The output ends with `DECISION NEEDED: <question>`: run `scripts/factory/human.sh ask $1 <ticket> --stdin <<'FACTORY_TEXT_END'`, then the question verbatim on the following lines, then a line `FACTORY_TEXT_END`. Do not integrate. If it prints `AUTO-ANSWERED`, the question was settled by a rule or an earlier answer: continue the loop. If it prints `ASKED`, stop.
+     - The output ends with `DECISION NEEDED: <question>`: record it as the rule below says, with the ticket. Do not integrate it; go on with the other tickets.
      A failed integration is expected and recorded as a round; continue.
    - `review`: `scripts/factory/workflow.sh review-wave $1`, pass its `WORKFLOW_FILE` path as above, then `scripts/factory/collect.sh $1`.
    - `collect`: `scripts/factory/collect.sh $1`, then `next.sh` again. A verdict counts only once it is recorded.
@@ -39,7 +39,7 @@ Rules:
 - Always `context: "fresh"`. Never fork your conversation into a subagent.
 - The scripts commit mission state themselves. Never commit, amend or revert anything by hand.
 - If a script exits non-zero (except integrate.sh, whose failure is recorded), stop and show its output.
-- If a subagent asks for a decision through the supervisor channel, record it the same way (`human.sh ask $1 <ticket> --stdin` and the question verbatim in the quoted heredoc); stop unless it prints `AUTO-ANSWERED`. Never answer it yourself, never let it time out into a default.
+- Any agent's output that ends with `DECISION NEEDED: <question>` (a worker, a reviewer, the contract author or critic, the ticket writer, the validator, the steward), or a subagent that asked through the supervisor channel: run `scripts/factory/human.sh ask $1 <ticket> --stdin <<'FACTORY_TEXT_END'`, then the question verbatim on the following lines, then a line `FACTORY_TEXT_END`. `<ticket>` is the ticket the agent worked on, or `-` for a mission-wide role. If it prints `AUTO-ANSWERED` or `HELD`, continue the loop: only that ticket waits, and next.sh asks the person once nothing else can run (D141). If it prints `ASKED`, stop. Never answer it yourself, never let it time out into a default.
 - The command guard may block a tool call ("blocked by the factory guard"). Never try another way to do the same thing: stop and show the human what was blocked.
 - Watchdog: every reply of yours runs a script or a subagent, or stops at a human step. If you notice you are repeating yourself or writing without a tool call, stop.
 - Any agent or workflow that fails with a provider error (429, rate limit, quota, 5xx, overloaded) — the architect, a critic, a judge, a wave — is not a failure of the work: run `scripts/factory/pause.sh $1 "provider error: <the error line, verbatim>"`, show its output, and stop. Never run the step again in this session: the limit hasn't moved.
