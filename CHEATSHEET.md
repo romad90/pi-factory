@@ -208,11 +208,12 @@ Keep specs to roughly 12 stories or fewer; split anything bigger into two missio
 | `mission` | lead | the strategy is approved | continues with the job's next mission |
 | `job-done` | you | every mission of the job has its MR | merge them in order; `retro.sh close` after each |
 | `grill` | you | no spec (and no job) | `/grill-with-docs`, `/to-spec`, or `/factory-job` |
+| `install` | lead | the spec names npm commands under `## Dependencies`, no `deps` row yet | `install.sh <f>`: runs them with install scripts off, commits manifest and lockfile (no model, D139) |
 | `context-sync` | lead | context repos not cloned, or changed in the spec | `context.sh sync <f>` (read-only clones, D99) |
 | `investigate` | lead | briefs, answers, a conclusion or a reproduction ticket missing | runs the investigate wave (explorers, then the investigator) |
 | `approve-conclusion` | you | the investigation concluded | `/factory-approve <f> conclusion` |
 | `handoff` / `report` | you | the fix belongs elsewhere / an exploration is done | send the finding / read the report; the mission ends |
-| `contract` | lead | no contract, no critique, or a pending amendment | runs the contract wave |
+| `contract` | lead | no contract, no critique, a pending amendment, or a [blocking] finding with critic rounds left (2, D139) | runs the contract wave; the author applies the critic's blocking findings |
 | `approve` | you | G1 | `/factory-approve <f>` or `/factory-amend` |
 | `design` | lead | feature or refactor (or `**Design:** yes`), G1 approved, no `design.md` | runs the designer |
 | `approve-design` | you | G1b: `design.md` not approved | read it, `/factory-approve <f> design` |

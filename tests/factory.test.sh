@@ -326,13 +326,30 @@ echo "No findings. Critique result: approve" > $m/contract-critique.md
 expect_step approve "critique present, not approved"
 # D126: from the third round, next.sh says which blocking findings name a wrong
 # change that would pass (deps-node-22: 6 critiques, 5 amendments, 63 min at G1).
+# D139: a [blocking] finding goes back to the author, with no person between,
+# until the critic has had its 2 rounds; a [non-blocking] one doesn't.
+mkdir -p $m/workflows; touch $m/workflows/20260101-000000-contract.js
+printf '**Critique result:** FINDINGS\n\n- [non-blocking] wording\n' > $m/contract-critique.md
+expect_step approve "a critique with only [non-blocking] findings goes to G1 (D139)"
+printf '**Critique result:** FINDINGS\n\n- [blocking] VAL-HELLO-001: a hole.\n  Passes wrongly: a bot that never greets.\n' > $m/contract-critique.md
+out="$(bash scripts/factory/next.sh demo 2>&1)"
+[ "$(head -1 <<<"$out")" = "STEP: contract" ] && grep -q 'Critic round 1 of 2 left \[blocking\] findings: the author applies them in round 2, no person needed' <<<"$out" \
+  && t "critic round 1's [blocking] findings go back to the author without /factory-amend (D139)" || fail "auto round" "$out"
+cb="$(bash scripts/factory/brief.sh contract-critic demo)"; ab="$(bash scripts/factory/brief.sh contract-author demo)"
+grep -q 'This is critic round 2 of 2\.' <<<"$cb" && grep -q 'From round 2 on, a finding whose wrong change is only imagined' <<<"$cb" \
+  && grep -q 'Apply every \[blocking\] finding of the critique yourself' <<<"$ab" \
+  && t "the critic's brief carries its round and the round-2 rule; the author's says to apply the findings (D139)" || fail "round briefs" "$cb"
+touch $m/workflows/20260101-000001-contract.js
+out="$(bash scripts/factory/next.sh demo 2>&1)"
+[ "$(head -1 <<<"$out")" = "STEP: approve" ] && grep -q 'The critic used its 2 rounds and still lists \[blocking\] findings' <<<"$out" \
+  && t "after the critic's 2 rounds, open [blocking] findings go to G1, on the record (D139)" || fail "round cap" "$out"
 mkdir -p $m/amendments; printf '# Amendment request\n**Status:** done\n' | tee $m/amendments/a1.md > $m/amendments/a2.md
 printf '**Critique result:** FINDINGS\n\n### F1 — [blocking] a\n\nx\n\nPasses wrongly: a job that ignores the matrix.\n\n### F2 — b\n\n- [blocking] y\n' > $m/contract-critique.md
 out="$(bash scripts/factory/next.sh demo 2>&1)"
 grep -q 'Contract round 3: 1 of 2 blocking finding(s) name a wrong change that would pass. Approving accepts the others; it is recorded.' <<<"$out" \
   && grep -q 'Passes wrongly' .factory/briefs/contract-critic.md \
   && t "G1: from round 3, next.sh counts the blocking findings that name a wrong change that would pass (D126)" || fail "critic rounds" "$out"
-rm -rf $m/amendments; echo "No findings. Critique result: approve" > $m/contract-critique.md
+rm -rf $m/amendments $m/workflows; echo "No findings. Critique result: approve" > $m/contract-critique.md
 # D101: an approval line typed by hand (or by an agent) has no decisions.tsv row: it approves nothing.
 cp $m/spec.md "$work/spec.bak"; printf '\n**Contract approved:** %s\n' "$(date +%F)" >> $m/spec.md
 out="$(bash scripts/factory/next.sh demo 2>&1)"

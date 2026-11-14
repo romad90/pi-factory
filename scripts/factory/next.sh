@@ -186,7 +186,15 @@ open_amendments=()
 for a in "$dir"/amendments/*.md; do
   [ -f "$a" ] && amendment_open "$a" "$spec" && open_amendments+=("$a")
 done
-if ! has_contract "$spec" || [ ! -f "$critique" ] || [ ${#open_amendments[@]} -gt 0 ]; then
+# D139: the critic's [blocking] findings go back to the author in the next
+# round, with no person between, until the critic has had its rounds.
+crounds="$(contract_rounds "$dir")"; reround=""
+if has_contract "$spec" && [ -f "$critique" ] && [ ${#open_amendments[@]} -eq 0 ] && ! contract_approved "$spec" \
+   && grep -q '\[blocking\]' "$critique" && [ "$crounds" -lt "$FACTORY_CONTRACT_ROUNDS" ]; then
+  reround=1
+  STATUS="Critic round $crounds of $FACTORY_CONTRACT_ROUNDS left [blocking] findings: the author applies them in round $((crounds + 1)), no person needed."$'\n'
+fi
+if ! has_contract "$spec" || [ ! -f "$critique" ] || [ ${#open_amendments[@]} -gt 0 ] || [ -n "$reround" ]; then
   unsent=""
   for a in "${open_amendments[@]}"; do
     grep -q '^\*\*Status:\*\* pending' "$a" && continue
@@ -197,7 +205,7 @@ if ! has_contract "$spec" || [ ! -f "$critique" ] || [ ${#open_amendments[@]} -g
 fi
 if ! contract_approved "$spec"; then
   hint=""
-  grep -q '\[blocking\]' "$critique" && hint=" The critique has [blocking] findings: rerun 'workflow.sh contract' to amend, then re-read."
+  grep -q '\[blocking\]' "$critique" && hint=" The critic used its $FACTORY_CONTRACT_ROUNDS rounds and still lists [blocking] findings (D139): approve with them on the record, or /factory-amend $feature \"<change>\" for another round."
   # D126: from the third round on, say which blocking findings name a wrong
   # change that would pass (deps-node-22: 6 critiques, 5 amendments, 63 min).
   shopt -s nullglob; am=("$(dirname "$spec")"/amendments/*.md); shopt -u nullglob
