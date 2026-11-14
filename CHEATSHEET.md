@@ -214,7 +214,7 @@ Keep specs to roughly 12 stories or fewer; split anything bigger into two missio
 | `approve-conclusion` | you | the investigation concluded | `/factory-approve <f> conclusion` |
 | `handoff` / `report` | you | the fix belongs elsewhere / an exploration is done | send the finding / read the report; the mission ends |
 | `contract` | lead | no contract, no critique, a pending amendment, or a [blocking] finding with critic rounds left (2, D140) | runs the contract wave; the author applies the critic's blocking findings |
-| `approve` | you | G1 | `/factory-approve <f>` or `/factory-amend` |
+| `approve` | you | G1 (with auto-approval on, only when the critic still blocks with rounds left, D141) | `/factory-approve <f>` or `/factory-amend` |
 | `design` | lead | feature or refactor (or `**Design:** yes`), G1 approved, no `design.md` | runs the designer |
 | `approve-design` | you | G1b: `design.md` not approved | read it, `/factory-approve <f> design` |
 | `decide` | you | an agent ended with `DECISION NEEDED:`; a ticket's question waits until nothing else can run (D142) | `/factory-decide` |
@@ -236,6 +236,7 @@ Keep specs to roughly 12 stories or fewer; split anything bigger into two missio
 | `verify` | lead | the spec has a `## Done when` with commands, not run on the current code | `verify.sh <f>` (no model, D106) |
 | `verify-failed` | you | a done command fails | fix tickets for the failure, or amend the done condition |
 | `pr` | you | all gates green | `/pr`, `mr.sh`, `/skill:mission-retro` |
+| `pr-draft` | lead | all gates green, auto-approval on (D141) | `metrics.sh`, then `mr.sh <f> --draft`: a draft PR, its body from the record |
 | `mr-open` | the MR's reviewers | `mr.url` holds the MR's link | merge it, then `retro.sh close <mission>` |
 | `closed` | nobody | closed without an MR: `mr.sh <mission> --local "<why>"` (a private repository, work merged by hand) | nothing |
 
