@@ -5,7 +5,8 @@
 # Usage: scripts/factory/mr.sh <feature> [--draft] [--dry-run]
 #        scripts/factory/mr.sh <feature> --local "<why>"   closed without an MR (F7)
 #
-# Body:   .scratch/<feature>/pr.md (what /pr writes), else /tmp/pr-body-<feature>.md
+# Body:   .scratch/<feature>/pr.md (what /pr writes), else /tmp/pr-body-<feature>.md,
+#         else, with --draft, one written from the record (D140)
 # Title:  the body's first "# " line (removed from the description), else
 #         "<type>(<mission>): <the spec's title>", the type from its intent
 #         (feature feat, bugfix fix, refactor refactor, maintenance test),
@@ -70,6 +71,17 @@ conf() { # conf NAME: environment first, then .factory/commands.env
 
 body_file=""
 for f in "$dir/pr.md" "/tmp/pr-body-$feature.md"; do [ -s "$f" ] && { body_file="$f"; break; }; done
+# D140: a draft the factory opens with no person's step gets a body from the
+# record; /pr writes the real one later (mr.sh again updates the PR).
+if [ -z "$body_file" ] && [ -n "$draft" ] && [ -f "$dir/spec.md" ]; then
+  body_file="$dir/pr.md"
+  { printf 'Draft opened by the factory with no person'"'"'s step (D140): every gate passed, and each approval the factory gave itself is in `%s/decisions.tsv` as `factory (auto)`. A person writes the description with /pr (then `scripts/factory/mr.sh %s` updates this PR) and decides the merge.\n\n## Validation contract\n\n' "$dir" "$feature"
+    sed -n 's/^### \(VAL-[A-Z0-9]*-[0-9]*\): */- \1: /p' "$dir/spec.md"
+    if grep -q $'\tfactory (auto)\t' "$dir/decisions.tsv" 2>/dev/null; then
+      printf '\n## Approved by the factory\n\n'
+      awk -F'\t' 'NR > 1 && $7 == "factory (auto)" { printf "- %s %s: %s\n", $1, $3, $5 }' "$dir/decisions.tsv"
+    fi; } > "$body_file"
+fi
 [ -n "$body_file" ] || die "no PR body: run /pr first (it writes $dir/pr.md)"
 
 branch="$(git rev-parse --abbrev-ref HEAD)"

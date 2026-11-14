@@ -908,6 +908,30 @@ brief_id() { printf '%s|%s|%s|%s' "$1" "$2" "$3" "$4" | sha256 "" | cut -c1-12; 
 # was, and next.sh offered G1 on a contract without the change. The approval
 # line isn't part of the hash: approving changes nothing the author wrote.
 contract_sha() { grep -v '^\*\*Contract approved:\*\*' "$1" | sha256 | cut -c1-12; }
+# D139: the contract's author+critic rounds, counted from the contract waves
+# workflow.sh wrote (workflows/<date>-contract.js, one per wave). The author
+# applies the critic's [blocking] findings in the next round with no person
+# between; after FACTORY_CONTRACT_ROUNDS critic rounds the contract goes to G1.
+FACTORY_CONTRACT_ROUNDS="${FACTORY_CONTRACT_ROUNDS:-2}"
+contract_rounds() {         # contract_rounds <mission dir>
+  local f n=0
+  for f in "$1"/workflows/*-contract.js "$1"/workflows/*-contract-[0-9]*.js; do [ -f "$f" ] && n=$((n + 1)); done
+  echo "$n"
+}
+
+# D140: the factory approves G1 and the tickets itself when they are clean.
+# FACTORY_AUTO_APPROVE in .factory/commands.env (else the environment): off,
+# on, or flag (the default): only a mission whose spec says
+# **Auto-approve:** yes, the line a trigger writes (or a person, as a flag).
+auto_approve_on() {         # auto_approve_on <spec>
+  local mode=""
+  [ ! -f .factory/commands.env ] || mode="$(sed -n 's/^[[:space:]]*\(export[[:space:]]*\)\{0,1\}FACTORY_AUTO_APPROVE=["'"'"']\{0,1\}\([a-z]*\).*/\2/p' .factory/commands.env | tail -1)"
+  case "${mode:-${FACTORY_AUTO_APPROVE:-flag}}" in
+    on) return 0 ;;
+    off) return 1 ;;
+    *) [ "$(verdict_field "$1" Auto-approve | tr '[:upper:]' '[:lower:]')" = yes ] ;;
+  esac
+}
 amendment_open() {          # amendment_open <amendment.md> <spec.md>
   grep -q '^\*\*Status:\*\* pending' "$1" && return 0
   local s; s="$(sed -n 's/^\*\*Spec at send:\*\* //p' "$1" | head -1)"

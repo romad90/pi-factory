@@ -446,6 +446,40 @@ printf 'FACTORY_LINT_CMD="true"\nFACTORY_TEST_CMD="test -f src/tools/a.js"\n' > 
 git add -A; git commit -q -m "chore: commands"
 expect_step build "tests configured"
 
+echo "Gates that approve themselves (D140)"
+auto0="$(git rev-parse HEAD)"; a=.scratch/auto; mkdir -p $a/issues
+printf '# Auto\n**Intent:** bugfix\n**Auto-approve:** yes\n\nA trigger wrote this.\n\n## Validation contract\n\n### VAL-AUTO-001: one\nGiven a, then b.\n\n### VAL-AUTO-002: two\nGiven c, then d.\n' > $a/spec.md
+printf -- '- [blocking] VAL-AUTO-001: a hole.\n' > $a/contract-critique.md
+git add $a; git commit -qm "test: a mission a trigger started"
+ea() { local o; o="$(bash scripts/factory/next.sh auto 2>&1)"; [ "$(head -1 <<<"$o")" = "STEP: $1" ] && t "$2" || fail "$2" "$o"; }
+ea approve "a [blocking] finding with critic rounds left never approves itself (D140)"
+echo "No findings." > $a/contract-critique.md
+cp .factory/commands.env "$work/cmds.keep"; echo 'FACTORY_AUTO_APPROVE=off' >> .factory/commands.env
+ea approve "FACTORY_AUTO_APPROVE=off in the project turns auto-approval off (D140)"
+cp "$work/cmds.keep" .factory/commands.env
+ea tickets "a clean critique on a flagged mission approves G1 itself, then goes on (D140)"
+grep -qE '^\*\*Contract approved:\*\* [0-9-]+ — by factory \(auto\) — critic round 0: no \[blocking\] finding' $a/spec.md \
+  && grep -q $'\tapprove\tG1: approve the validation contract\tapproved: critic round 0: no \\[blocking\\] finding\tcontract\tfactory (auto)\tunreviewed$' $a/decisions.tsv \
+  && [ -z "$(git status --porcelain -- $a)" ] \
+  && t "the auto G1 is logged in decisions.tsv by factory (auto), with why, and counts as an approval (D140)" || fail "auto G1 record" "$(cat $a/decisions.tsv; grep approved $a/spec.md)"
+bash scripts/factory/workflow.sh tickets auto all >/dev/null
+printf '# 01\n**Size:** S\n## Covers\nVAL-AUTO-001\n' > $a/issues/01-one.md
+ea approve-tickets "tickets whose Covers miss a contract ID wait for a person (D140)"
+printf '# 02\n**Size:** S\n## Covers\nVAL-AUTO-002\n' > $a/issues/02-two.md
+out="$(bash scripts/factory/next.sh auto 2>&1)"
+[ "$(head -1 <<<"$out")" != "STEP: approve-tickets" ] && [ ! -f $a/state/tickets.pending ] \
+  && grep -q $'\tapprove-tickets\t.*their Covers equal the contract IDs\ttickets\tfactory (auto)\t' $a/decisions.tsv \
+  && t "tickets whose Covers together equal the contract's IDs approve themselves, logged by factory (auto) (D140)" || fail "auto tickets" "$out"
+aa() { bash -c '. scripts/factory/lib.sh; auto_approve_on "$1" && echo on || echo off' _ "$1"; }
+printf '# X\n**Intent:** bugfix\n' > "$work/plain-spec.md"
+[ "$(aa $a/spec.md)" = on ] && [ "$(aa "$work/plain-spec.md")" = off ] && [ "$(FACTORY_AUTO_APPROVE=on aa "$work/plain-spec.md")" = on ] \
+  && t "auto-approval: on for a spec flagged **Auto-approve:** yes, off otherwise unless FACTORY_AUTO_APPROVE=on (D140)" || fail "auto_approve_on"
+out="$(FACTORY_MR_TARGET=production bash scripts/factory/mr.sh auto --draft --dry-run 2>&1)"
+grep -q "body:  $a/pr.md" <<<"$out" && grep -q '^Draft opened by the factory' $a/pr.md && grep -q '^- VAL-AUTO-002: two$' $a/pr.md \
+  && grep -q '^- [0-9-]* approve-tickets: approved: 2 ticket(s)' $a/pr.md && grep -q 'title: Draft: fix(auto): Auto' <<<"$out" \
+  && t "mr.sh --draft without pr.md writes a body from the record: contract and the factory's approvals (D140)" || fail "draft body" "$out$(cat $a/pr.md 2>&1)"
+git reset -q --hard "$auto0"; rm -rf $a
+
 echo "Mission: build and review"
 bash scripts/factory/workflow.sh build-wave demo >"$work/wf.log"
 wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"

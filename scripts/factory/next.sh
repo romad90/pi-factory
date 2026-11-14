@@ -7,7 +7,7 @@
 #   paused* grill* context-sync investigate approve-conclusion* handoff* report*
 #   contract approve* design approve-design* decide* tickets approve-tickets* coverage*
 #   setup* build hand* review escalate* blocked* validate behavior-fix
-#   behavior-stale health health-fix steward unverified* verify verify-failed* pr*
+#   behavior-stale health health-fix steward unverified* verify verify-failed* pr* pr-draft
 #
 # Usage: scripts/factory/next.sh <feature>
 set -euo pipefail
@@ -196,6 +196,17 @@ if ! has_contract "$spec" || [ ! -f "$critique" ] || [ ${#open_amendments[@]} -g
   step contract "scripts/factory/workflow.sh contract $feature (author, then critic, fresh, other families)"
 fi
 if ! contract_approved "$spec"; then
+  # D140: G1 approves itself when the critic's last round blocks nothing, or
+  # the critic used its rounds (D139); an open question stopped us above.
+  if auto_approve_on "$spec"; then
+    nb="$(grep -c '\[blocking\]' "$critique" || true)"; cr="$(contract_rounds "$dir")"
+    if [ "${nb:-0}" -eq 0 ] || [ "$cr" -ge "$FACTORY_CONTRACT_ROUNDS" ]; then
+      why="critic round $cr: no [blocking] finding"
+      [ "${nb:-0}" -eq 0 ] || why="critic rounds used ($cr of $FACTORY_CONTRACT_ROUNDS), $nb [blocking] finding(s) left open in contract-critique.md"
+      FACTORY_AUTO=1 bash "$here/human.sh" approve "$feature" "$why" >/dev/null
+      exec bash "$0" "$feature"
+    fi
+  fi
   hint=""
   grep -q '\[blocking\]' "$critique" && hint=" The critique has [blocking] findings: rerun 'workflow.sh contract' to amend, then re-read."
   # D126: from the third round on, say which blocking findings name a wrong
@@ -224,6 +235,13 @@ fi
 tickets=("$dir"/issues/*.md)
 # D52: tickets come from the ticket writer (or by hand), and wait for a human.
 if [ -f "$dir/state/tickets.pending" ]; then
+  # D140: the tickets approve themselves when the writer wrote some and their
+  # ## Covers together are exactly the contract's assertion IDs.
+  if auto_approve_on "$spec" && [ -n "$(find "$dir/issues" -name '*.md' -newer "$dir/state/tickets.pending" 2>/dev/null | head -1)" ] \
+     && [ "$(for t in "${tickets[@]}"; do ticket_covers "$t"; done | grep '^VAL-' | sort -u)" = "$(contract_ids "$spec" | sort -u)" ]; then
+    FACTORY_AUTO=1 bash "$here/human.sh" approve "$feature" tickets >/dev/null
+    exec bash "$0" "$feature"
+  fi
   STATUS="$(cat "$dir/state/tickets.pending")"$'\n'"Tickets now: $(ls "$dir/issues" 2>/dev/null | tr '\n' ' ')"$'\n'
   step approve-tickets "human: review .scratch/$feature/issues/ (edit, split or delete freely), then /factory-approve $feature tickets"
 fi
@@ -365,5 +383,10 @@ if [ -s "$dir/mr.url" ]; then
     local:*) step closed "nothing left: closed without an MR (${mr_line#local: }). If the retro isn't saved yet: /skill:mission-retro" ;;
     *) step mr-open "the MR is open: $mr_line. After it merges: scripts/factory/retro.sh close $feature (its review comments join the retro). Edited pr.md? scripts/factory/mr.sh $feature updates the MR" ;;
   esac
+fi
+# D140: no person before the PR: the factory opens it as a draft, with a body
+# from the record; /pr can rewrite it, the merge stays a person's.
+if auto_approve_on "$spec"; then
+  step pr-draft "scripts/factory/metrics.sh $feature, then scripts/factory/mr.sh $feature --draft (a draft PR, its body from the record; no person needed)"
 fi
 step pr "scripts/factory/metrics.sh $feature → /pr (Evidence, written to $dir/pr.md) → scripts/factory/mr.sh $feature opens the MR → /skill:mission-retro (private: retro.sh save)"

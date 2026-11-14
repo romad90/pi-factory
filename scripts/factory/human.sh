@@ -70,6 +70,9 @@ if [ "$cmd" = approve ] && [ "${1:-}" = strategy ] && [ -f "$dir/job.md" ]; then
   exit 0
 fi
 [ -n "$light" ] || [ -f "$spec" ] || die "no spec at $spec"
+# D140: an approval the factory gives itself (next.sh, FACTORY_AUTO=1) is
+# logged as "factory (auto)", never as the person whose git config runs it.
+auto_who=""; [ "${FACTORY_AUTO:-0}" != 1 ] || { auto_who="factory (auto)"; export FACTORY_APPROVER="$auto_who"; }
 checkpoint() { if [ -n "$light" ]; then bash "$here/checkpoint.sh" --light "$light"; else bash "$here/checkpoint.sh" "$feature"; fi; }
 q="$dir/state/open-question.md"
 
@@ -96,7 +99,7 @@ case "$cmd" in
       task="$(verdict_field "$dir/state/tickets.pending" Task)"
       rm -f "$dir/state/tickets.pending"
       shopt -s nullglob; list=("$dir"/issues/*.md)
-      decision_log "$feature" - approve-tickets "Approve the tickets ($task)" "approved: ${#list[@]} ticket(s)" tickets
+      decision_log "$feature" - approve-tickets "Approve the tickets ($task)" "approved: ${#list[@]} ticket(s)${auto_who:+, their Covers equal the contract IDs}" tickets "$auto_who"
       # B3: a ticket that changes only paths the patch guard reserves for people
       # (CI, hooks, the factory) would go to a worker bound to be refused
       # (deps-node-22 ticket 03). It goes to the person instead.
@@ -156,7 +159,7 @@ case "$cmd" in
     fi
     who="$(approver)"
     set_contract_line "Contract approved" "$(date +%F)${who:+ — by $who}${1:+ — $*}"
-    decision_log "$feature" - approve "G1: approve the validation contract" "approved" contract
+    decision_log "$feature" - approve "G1: approve the validation contract" "approved${auto_who:+${1:+: $*}}" contract "$auto_who"
     echo "G1 approved."
     ;;
 
