@@ -498,7 +498,8 @@ printf '# Auto\n**Intent:** bugfix\n**Auto-approve:** yes\n\nA trigger wrote thi
 printf -- '- [blocking] VAL-AUTO-001: a hole.\n' > $a/contract-critique.md
 git add $a; git commit -qm "test: a mission a trigger started"
 ea() { local o; o="$(bash scripts/factory/next.sh auto 2>&1)"; [ "$(head -1 <<<"$o")" = "STEP: $1" ] && t "$2" || fail "$2" "$o"; }
-ea approve "a [blocking] finding with critic rounds left never approves itself (D141)"
+ea contract "a [blocking] finding with critic rounds left goes back to the author, never approves itself (D140, D141)"
+! grep -q $'\tapprove\t' $a/decisions.tsv 2>/dev/null && t "no approval was logged for it (D141)" || fail "blocked G1 approved" "$(cat $a/decisions.tsv)"
 echo "No findings." > $a/contract-critique.md
 cp .factory/commands.env "$work/cmds.keep"; echo 'FACTORY_AUTO_APPROVE=off' >> .factory/commands.env
 ea approve "FACTORY_AUTO_APPROVE=off in the project turns auto-approval off (D141)"
