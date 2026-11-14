@@ -205,6 +205,10 @@ $nxt"
     pr)
       must metrics.sh "$feature"
       printf '%s\n' "$nxt"; echo "WAITING: human (pr)"; exit 0 ;;
+    pr-draft)
+      must metrics.sh "$feature"; must mr.sh "$feature" --draft ;;
+    mr-open|closed)
+      printf '%s\n' "$nxt"; exit 0 ;;
     *) printf '%s\n' "$nxt"; stop 2 "unknown step '$step'" ;;
   esac
 done
