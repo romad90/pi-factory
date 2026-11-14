@@ -18,7 +18,9 @@ dir="$(mission_dir "$feature")"; spec="$dir/spec.md"
 cmds="$(install_commands "$spec")"
 [ -n "$cmds" ] || die "no npm install command in backticks under \"## Dependencies\" in $spec"
 if grep -q $'\tdeps\t' "$dir/decisions.tsv" 2>/dev/null; then echo "Dependencies already changed and recorded (decisions.tsv): nothing to install."; exit 0; fi
-dirty="$(git status --porcelain | cut -c4- | grep -E "$DEPS_FILES_RE" || true)"
+# Paths relative to this project (a monorepo folder), unquoted: ls-files, not status.
+changed() { git ls-files --modified --others --exclude-standard | grep -E "$DEPS_FILES_RE" || true; }
+dirty="$(changed)"
 [ -z "$dirty" ] || die "uncommitted changes to $(paste -sd' ' <<<"$dirty"): commit or discard them first"
 
 # Only what the spec names: npm's save flags and name@version, nothing a shell
@@ -36,10 +38,11 @@ while IFS= read -r c; do
   echo "+ $c --ignore-scripts"
   npm "${a[@]:1}" --ignore-scripts || die "\`$c\` failed: fix the command under ## Dependencies, or make the change by hand and record it (/factory-deps)"
 done <<<"$cmds"
-files="$(git status --porcelain --untracked-files=all | cut -c4- | grep -E "$DEPS_FILES_RE" || true)"
+files="$(changed | sort -u)"
 [ -n "$files" ] || die "the install changed no manifest or lockfile: is the version already there?"
-git add -- $files
-git commit -q --author="$FACTORY_AUTHOR" -m "build($feature): $(paste -sd';' <<<"$cmds" | sed 's/;/; /g')" -m "Factory-Script: install" -- $files
+mapfile -t fl <<<"$files"
+git add -- "${fl[@]}"
+git commit -q --author="$FACTORY_AUTHOR" -m "build($feature): $(paste -sd';' <<<"$cmds" | sed 's/;/; /g')" -m "Factory-Script: install" -- "${fl[@]}"
 c="$(git rev-parse --short HEAD)"; list="$(paste -sd, <<<"$files" | sed 's/,/, /g')"
 decision_log "$feature" - deps "Dependencies installed by the factory (D139)" "commit $c: $list — $(paste -sd';' <<<"$cmds" | sed 's/;/; /g') (--ignore-scripts)" mission "factory (auto)"
 bash "$here/checkpoint.sh" "$feature" >/dev/null

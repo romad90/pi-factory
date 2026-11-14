@@ -315,7 +315,7 @@ out="$(bash scripts/factory/next.sh inst 2>&1)"
 PATH="$work/fakebin:$PATH" NPM_LOG="$work/npm.log" bash scripts/factory/install.sh inst >"$work/install-deps.log" 2>&1 || fail "install.sh" "$(cat "$work/install-deps.log")"
 ic="$(git log --format='%h %s' --grep='^Factory-Script: install$' -1)"
 [ "$(cat "$work/npm.log")" = "i -D left-pad@^1.3.0 --ignore-scripts" ] && grep -q 'build(inst): npm i -D left-pad@^1.3.0' <<<"$ic" \
-  && [ "$(git show --name-only --format= "${ic%% *}" | sort | paste -sd' ' -)" = "package-lock.json package.json" ] \
+  && [ "$(git show --name-only --relative --format= "${ic%% *}" | sort | paste -sd' ' -)" = "package-lock.json package.json" ] \
   && grep -qF "$(printf 'deps\tDependencies installed by the factory (D139)\tcommit %s: package-lock.json, package.json' "${ic%% *}")" .scratch/inst/decisions.tsv \
   && grep -q $'\tfactory (auto)\tunreviewed$' .scratch/inst/decisions.tsv && [ -z "$(git status --porcelain)" ] \
   && t "install.sh runs the named command with install scripts off, commits manifest and lockfile, logs a deps row by factory (auto)" || fail "install.sh result" "$(cat "$work/install-deps.log" "$work/npm.log" .scratch/inst/decisions.tsv; git log --oneline -3)"
