@@ -1599,6 +1599,11 @@ grep -qx -- '--body-file' "$work/gh.log" && grep -qx -- '--draft' "$work/gh.log"
   && grep -q 'pull/9' $m/mr.url && ! grep -qi 'gitlab' "$work/mr.log" \
   && [ "$(grep -c . "$work/gh.log.calls")" -ge 3 ] && ! grep -v -- '--repo o/p' "$work/gh.log.calls" | grep -q . \
   && t "mr.sh on a GitHub remote opens the PR with gh --body-file, no GitLab steps, every gh call on origin's repository (get-port-7)" || fail "mr gh create" "$(cat "$work/mr.log" "$work/gh.log")"
+# search-attrs-case: the archived metrics.json said "mr": null; mr.url was written 6 s after it.
+amj="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/archive/demo/metrics.json"
+node -e 'process.exit(/pull\/9/.test(require(process.argv[1]).mr || "") ? 0 : 1)' "$amj" \
+  && tar -xzOf "$(ls -t "$work/data"/*/demo-*.tar.gz | head -1)" demo/metrics.json | grep -q 'pull/9' \
+  && t "mr.sh: the archived metrics and the export carry the PR it just opened (search-attrs-case)" || fail "metrics mr" "$(cat "$amj" 2>&1)"
 printf '#!/usr/bin/env bash\nexit 1\n' > "$work/bin/gh"   # installed, not logged in
 out="$(PATH="$work/bin:$PATH" FACTORY_DATA_DIR="$work/data" FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo 2>&1)" \
   && grep -q 'gh pr create --repo o/p --base production' <<<"$out" && ! grep -qi 'gitlab' <<<"$out" \
