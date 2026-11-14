@@ -57,48 +57,49 @@ The rule for every improvement: count before judging, measure before and after, 
 ## The map
 
 ```mermaid
-mindmap
-  root((pi-factory))
-    Define done
-      grill + spec
-      contract VAL-AREA-NNN
-      critic on another family
-      G1 one-word approval
-    Build
-      ticket writer, you approve
-      size L to the heavy worker
-      parallel workers in worktrees
-      instrument hidden from workers
-      integrate.sh lint + tests
-      patch guard
-      heavy worker from round 2
-    Judge
-      fresh reviewers per ticket
-      validator holds the instrument
-      evidence or UNVERIFIED
-      rounds from history
-    Code health
-      quality bar QB items
-      ratchet never worse
-      code steward explains every file
-    Safety
-      command guard live
-      patch guard at integration
-      irreversible never defaults
-    Humans
-      approve / decide / amend
-      decisions.tsv
-      notifications
-      pause and resume
-    Enforce
-      gate.sh G1-G5 in CI
-      lanes from behavior paths
-      skills pinned v1.3.1
-      models-lint families
-    Small changes
-      fix lane
-      blast radius
-      one light reviewer
+flowchart TB
+    subgraph DEFINE["1 · Define done"]
+        direction LR
+        d1["grill + spec, or a one-line job"] --> d2["contract: VAL-AREA-NNN"]
+        d2 --> d3["critic of another family<br/>up to 2 rounds"]
+        d3 --> d4{{"G1: you approve,<br/>or it approves itself"}}
+    end
+    subgraph BUILD["2 · Build"]
+        direction LR
+        b1["ticket writer"] --> b2{{"tickets: you approve, or itself<br/>when Covers = contract IDs"}}
+        b2 --> b3["parallel workers in worktrees<br/>heavy worker from round 2"]
+        b3 --> b4["integrate.sh: patch guard,<br/>lint, tests"]
+    end
+    subgraph JUDGE["3 · Judge"]
+        direction LR
+        j1["fresh reviewers, other family,<br/>the mission's whole diff"] --> j2["validator holds the instrument"]
+        j2 --> j3["evidence or UNVERIFIED<br/>rounds from history"]
+    end
+    subgraph HEALTH["4 · Code health"]
+        direction LR
+        h1["ratchet: never worse"] --> h2["code steward vs quality bar<br/>explains every file"]
+    end
+    subgraph SHIP["5 · Ship"]
+        direction LR
+        s1["metrics: rounds, cost"] --> s2(["mr.sh: MR, or a draft PR"])
+        s2 --> s3["retro"]
+    end
+    DEFINE --> BUILD --> JUDGE --> HEALTH --> SHIP
+
+    subgraph ALWAYS["Throughout"]
+        direction LR
+        a1["Safety: command guard,<br/>patch guard, irreversible never defaults"]
+        a2["People: decisions.tsv,<br/>asked only when nothing else runs,<br/>the merge stays yours"]
+        a3["Enforce: gate.sh G1–G5 in CI,<br/>model families, skills pinned v1.3.1"]
+        a4["Small changes: fix lane,<br/>one light reviewer"]
+        a1 ~~~ a2 ~~~ a3 ~~~ a4
+    end
+    SHIP ~~~ ALWAYS
+
+    classDef gate fill:#fde68a,stroke:#b45309,color:#111
+    classDef ship fill:#bbf7d0,stroke:#15803d,color:#111
+    class d4,b2 gate
+    class s2 ship
 ```
 
 ## A mission, end to end
