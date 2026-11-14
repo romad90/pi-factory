@@ -6,7 +6,7 @@
 #        scripts/factory/mr.sh <feature> --local "<why>"   closed without an MR (F7)
 #
 # Body:   .scratch/<feature>/pr.md (what /pr writes), else /tmp/pr-body-<feature>.md,
-#         else, with --draft, one written from the record (D140)
+#         else, with --draft, one written from the record (D141)
 # Title:  the body's first "# " line (removed from the description), else
 #         "<type>(<mission>): <the spec's title>", the type from its intent
 #         (feature feat, bugfix fix, refactor refactor, maintenance test),
@@ -71,11 +71,11 @@ conf() { # conf NAME: environment first, then .factory/commands.env
 
 body_file=""
 for f in "$dir/pr.md" "/tmp/pr-body-$feature.md"; do [ -s "$f" ] && { body_file="$f"; break; }; done
-# D140: a draft the factory opens with no person's step gets a body from the
+# D141: a draft the factory opens with no person's step gets a body from the
 # record; /pr writes the real one later (mr.sh again updates the PR).
 if [ -z "$body_file" ] && [ -n "$draft" ] && [ -f "$dir/spec.md" ]; then
   body_file="$dir/pr.md"
-  { printf 'Draft opened by the factory with no person'"'"'s step (D140): every gate passed, and each approval the factory gave itself is in `%s/decisions.tsv` as `factory (auto)`. A person writes the description with /pr (then `scripts/factory/mr.sh %s` updates this PR) and decides the merge.\n\n## Validation contract\n\n' "$dir" "$feature"
+  { printf 'Draft opened by the factory with no person'"'"'s step (D141): every gate passed, and each approval the factory gave itself is in `%s/decisions.tsv` as `factory (auto)`. A person writes the description with /pr (then `scripts/factory/mr.sh %s` updates this PR) and decides the merge.\n\n## Validation contract\n\n' "$dir" "$feature"
     sed -n 's/^### \(VAL-[A-Z0-9]*-[0-9]*\): */- \1: /p' "$dir/spec.md"
     if grep -q $'\tfactory (auto)\t' "$dir/decisions.tsv" 2>/dev/null; then
       printf '\n## Approved by the factory\n\n'
@@ -161,7 +161,9 @@ echo "    body:  $body_file"
 if [ -n "$dry" ]; then echo "(dry run: nothing pushed)"; exit 0; fi
 
 url_file="$dir/mr.url"
-record() { [ -n "$1" ] || return 0; printf '%s\n' "$1" > "$url_file"; echo "MR: $1"; }
+# The mission data again once mr.url is written, so the archived metrics and
+# the export carry the MR (search-attrs-case: "mr": null, mr.url 6 s later).
+record() { [ -n "$1" ] || return 0; printf '%s\n' "$1" > "$url_file"; echo "MR: $1"; mission_data; }
 # D103: the mission's data, kept without anyone asking: the last runs go into
 # the archive, the metrics next to them, and one export per mission lands in
 # this machine's data folder (FACTORY_DATA_DIR, default ~/.pi-factory/data),

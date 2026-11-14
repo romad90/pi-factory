@@ -322,6 +322,28 @@ github_repo() {
 
 # Held while integrate.sh runs, outside the tree (a checkpoint would commit
 # it): "<pid> <ticket>". next.sh waits for it to go (get-port-7).
+# This checkout's folders, one per line: top level, git common dir, the
+# current folder and every worktree. A run is ours when it ran in one (D101).
+checkout_roots() {
+  git rev-parse --show-toplevel; git rev-parse --path-format=absolute --git-common-dir; printf '%s\n' "$PWD"
+  git worktree list --porcelain | sed -n 's/^worktree //p'
+}
+# When the mission began, as a local time `find -newermt` reads: its first
+# commit on any branch (its records may live on the mission branch, D116) or
+# its oldest file, whichever is older, less an hour (F10, D120). Fails when
+# the mission has neither.
+mission_since() {                      # <mission dir>
+  local first
+  first="$(git log --all --reverse --format=%ct -- "$1" 2>/dev/null | head -1 || true)"
+  node -e 'const fs = require("fs"), path = require("path");
+    let t = Number(process.argv[2]) * 1000 || Infinity;
+    const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name);
+      if (e.isDirectory()) walk(p); else t = Math.min(t, fs.statSync(p).mtimeMs); } };
+    try { walk(process.argv[1]); } catch {}
+    if (!Number.isFinite(t)) process.exit(1);
+    const d = new Date(t - 3600e3), p = (n) => String(n).padStart(2, "0");
+    console.log(`${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`)' "$1" "${first:-0}"
+}
 integrate_lock() { printf '%s/pi-factory/integrating-%s' "$(git rev-parse --path-format=absolute --git-common-dir)" "$1"; }
 
 # The repository's name, the same from every worktree of it: the folder that
@@ -908,7 +930,7 @@ brief_id() { printf '%s|%s|%s|%s' "$1" "$2" "$3" "$4" | sha256 "" | cut -c1-12; 
 # was, and next.sh offered G1 on a contract without the change. The approval
 # line isn't part of the hash: approving changes nothing the author wrote.
 contract_sha() { grep -v '^\*\*Contract approved:\*\*' "$1" | sha256 | cut -c1-12; }
-# D139: the contract's author+critic rounds, counted from the contract waves
+# D140: the contract's author+critic rounds, counted from the contract waves
 # workflow.sh wrote (workflows/<date>-contract.js, one per wave). The author
 # applies the critic's [blocking] findings in the next round with no person
 # between; after FACTORY_CONTRACT_ROUNDS critic rounds the contract goes to G1.
@@ -919,7 +941,7 @@ contract_rounds() {         # contract_rounds <mission dir>
   echo "$n"
 }
 
-# D140: the factory approves G1 and the tickets itself when they are clean.
+# D141: the factory approves G1 and the tickets itself when they are clean.
 # FACTORY_AUTO_APPROVE in .factory/commands.env (else the environment): off,
 # on, or flag (the default): only a mission whose spec says
 # **Auto-approve:** yes, the line a trigger writes (or a person, as a flag).

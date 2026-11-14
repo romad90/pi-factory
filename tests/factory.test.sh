@@ -446,38 +446,38 @@ printf 'FACTORY_LINT_CMD="true"\nFACTORY_TEST_CMD="test -f src/tools/a.js"\n' > 
 git add -A; git commit -q -m "chore: commands"
 expect_step build "tests configured"
 
-echo "Gates that approve themselves (D140)"
+echo "Gates that approve themselves (D141)"
 auto0="$(git rev-parse HEAD)"; a=.scratch/auto; mkdir -p $a/issues
 printf '# Auto\n**Intent:** bugfix\n**Auto-approve:** yes\n\nA trigger wrote this.\n\n## Validation contract\n\n### VAL-AUTO-001: one\nGiven a, then b.\n\n### VAL-AUTO-002: two\nGiven c, then d.\n' > $a/spec.md
 printf -- '- [blocking] VAL-AUTO-001: a hole.\n' > $a/contract-critique.md
 git add $a; git commit -qm "test: a mission a trigger started"
 ea() { local o; o="$(bash scripts/factory/next.sh auto 2>&1)"; [ "$(head -1 <<<"$o")" = "STEP: $1" ] && t "$2" || fail "$2" "$o"; }
-ea approve "a [blocking] finding with critic rounds left never approves itself (D140)"
+ea approve "a [blocking] finding with critic rounds left never approves itself (D141)"
 echo "No findings." > $a/contract-critique.md
 cp .factory/commands.env "$work/cmds.keep"; echo 'FACTORY_AUTO_APPROVE=off' >> .factory/commands.env
-ea approve "FACTORY_AUTO_APPROVE=off in the project turns auto-approval off (D140)"
+ea approve "FACTORY_AUTO_APPROVE=off in the project turns auto-approval off (D141)"
 cp "$work/cmds.keep" .factory/commands.env
-ea tickets "a clean critique on a flagged mission approves G1 itself, then goes on (D140)"
+ea tickets "a clean critique on a flagged mission approves G1 itself, then goes on (D141)"
 grep -qE '^\*\*Contract approved:\*\* [0-9-]+ — by factory \(auto\) — critic round 0: no \[blocking\] finding' $a/spec.md \
   && grep -q $'\tapprove\tG1: approve the validation contract\tapproved: critic round 0: no \\[blocking\\] finding\tcontract\tfactory (auto)\tunreviewed$' $a/decisions.tsv \
   && [ -z "$(git status --porcelain -- $a)" ] \
-  && t "the auto G1 is logged in decisions.tsv by factory (auto), with why, and counts as an approval (D140)" || fail "auto G1 record" "$(cat $a/decisions.tsv; grep approved $a/spec.md)"
+  && t "the auto G1 is logged in decisions.tsv by factory (auto), with why, and counts as an approval (D141)" || fail "auto G1 record" "$(cat $a/decisions.tsv; grep approved $a/spec.md)"
 bash scripts/factory/workflow.sh tickets auto all >/dev/null
 printf '# 01\n**Size:** S\n## Covers\nVAL-AUTO-001\n' > $a/issues/01-one.md
-ea approve-tickets "tickets whose Covers miss a contract ID wait for a person (D140)"
+ea approve-tickets "tickets whose Covers miss a contract ID wait for a person (D141)"
 printf '# 02\n**Size:** S\n## Covers\nVAL-AUTO-002\n' > $a/issues/02-two.md
 out="$(bash scripts/factory/next.sh auto 2>&1)"
 [ "$(head -1 <<<"$out")" != "STEP: approve-tickets" ] && [ ! -f $a/state/tickets.pending ] \
   && grep -q $'\tapprove-tickets\t.*their Covers equal the contract IDs\ttickets\tfactory (auto)\t' $a/decisions.tsv \
-  && t "tickets whose Covers together equal the contract's IDs approve themselves, logged by factory (auto) (D140)" || fail "auto tickets" "$out"
+  && t "tickets whose Covers together equal the contract's IDs approve themselves, logged by factory (auto) (D141)" || fail "auto tickets" "$out"
 aa() { bash -c '. scripts/factory/lib.sh; auto_approve_on "$1" && echo on || echo off' _ "$1"; }
 printf '# X\n**Intent:** bugfix\n' > "$work/plain-spec.md"
 [ "$(aa $a/spec.md)" = on ] && [ "$(aa "$work/plain-spec.md")" = off ] && [ "$(FACTORY_AUTO_APPROVE=on aa "$work/plain-spec.md")" = on ] \
-  && t "auto-approval: on for a spec flagged **Auto-approve:** yes, off otherwise unless FACTORY_AUTO_APPROVE=on (D140)" || fail "auto_approve_on"
+  && t "auto-approval: on for a spec flagged **Auto-approve:** yes, off otherwise unless FACTORY_AUTO_APPROVE=on (D141)" || fail "auto_approve_on"
 out="$(FACTORY_MR_TARGET=production bash scripts/factory/mr.sh auto --draft --dry-run 2>&1)"
 grep -q "body:  $a/pr.md" <<<"$out" && grep -q '^Draft opened by the factory' $a/pr.md && grep -q '^- VAL-AUTO-002: two$' $a/pr.md \
   && grep -q '^- [0-9-]* approve-tickets: approved: 2 ticket(s)' $a/pr.md && grep -q 'title: Draft: fix(auto): Auto' <<<"$out" \
-  && t "mr.sh --draft without pr.md writes a body from the record: contract and the factory's approvals (D140)" || fail "draft body" "$out$(cat $a/pr.md 2>&1)"
+  && t "mr.sh --draft without pr.md writes a body from the record: contract and the factory's approvals (D141)" || fail "draft body" "$out$(cat $a/pr.md 2>&1)"
 git reset -q --hard "$auto0"; rm -rf $a
 
 echo "Mission: build and review"
@@ -994,6 +994,15 @@ touch -d "@$(( $(date +%s) - 5 ))" "$work/usage/run/c9ctr_factory-contract-autho
 out="$(FACTORY_USAGE_DIRS="$work/usage" bash scripts/factory/archive.sh collect demo)"
 [ -f "$(dirname "$arch")/c9ctr_factory-contract-author/run.json" ] \
   && t "archive: a contract run before an amendment's rewrite of spec.md is still archived (F10)" || fail "archive contract run" "$out / $(ls "$(dirname "$arch")")"
+# search-attrs-case: usage.tsv held 6 runs of the 11 runs.tsv lists; every
+# contract run and the ticket writer finished before the last spec.md write.
+mkdir -p "$work/usage/other"
+printf '{"model":"gw/author-1","usage":{"input":5,"output":1,"cost":0,"turns":1},"durationMs":1000,"cwd":"/elsewhere/clone"}' > "$work/usage/other/f0rgn_factory-contract-author_meta.json"
+touch -d "@$(( $(date +%s) - 5 ))" "$work/usage/other/f0rgn_factory-contract-author_meta.json"
+FACTORY_USAGE_DIRS="$work/usage" bash scripts/factory/usage.sh demo >/dev/null
+grep -q 'c9ctr' $m/usage.tsv && ! grep -q 'f0rgn' $m/usage.tsv \
+  && t "usage: a contract run before an amendment's rewrite of spec.md is counted; another clone's run is not (search-attrs-case)" || fail "usage contract run" "$(cat $m/usage.tsv)"
+rm -rf "$work/usage/other"
 touch -r "$work/spec.mtime" "$m/spec.md"
 # P20: request sizes from the child transcript (pi-subagents' records): the
 # a 25k-token test log takes the reviewer's request from 10k to 35k; the next one would be 36.2k.
@@ -1086,10 +1095,11 @@ FACTORY_JUDGE_BIN="$work/judge-bad.sh" FACTORY_JUDGE_MODELS="gw/judge-1" bash sc
 [ "$(wc -l < $m/scores.tsv)" = "$n0" ] && t "score: a run is judged once per dimension; a malformed answer is never guessed" || fail "score dedupe" "$(cat "$work/score2.log")"
 FACTORY_JUDGE_BIN="$work/judge.sh" FACTORY_JUDGE_MODELS="gw/maker-2" bash scripts/factory/score.sh demo --dimension context-waste >"$work/score3.log" 2>&1
 grep -q 'without a judge of another family' "$work/score3.log" && t "score: no judge of the run's own family" || fail "score family" "$(cat "$work/score3.log")"
+# Two runs: the worker and the contract author that ran before spec.md last changed (search-attrs-case).
 echo 'https://gitlab.example/g/p/-/merge_requests/9' > $m/mr.url
 bash scripts/factory/metrics.sh --all > "$work/all.md"; bash scripts/factory/metrics.sh --all --json > "$work/all.json"
 grep -q '^| demo | ' "$work/all.md" && grep -q '^| \*\*Total\*\*' "$work/all.md" && grep -q 'Cost per MR' "$work/all.md" \
-  && node -e 'const j=require(process.argv[1]); const d=j.missions.find(m=>m.mission==="demo"); process.exit(d && d.runs===1 && d.tokensIn===120000 && d.scored>=2 && d.scoreFails>=1 && d.mr && j.total.mrs===1 ? 0 : 1)' "$work/all.json" \
+  && node -e 'const j=require(process.argv[1]); const d=j.missions.find(m=>m.mission==="demo"); process.exit(d && d.runs===2 && d.tokensIn===121000 && d.scored>=2 && d.scoreFails>=1 && d.mr && j.total.mrs===1 ? 0 : 1)' "$work/all.json" \
   && grep -q 'Scored runs (scores.tsv, D97) | .*fail' <<<"$(bash scripts/factory/metrics.sh demo)" \
   && t "metrics --all: every mission and the total, with cost per MR and scores (D97)" || fail "metrics all" "$(cat "$work/all.md" "$work/all.json")"
 rm -f $m/mr.url $m/scores.tsv
@@ -1623,6 +1633,11 @@ grep -qx -- '--body-file' "$work/gh.log" && grep -qx -- '--draft' "$work/gh.log"
   && grep -q 'pull/9' $m/mr.url && ! grep -qi 'gitlab' "$work/mr.log" \
   && [ "$(grep -c . "$work/gh.log.calls")" -ge 3 ] && ! grep -v -- '--repo o/p' "$work/gh.log.calls" | grep -q . \
   && t "mr.sh on a GitHub remote opens the PR with gh --body-file, no GitLab steps, every gh call on origin's repository (get-port-7)" || fail "mr gh create" "$(cat "$work/mr.log" "$work/gh.log")"
+# search-attrs-case: the archived metrics.json said "mr": null; mr.url was written 6 s after it.
+amj="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/archive/demo/metrics.json"
+node -e 'process.exit(/pull\/9/.test(require(process.argv[1]).mr || "") ? 0 : 1)' "$amj" \
+  && tar -xzOf "$(ls -t "$work/data"/*/demo-*.tar.gz | head -1)" demo/metrics.json | grep -q 'pull/9' \
+  && t "mr.sh: the archived metrics and the export carry the PR it just opened (search-attrs-case)" || fail "metrics mr" "$(cat "$amj" 2>&1)"
 printf '#!/usr/bin/env bash\nexit 1\n' > "$work/bin/gh"   # installed, not logged in
 out="$(PATH="$work/bin:$PATH" FACTORY_DATA_DIR="$work/data" FACTORY_MR_TARGET=production bash scripts/factory/mr.sh demo 2>&1)" \
   && grep -q 'gh pr create --repo o/p --base production' <<<"$out" && ! grep -qi 'gitlab' <<<"$out" \

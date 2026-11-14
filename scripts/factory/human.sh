@@ -70,7 +70,7 @@ if [ "$cmd" = approve ] && [ "${1:-}" = strategy ] && [ -f "$dir/job.md" ]; then
   exit 0
 fi
 [ -n "$light" ] || [ -f "$spec" ] || die "no spec at $spec"
-# D140: an approval the factory gives itself (next.sh, FACTORY_AUTO=1) is
+# D141: an approval the factory gives itself (next.sh, FACTORY_AUTO=1) is
 # logged as "factory (auto)", never as the person whose git config runs it.
 auto_who=""; [ "${FACTORY_AUTO:-0}" != 1 ] || { auto_who="factory (auto)"; export FACTORY_APPROVER="$auto_who"; }
 checkpoint() { if [ -n "$light" ]; then bash "$here/checkpoint.sh" --light "$light"; else bash "$here/checkpoint.sh" "$feature"; fi; }
