@@ -1087,15 +1087,18 @@ test_on_base() (
   done < <(node "$FACTORY_SCRIPTS/patch-paths.mjs" list "$patch") | sort -u > "$tmp/tests"
   if [ ! -s "$tmp/tests" ]; then echo "test on base: the change has no test files"; exit 0; fi
   node "$FACTORY_SCRIPTS/patch-paths.mjs" keep "$patch" "$tmp/tests.patch" "$tmp/tests"
-  if [ -n "$fixround" ]; then   # D148: the test files from the base to HEAD plus this round
-    mapfile -t specs < <(sed 's/^/:(top)/' "$tmp/tests")
-    if ! { GIT_INDEX_FILE="$tmp/index" git read-tree HEAD && GIT_INDEX_FILE="$tmp/index" git apply --cached "$tmp/tests.patch" \
-         && GIT_INDEX_FILE="$tmp/index" git diff --cached --relative "$base" -- "${specs[@]}" > "$tmp/tests.full"; } >"$log" 2>&1; then
+  top="$(git rev-parse --show-toplevel)"; prefix="$(project_prefix)"
+  dirarg=(); rel=(); [ -z "$prefix" ] || { dirarg=(--directory="$prefix"); rel=(--relative="$prefix/"); }
+  if [ -n "$fixround" ]; then   # D148: the test files from the base to HEAD plus this round (paths: the project's, as the patch's)
+    specs=(); while IFS= read -r f; do specs+=("${prefix:+$prefix/}$f"); done < "$tmp/tests"   # no sed: a folder may hold "&"
+    if ! { GIT_INDEX_FILE="$tmp/index" git -C "$top" read-tree HEAD \
+         && GIT_INDEX_FILE="$tmp/index" git -C "$top" apply --cached "${dirarg[@]}" "$tmp/tests.patch" \
+         && GIT_INDEX_FILE="$tmp/index" git -C "$top" diff --cached "${rel[@]}" "$base" -- "${specs[@]}" > "$tmp/tests.full"; } >"$log" 2>&1 \
+       || [ ! -s "$tmp/tests.full" ]; then
       echo "test on base: error: the tests don't apply on HEAD ($(tail -1 "$log"))"; exit 2
     fi
     mv "$tmp/tests.full" "$tmp/tests.patch"
   fi
-  top="$(git rev-parse --show-toplevel)"; prefix="$(project_prefix)"
   # The instrument stays hidden, as in a worker's worktree (D21).
   if ! git worktree add -q --detach --no-checkout "$wt" "$base" >"$log" 2>&1; then
     echo "test on base: error: no temporary worktree at $base ($(tail -1 "$log"))"; exit 2
@@ -1123,7 +1126,6 @@ test_on_base() (
       exit 2
     fi
   fi
-  dirarg=(); [ -z "$prefix" ] || dirarg=(--directory="$prefix")
   if ! git -C "$wt" apply "${dirarg[@]}" "$tmp/tests.patch" >"$log" 2>&1; then
     echo "test on base: error: the tests don't apply on $base alone ($(tail -1 "$log"))"; exit 2
   fi
