@@ -86,8 +86,19 @@ wave() {
   [ -n "$wf" ] || stop 2 "workflow.sh $* printed no WORKFLOW_FILE"
   WAVE_FILE="$wf"
   say "wave $1: $wf ($runner)"
+  local sp=""; if [ -t 2 ]; then spin "$1" & sp=$!; fi
   if RESULT="$(run_workflow "$wf")"; then WAVE_OK=1; else WAVE_OK=0; fi
+  [ -z "$sp" ] || { kill "$sp" 2>/dev/null; wait "$sp" 2>/dev/null || true; printf '\r\033[K' >&2; }
   printf '%s\n' "$RESULT" > "$logs/$(basename "$wf" .js).result.json"
+}
+# spin <wave>: a wave runs for minutes with no output; on a terminal only,
+# show that it is alive and for how long (stderr: RESULT captures stdout).
+spin() {
+  local start=$SECONDS i=0 c='|/-\'
+  while :; do
+    printf '\r%s wave %s running %dm%02ds ' "${c:i++%4:1}" "$1" $(((SECONDS - start) / 60)) $(((SECONDS - start) % 60)) >&2
+    sleep 1
+  done
 }
 
 must() { # must <name> <args...>: a factory script that must succeed
