@@ -1794,6 +1794,17 @@ bash scripts/factory/test-on-base.sh tob-feature 01-a "$work/tob-adds.patch" "$t
   && t "test-on-base.sh: the same check on its own (exit 0, 1, 2), the branch untouched" || fail "tob script" "$out"
 # D101: errors are errors, a red base is inconclusive, only the patch's tests with FACTORY_TEST_FILES_CMD, cleanup on any exit.
 tob_rc() { rc=0; out="$(bash scripts/factory/test-on-base.sh "$@" 2>&1)" || rc=$?; }
+# D148: a fix round that only changes tests runs on the commit before the ticket's first integration.
+tob_int bugfix adds || fail "tob fix round: round 1" "$(cat "$work/tob.log")"
+printf 'diff --git a/tests/tob/adds.check b/tests/tob/adds.check\n--- a/tests/tob/adds.check\n+++ b/tests/tob/adds.check\n@@ -1 +1,2 @@\n+test -s src/tob/value.txt\n grep -qx 2 src/tob/value.txt\n' > "$work/tob-r2.patch"
+printf 'diff --git a/tests/tob/adds.check b/tests/tob/adds.check\n--- a/tests/tob/adds.check\n+++ b/tests/tob/adds.check\n@@ -1 +1 @@\n-grep -qx 2 src/tob/value.txt\n+test -s src/tob/value.txt\n' > "$work/tob-r2pins.patch"
+tob_rc tob-bugfix 01-a "$work/tob-r2.patch"; r2="$rc $out"
+tob_rc tob-bugfix 01-a "$work/tob-r2.patch" HEAD; r2head="$rc $out"
+tob_rc tob-bugfix 01-a "$work/tob-r2pins.patch"
+[ "${r2%% *}" = 0 ] && grep -q 'as expected (fails before the change)' <<<"$r2" && [ "${r2head%% *}" = 1 ] && [ "$rc" = 1 ] \
+  && grep -q "pass on the code before the change" <<<"$out" && [ -z "$(git status --porcelain --untracked-files=no)" ] \
+  && t "test on base: a tests-only fix round runs on the code before the ticket's first round, where HEAD already has its fix (D148)" || fail "tob fix round" "$r2 / $r2head / $rc $out"
+git reset -q --hard "$tobbase"
 printf 'diff --git a/tests/tob/zz.check b/tests/tob/zz.check\n--- a/tests/tob/zz.check\n+++ b/tests/tob/zz.check\n@@ -1 +1 @@\n-nothing here\n+grep -qx 2 src/tob/value.txt\n' > "$work/tob-noapply.patch"
 tob_rc tob-feature 01-a "$work/tob-noapply.patch" "$tobbase"
 [ "$rc" = 2 ] && grep -q "test on base: error: the tests don't apply on" <<<"$out" || fail "tob: a patch that doesn't apply is an error" "$rc $out"
