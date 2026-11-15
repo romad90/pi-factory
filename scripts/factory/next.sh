@@ -24,7 +24,6 @@ UNRECORDED="The approval line has no /factory-approve record in decisions.tsv (w
 STATUS=""
 shopt -s nullglob
 
-HUMAN_STEPS=" paused grill approve-strategy job-done verify-failed approve-conclusion handoff report approve approve-design decide approve-tickets coverage setup hand escalate blocked unverified pr "
 
 step() {                                  # <code> <human explanation>
   local code="$1"; shift
