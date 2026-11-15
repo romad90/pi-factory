@@ -384,6 +384,17 @@ test("P25: the lead and the judges write files only under .scratch/", () => {
     assert.equal(bash(cmd), null, `should allow: ${cmd}`);
 });
 
+test("E60: the validator writes its raw results to instrument/results/, as its brief says", () => {
+  // The brief (D21, bot-harness.md) sends raw results there; P25 refused the
+  // redirect as a write outside .scratch/. The folder is git-ignored, so the
+  // tree stays clean; the rest of instrument/ stays the human's.
+  for (const cmd of ["node probe.cjs > instrument/results/m/round-1/results.json",
+    'R="$PWD/instrument/results/m/round-1"; node p.cjs | tee "$R/out.log"'])
+    assert.equal(bash(cmd), null, `should allow: ${cmd}`);
+  for (const cmd of ["echo x > instrument/scenarios/VAL-X-001.yaml", "echo x > instrument/results/../../src/a.js", "echo x > instrument/notes.md"])
+    assert.equal(bash(cmd)?.rule, "scratch", `should block: ${cmd}`);
+});
+
 test("pi-subagents 0.87: options.context fresh is the same call, nothing else in options", () => {
   const sub = (input) => check({ tool: "subagent", input, cwd: main });
   const wf = "./.scratch/light/dryrun-087/workflows/20261108-034723-light.js";

@@ -201,5 +201,13 @@
    "cwd": "{root}",
    "output": false
   }
+ },
+ {
+  "id": "E60",
+  "context": "judge",
+  "tool": "bash",
+  "input": {
+   "command": "RES_DIR=\"{root}/instrument/results/m/round-1\"\nBASE_DIR=\"{root}/.scratch/m/tmp/copies/validator-c5aeff34-base\"\nFIXED_DIR=\"{root}/.scratch/m/tmp/copies/validator-c5aeff34-fixed\"\nmkdir -p \"$RES_DIR\"\nnode .scratch/m/tmp/validator-c5aeff34-probe.cjs \"$BASE_DIR\" \"$FIXED_DIR\" > \"$RES_DIR/results.json\""
+  }
  }
 ]

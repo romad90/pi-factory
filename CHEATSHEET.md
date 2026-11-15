@@ -377,7 +377,7 @@ If the merge left your branch's dependency versions, take the target's `package.
 
 Pick models, thinking levels and factory changes on your own tickets, not on public benchmarks or feel.
 
-0. **Every mission feeds it on its own (D145):** each finished ticket (passed, or escalated) is captured as a case in its mission folder (`<mission>/bench/<ticket>/`) at checkpoint, with the models it really ran on. They form the suite `missions`: `bench.sh list missions`, `bench.sh run missions --config …`. `FACTORY_BENCH_CAPTURE=0` turns the capture off.
+0. **Every mission feeds it on its own (D146):** each finished ticket (passed, or escalated) is captured as a case in its mission folder (`<mission>/bench/<ticket>/`) at checkpoint, with the models it really ran on. They form the suite `missions`: `bench.sh list missions`, `bench.sh run missions --config …`. `FACTORY_BENCH_CAPTURE=0` turns the capture off.
 1. **Build a suite** from tickets the factory did: `scripts/factory/bench.sh add <mission> <ticket> --area <tag>` (difficulty comes from the ticket's rounds; `--difficulty` to override). Mix easy, hard and one escalated ticket, so the suite tells good setups from bad ones. A suite tests one role (`--role`, worker by default).
 2. **Run one configuration per run:** a models profile (as `models-profile.mjs` writes) with the roles you test, `bench.sh run default --config gw-maker-1.json --label maker1`. `--case <id> --debug` replays one case and keeps its worktree to look at. `--review` also runs the reviewer on the passes.
 3. **Change one thing at a time:** each new profile differs from the default by one variable, a model or a thinking level.

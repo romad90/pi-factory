@@ -13,7 +13,7 @@
 #   bench.sh capture <mission>
 #                every finished ticket of the mission (passed, or escalated)
 #                as a case in the mission folder: <mission>/bench/<ticket>/.
-#                checkpoint.sh runs it on its own (D145; FACTORY_BENCH_CAPTURE=0
+#                checkpoint.sh runs it on its own (D146; FACTORY_BENCH_CAPTURE=0
 #                turns it off), so every mission feeds the benchmark. These
 #                cases are suite "missions"; a case added by hand wins.
 #   bench.sh run <suite|all> --config <models-profile.json> [--label x] [--review]
@@ -34,7 +34,7 @@
 #   .factory/bench/results/<label>.tsv     one line per case run
 #   .factory/bench/results/<label>.json    the configuration and the summary
 #   .factory/bench/compare/<name>.json     what the cockpit's Benchmarks view reads
-#   <mission dir>/bench/<ticket>/           a captured case (D145): issue.md, spec.md,
+#   <mission dir>/bench/<ticket>/           a captured case (D146): issue.md, spec.md,
 #                                           case.json, base.patch (the earlier
 #                                           tickets, applied on the fork commit)
 #
@@ -72,7 +72,7 @@ HEADER=$'id\tmission\tticket\tsuite\tkind\trole\tdifficulty\tarea\tbase\trounds\
 cmd="${1:-}"; shift || true
 
 ensure_cases() { mkdir -p "$BENCH/cases"; [ -f "$CASES" ] || printf '%s\n' "$HEADER" > "$CASES"; }
-# D145: the cases a run sees: those added by hand, then those every mission
+# D146: the cases a run sees: those added by hand, then those every mission
 # captured on its own (a hand-added case with the same id wins).
 VIEW=""
 cases_view() {
@@ -183,7 +183,7 @@ do_add_file() {
   add_case "$mission--$ticket" "$mission" "$ticket" "$suite" followup "$role" "$difficulty" "$area" - 0 no no "$why" "$file" "$spec"
 }
 
-# --- capture (D145) ----------------------------------------------------------
+# --- capture (D146) ----------------------------------------------------------
 # Every finished ticket becomes a case without anyone asking. The case lives in
 # the mission folder, so no gate or scope check sees it, and it starts from the
 # mission's fork commit (the target branch's, which survives a squash merge)
@@ -216,7 +216,7 @@ do_capture() {
           if(key===ticket||key.startsWith(ticket+"-")||key.startsWith(ticket+":"))models[f[ix("agent")]]=[f[ix("model")],f[ix("thinking")]].filter(Boolean).join(":")}}catch{}
       let prev={};try{prev=JSON.parse(fs.readFileSync(file,"utf8"))}catch{}
       const c={id,mission,ticket,suite:"missions",kind:"regression",role:"worker",difficulty,area:prev.area||"",fork,base_patch:"base.patch",
-        outcome:{rounds:Number(rounds)||0,first_pass:first==="yes",escalated:esc==="yes"},live:{models},why:prev.why||"captured at checkpoint (D145)",
+        outcome:{rounds:Number(rounds)||0,first_pass:first==="yes",escalated:esc==="yes"},live:{models},why:prev.why||"captured at checkpoint (D146)",
         captured:prev.captured||new Date().toISOString().slice(0,10)};
       const txt=JSON.stringify(c,null,2)+"\n";if(fs.existsSync(file)&&fs.readFileSync(file,"utf8")===txt)process.exit(0);fs.writeFileSync(file,txt)' \
       "$d/case.json" "$mission--$ticket" "$mission" "$ticket" "$fork" "$rounds" "$first" "$esc" "$dir/runs.tsv" "$(difficulty_of "$rounds" "$first" "$esc")"
@@ -227,7 +227,7 @@ do_capture() {
 # select_cases <suite|all> <kind filter: regression|followup|any> [case id]
 select_cases() {
   local v; v="$(cases_view)"
-  [ "$(wc -l < "$v")" -gt 1 ] || die "no cases yet: bench.sh add <mission> <ticket>, or finish a mission (D145)"
+  [ "$(wc -l < "$v")" -gt 1 ] || die "no cases yet: bench.sh add <mission> <ticket>, or finish a mission (D146)"
   awk -F'\t' -v s="$1" -v k="$2" -v c="${3:-}" 'NR > 1 && (s == "all" || $4 == s) && (k == "any" || $5 == k) && (c == "" || $1 == c) { print $1 }' "$v"
 }
 
@@ -328,7 +328,7 @@ one_case() {
   wt="$wts/wt-$label-$id-$$"; out="$root/out/$label/$id"; rm -rf "$out"; mkdir -p "$out"
   git -C "$top" worktree add -q --detach "$wt" "$base" >/dev/null 2>&1 || die "could not create a worktree at $base"
   BENCH_WT="$wt"; BENCH_TOP="$top"; BENCH_KEEP="$debug"
-  # D145: a captured case starts at its mission's fork plus the earlier tickets.
+  # D146: a captured case starts at its mission's fork plus the earlier tickets.
   if [ -z "$at" ] && [ -s "$d/base.patch" ]; then
     git -C "$wt" apply --binary "$(cd "$d" && pwd)/base.patch" || die "case $id: its base.patch doesn't apply on $base"
     git -C "$wt" add -A >/dev/null && git -C "$wt" -c user.name=bench -c user.email=bench@localhost commit -q -m "bench: base of $id" >/dev/null
