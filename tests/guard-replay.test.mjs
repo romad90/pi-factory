@@ -17,6 +17,7 @@ import { check } from "../scripts/factory/guard-rules.mjs";
 const main = mkdtempSync(join(homedir(), ".factory-replay-main-"));
 after(() => rmSync(main, { recursive: true, force: true }));
 mkdirSync(join(main, ".git")); mkdirSync(join(main, ".factory"));   // a real project has both
+mkdirSync(join(main, "instrument"));   // and its instrument, beside the judges (D21)
 const workerGit = mkdtempSync(join(tmpdir(), "replay-gitdir-"));
 writeFileSync(join(workerGit, "HEAD"), "ref: refs/heads/pi-subagents/01-x-abc123-s0-t0\n");
 const worker = mkdtempSync(join(tmpdir(), "replay-worker-"));
@@ -68,6 +69,12 @@ test("replay: the fixes let nothing dangerous through", () => {
   for (const cmd of ['echo x > "$PWD/notes.md"', 'D="$PWD/.."; echo x > "$D/notes.md"', 'export TMPDIR="$PWD/src"; echo x > "$TMPDIR/a.js"'])
     assert.ok(bash(cmd), `should block: ${cmd}`);
   assert.equal(bash('echo x > "${PWD}/.scratch/m/tmp/a.log"'), null);
+  // E60: the validator's raw results go to instrument/results/ (git-ignored),
+  // and nowhere else in instrument/ or the tree; a worker never reaches it.
+  for (const cmd of ["echo x > instrument/scenarios/a.yaml", "echo x > instrument/results/../../src/a.js",
+    'R="$PWD/instrument/results/../.."; echo x > "$R/notes.md"', "echo x > instrument/results.json"])
+    assert.ok(bash(cmd), `should block: ${cmd}`);
+  assert.ok(bash("echo x > instrument/results/m/a.json", worker), "a worker can't write the validator's results");
   // Subagent launches: only a generated workflow, fresh and blocking; only the
   // review axis directly, fresh, in this project; only read-only actions.
   const wf = "./.scratch/m/workflows/20261108-000000-build-wave.js";

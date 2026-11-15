@@ -97,7 +97,7 @@ test("check and ingest: one foreign word refuses the whole file", () => {
 
 // The guard must judge a shape as it judged the original, or the lesson
 // teaches nothing: real refusals (fixed since) and calls that must stay blocked.
-const root = mkdtempSync(join(tmpdir(), "fidelity-root-")); mkdirSync(join(root, ".git")); mkdirSync(join(root, ".factory"));
+const root = mkdtempSync(join(tmpdir(), "fidelity-root-")); mkdirSync(join(root, ".git")); mkdirSync(join(root, ".factory")); mkdirSync(join(root, "instrument"));
 const gitdir = mkdtempSync(join(tmpdir(), "fidelity-gitdir-"));
 writeFileSync(join(gitdir, "HEAD"), "ref: refs/heads/pi-subagents/01-x-abc123-s0-t0\n");
 const worker = mkdtempSync(join(tmpdir(), "fidelity-worker-")); writeFileSync(join(worker, ".git"), `gitdir: ${gitdir}\n`);
