@@ -1061,6 +1061,17 @@ echo "// hand repair" >> src/tools/hello.js; git commit -qam "fix: hand repair"
 bash scripts/factory/metrics.sh demo > "$work/metrics2.md"; git revert --no-edit HEAD >/dev/null
 hand1="$(sed -n 's/^| Hand commits in the mission[^|]*| \([0-9]*\) |$/\1/p' "$work/metrics2.md")"
 [ -n "$hand0" ] && [ "$hand1" = $((hand0 + 1)) ] && t "metrics: a hand commit counts as an intervention; script commits carry Factory-Script (D89)" || fail "hand commits" "$hand0 → $hand1"
+mkdir -p .scratch/later; echo x > .scratch/later/spec.md; git add .scratch/later; git commit -qm "chore(factory): later state" --trailer "Factory-Script: checkpoint"
+echo "// later mission's hand repair" >> src/tools/hello.js; git commit -qam "fix: later hand repair"
+bash scripts/factory/metrics.sh demo > "$work/metrics3.md"; git revert --no-edit HEAD >/dev/null; git rm -rq .scratch/later; git commit -qm "chore: drop later"
+hand3="$(sed -n 's/^| Hand commits in the mission[^|]*| \([0-9]*\) |$/\1/p' "$work/metrics3.md")"
+[ "$hand3" = "$hand0" ] && t "metrics: hand commits stop at the mission's last factory commit once another mission's follows (gym: 86 counted, 20 real)" || fail "hand commits scoped" "$hand0 → $hand3"
+mkdir -p .scratch/sq; echo x > .scratch/sq/spec.md; git add .scratch/sq; git commit -qm "feat: squash-merged mission (#1)"
+sq0="$(bash scripts/factory/metrics.sh sq --json)"
+sqa="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/archive/sq"; mkdir -p "$sqa"; echo '{"handCommits":4}' > "$sqa/metrics.json"
+sq1="$(bash scripts/factory/metrics.sh sq --json)"; rm -rf "$sqa"; git rm -rq .scratch/sq; git commit -qm "chore: drop sq"
+grep -q '"handCommits":null' <<<"$sq0" && grep -q '"handCommits":4' <<<"$sq1" \
+  && t "metrics: a squash-merged mission's hand commits come from the metrics archived at its PR, never from other missions (D147)" || fail "hand commits archived" "$sq0 / $sq1"
 # D97: the run archive, scoring, metrics across missions.
 bid="$(bash -c '. scripts/factory/lib.sh; verdict_field "$1" Brief' _ $m/verdicts/01-hello-code.md)"
 printf 'Role: factory-worker. Mission demo, ticket 01-hello.\n\nbrief-id: %s\n' "$bid" > "$work/usage/run/r1abc_factory-worker_input.md"

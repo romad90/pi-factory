@@ -25,4 +25,5 @@ for (const r of rows) {
 }
 const t = total;
 console.log(`| **Total** (${t.missions}) | | ${t.tickets} | ${pct(t.firstPass, t.reviewed)} | ${t.reviewed ? (t.rounds / t.reviewed).toFixed(1) : "-"} | ${t.decisions} | ${t.handCommits} | | ${k(t.tokensIn)}/${k(t.tokensOut)} | ${t.cost} | ${t.scored} (${t.scoreFails}) | ${t.mrs} |`);
-console.log(`\nCost per MR: ${v(t.costPerMr)} · human interventions (decisions + hand commits) per MR: ${v(t.decisionsPerMr)}`);
+const handMeasured = mrs.filter((r) => r.handCommits !== null && r.handCommits !== undefined).length;
+console.log(`\nCost per MR: ${v(t.costPerMr)} · human interventions (decisions + hand commits) per MR: ${v(t.decisionsPerMr)}${handMeasured < mrs.length ? ` (hand commits measured on ${handMeasured} of ${mrs.length} MRs; the others were squash-merged with no archived metrics)` : ""}`);
