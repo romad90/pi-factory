@@ -85,7 +85,7 @@ const VOCAB = new Set([
     api cli server client model models event events hook data schema schemas key keys value values state store home
     counts calls refusal lost round deviation message causes class bug cost retry weakness na gap intervention genuine
     environment flake other cases tool shape rule faithful seen steer resume stop cancel interrupt lesson source factory
-    tmpdir ifs eof http https rc ret err dir dirs pass fail tmpfile logfile outfile`),
+    tmpdir ifs eof http https rc ret err dir dirs pass fail tmpfile logfile outfile instrument scenarios`),
 ]);
 // Words of the factory itself: guard rule ids, its scripts and agents.
 const guardSrc = readFileSync(join(here, "guard-rules.mjs"), "utf8");

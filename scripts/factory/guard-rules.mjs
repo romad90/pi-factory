@@ -265,6 +265,9 @@ export function strayWrite(n, cwd, root) {
     if (/^&\d|^\/dev\//.test(target)) return true;
     const abs = resolve(from, target.replace(/^~(?=\/)/, homedir()));
     if (abs.startsWith(join(root, ".scratch") + "/")) return true;
+    // E60: the validator's raw results (D21, bot-harness.md), git-ignored. A
+    // worker never gets here, and the wall keeps it out of instrument/.
+    if (abs.startsWith(join(root, "instrument", "results") + "/")) return true;
     if (abs.startsWith(root + "/")) return false;
     return [tmpdir(), "/tmp", "/var/tmp", process.env.TMPDIR].filter(Boolean).some((t) => abs.startsWith(resolve(t) + "/"));
   };
