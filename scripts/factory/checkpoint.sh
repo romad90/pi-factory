@@ -19,6 +19,11 @@ else
 fi
 [ -d "$dir" ] || die "nothing at $dir"
 why="$(reattach_head)" || die "$why"
+# D145: every finished ticket becomes a benchmark case, in the mission folder,
+# without anyone asking; best effort, never a reason not to checkpoint.
+if [ "${1:-}" != "--light" ] && [ "${FACTORY_BENCH_CAPTURE:-1}" != 0 ]; then
+  bash "$here/bench.sh" capture "$name" >/dev/null 2>&1 || true
+fi
 # B0: a judge's copy of the project (git archive + npm ci), a node_modules or
 # an npm cache is never mission state, wherever it sits under the mission
 # folder: one such copy made 4,880 of a PR's files and broke Windows checkout.
