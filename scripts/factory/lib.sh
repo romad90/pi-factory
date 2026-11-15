@@ -13,6 +13,7 @@ fi
 FACTORY_DIR="${FACTORY_DIR:-.scratch}"            # one path segment, no slash
 # The steps where next.sh stops for a person: one list for next.sh, status.sh
 # (the cockpit's "needs you") and run.sh, which each kept a copy that drifted.
+# shellcheck disable=SC2034  # used by next.sh, status.sh and run.sh
 HUMAN_STEPS=" paused grill approve-strategy job-done verify-failed approve-conclusion handoff report approve approve-design decide approve-tickets coverage setup hand escalate blocked unverified pr "
 # Some workspace images ship without coreutils' head (D102); every
 # "… | head -1" would then stop a script under pipefail. This stand-in covers
