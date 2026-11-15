@@ -102,13 +102,25 @@ cycle="-"
 # D89: P8 counts a hand commit as an intervention. Every commit a factory
 # script makes carries a Factory-Script trailer; the others, from the
 # mission's first commit on, were made by hand (repairs, resets, merges).
+# They end at the mission's last factory commit once a later factory commit
+# (another mission on this branch) follows it: --all counted every later
+# mission's commits into the earlier ones (86 hand commits on the gym, 20 real).
 hand="-"
 start="$(git log --reverse --format=%H -- "$dir" | awk 'NR == 1')"
-if [ -n "$start" ]; then                 # after the spec commit, which is the human's by design
+own="$(git log --format='%H %(trailers:key=Factory-Script,valueonly,separator=%x2C)' HEAD -- "$dir" | awk 'NF > 1 && !f { print $1; f = 1 }')"
+if [ -z "$own" ]; then
+  # squash-merged: the count mr.sh archived when the PR opened, on the mission's branch
+  archived="$(node -e 'try { const h = require(process.argv[1]).handCommits; if (Number.isInteger(h)) console.log(h) } catch {}' \
+    "$(dirname "$(dirname "$(dirname "$(draft_patch "$feature" x)")")")/archive/$feature/metrics.json")"
+  if [ -n "$archived" ]; then hand="$archived"
+  elif [ -n "$start" ]; then hand="not measured (no factory commit of this mission on this branch: squash-merged, or started before D89)"; fi
+else                                     # after the spec commit, which is the human's by design
+  end=HEAD
+  [ "$(git log --first-parent --format='%(trailers:key=Factory-Script,valueonly)' "$own..HEAD" | grep -c . || true)" = 0 ] || end="$own"
   # first parent only: commits a merge from main brings in are nobody's repair
-  marked="$(git log --first-parent --no-merges --format='%(trailers:key=Factory-Script,valueonly)' "$start..HEAD" | grep -c . || true)"
-  total="$(git log --first-parent --no-merges --format=%H "$start..HEAD" | wc -l | tr -d ' ')"
-  if [ "$marked" -gt 0 ]; then hand=$(( total - marked )); else hand="not measured (mission started before D89)"; fi
+  marked="$(git log --first-parent --no-merges --format='%(trailers:key=Factory-Script,valueonly)' "$start..$end" | grep -c . || true)"
+  total="$(git log --first-parent --no-merges --format=%H "$start..$end" | wc -l | tr -d ' ')"
+  hand=$(( total - marked ))
 fi
 if [ -n "$first" ] && [ -n "$last" ]; then
   h=$(( (last - first) / 3600 ))
