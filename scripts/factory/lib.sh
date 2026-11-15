@@ -952,6 +952,17 @@ contract_rounds() {         # contract_rounds <mission dir>
   for f in "$1"/workflows/*-contract.js "$1"/workflows/*-contract-[0-9]*.js; do [ -f "$f" ] && n=$((n + 1)); done
   echo "$n"
 }
+# D144: a critique counts once it is newer than the latest contract wave. A
+# round is counted when its wave starts, so a next.sh call while the wave runs
+# read the round before's critique (search-attrs-case-replay: G1 approved
+# itself on round 1's 4 [blocking] findings, 15 s before round 2's critique).
+# ponytail: file times; a fresh clone can make a current critique look old,
+# which only sends G1 to the person.
+critique_current() {        # critique_current <mission dir> <critique>
+  local f last=""
+  for f in "$1"/workflows/*-contract.js "$1"/workflows/*-contract-[0-9]*.js; do [ -f "$f" ] && [[ "$f" > "$last" ]] && last="$f"; done
+  [ -z "$last" ] || [ "$2" -nt "$last" ]
+}
 
 # D141: the factory approves G1 and the tickets itself when they are clean.
 # FACTORY_AUTO_APPROVE in .factory/commands.env (else the environment): off,

@@ -196,7 +196,7 @@ done
 # round, with no person between, until the critic has had its rounds.
 crounds="$(contract_rounds "$dir")"; reround=""
 if has_contract "$spec" && [ -f "$critique" ] && [ ${#open_amendments[@]} -eq 0 ] && ! contract_approved "$spec" \
-   && grep -q '\[blocking\]' "$critique" && [ "$crounds" -lt "$FACTORY_CONTRACT_ROUNDS" ]; then
+   && grep -q '\[blocking\]' "$critique" && [ "$crounds" -lt "$FACTORY_CONTRACT_ROUNDS" ] && critique_current "$dir" "$critique"; then
   reround=1
   STATUS="Critic round $crounds of $FACTORY_CONTRACT_ROUNDS left [blocking] findings: the author applies them in round $((crounds + 1)), no person needed."$'\n'
 fi
@@ -212,7 +212,8 @@ fi
 if ! contract_approved "$spec"; then
   # D141: G1 approves itself when the critic's last round blocks nothing, or
   # the critic used its rounds (D140); an open question stopped us above.
-  if auto_approve_on "$spec"; then
+  critique_current "$dir" "$critique" || STATUS+="The critic of round $crounds hasn't written its critique yet: its wave still runs, or stopped before the critic. Wait for it, or run the contract wave again. G1 doesn't approve itself on the older critique (D144)."$'\n'
+  if auto_approve_on "$spec" && critique_current "$dir" "$critique"; then
     nb="$(grep -c '\[blocking\]' "$critique" || true)"; cr="$(contract_rounds "$dir")"
     if [ "${nb:-0}" -eq 0 ] || [ "$cr" -ge "$FACTORY_CONTRACT_ROUNDS" ]; then
       why="critic round $cr: no [blocking] finding"

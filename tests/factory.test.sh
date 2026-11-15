@@ -525,6 +525,15 @@ echo "No findings." > $a/contract-critique.md
 cp .factory/commands.env "$work/cmds.keep"; echo 'FACTORY_AUTO_APPROVE=off' >> .factory/commands.env
 ea approve "FACTORY_AUTO_APPROVE=off in the project turns auto-approval off (D141)"
 cp "$work/cmds.keep" .factory/commands.env
+# search-attrs-case-replay: round 2's wave started, its critic not done yet,
+# round 1's critique (a [blocking] finding) still on disk.
+mkdir -p $a/workflows; printf -- '- [blocking] VAL-AUTO-001: a hole.\n' > $a/contract-critique.md
+touch -t 202601010000 $a/contract-critique.md; touch $a/workflows/20260101-000100-contract.js $a/workflows/20260101-000200-contract.js
+out="$(bash scripts/factory/next.sh auto 2>&1)"
+[ "$(head -1 <<<"$out")" = "STEP: approve" ] && grep -q "critic of round 2 hasn't written its critique yet" <<<"$out" \
+  && ! grep -q $'\tapprove\t' $a/decisions.tsv 2>/dev/null \
+  && t "G1 never approves itself on the round before's critique while the critic's wave runs (D144)" || fail "stale critique approved" "$out$(cat $a/decisions.tsv 2>/dev/null)"
+rm -rf $a/workflows; echo "No findings." > $a/contract-critique.md
 ea tickets "a clean critique on a flagged mission approves G1 itself, then goes on (D141)"
 grep -qE '^\*\*Contract approved:\*\* [0-9-]+ — by factory \(auto\) — critic round 0: no \[blocking\] finding' $a/spec.md \
   && grep -q $'\tapprove\tG1: approve the validation contract\tapproved: critic round 0: no \\[blocking\\] finding\tcontract\tfactory (auto)\tunreviewed$' $a/decisions.tsv \
