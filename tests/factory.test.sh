@@ -1941,6 +1941,25 @@ export BENCH_LOG="$work/bench.log" FACTORY_BENCH_RUNNER="$work/bin/fakebench"
 printf '{"agents":{"factory-worker":{"model":"gw/maker-1","thinking":"medium"}}}' > "$work/p1.json"
 printf '{"agents":{"factory-worker":{"model":"gw/maker-2","thinking":"medium"}}}' > "$work/p2.json"
 printf '{"agents":{"factory-worker":{"model":"gw/maker-3","thinking":"high"}}}' > "$work/p3.json"
+# D146: every finished ticket of every mission becomes a case on its own, at
+# checkpoint: nobody has to remember `bench.sh add`. The case lives in the
+# mission folder (no gate sees it), from a fork commit that survives a squash merge.
+bash scripts/factory/checkpoint.sh runner >/dev/null
+cap=.scratch/runner/bench/01-run
+fork_runner="$(bash -c '. scripts/factory/lib.sh; mission_base runner')"
+[ -f $cap/case.json ] && [ -f $cap/issue.md ] && [ -f $cap/spec.md ] && [ -f $cap/base.patch ] \
+  && [ -n "$(git ls-files $cap/case.json)" ] \
+  && node -e 'const c=require(process.argv[1]);process.exit(c.id==="runner--01-run"&&c.fork===process.argv[2]&&c.outcome.first_pass===true&&c.difficulty==="easy"&&c.suite==="missions"&&c.live&&c.live.models&&Object.keys(c.live.models).length>0?0:1)' "$PWD/$cap/case.json" "$fork_runner" \
+  && t "checkpoint captures a finished ticket as a bench case in its mission folder, with the models it really ran on (D146)" || fail "bench capture" "$(ls -la $cap 2>&1; cat $cap/case.json 2>&1)"
+before="$(git rev-parse HEAD)"; bash scripts/factory/checkpoint.sh runner >/dev/null
+[ "$(git rev-parse HEAD)" = "$before" ] && t "capturing again with nothing new commits nothing" || fail "capture churn" "$(git show --stat HEAD | head)"
+bash scripts/factory/bench.sh list missions | grep -qE '^runner--01-run[[:space:]]' && [ ! -f .factory/bench/cases.tsv ] \
+  && t "bench list shows captured cases without any bench add" || fail "bench list captured" "$(bash scripts/factory/bench.sh list missions 2>&1)"
+out="$(bash scripts/factory/bench.sh run missions --config "$work/p1.json" --label cap --case runner--01-run 2>&1)" || fail "bench run captured" "$out"
+grep -qP '^runner--01-run\teasy\t[^\t]*\tyes\t-\t' .factory/bench/results/cap.tsv && [ "$(git rev-parse HEAD)" = "$before" ] && [ ! -e tests/bench.test.js ] \
+  && t "bench run replays a captured case from its fork plus the earlier tickets' patch" || fail "bench run captured" "$out
+$(cat .factory/bench/results/cap.tsv 2>&1)"
+rm -rf .factory/bench
 int="$(git log --format='%H %s' | awk '$2 == "feat(runner):" && $3 == "01-run" { print $1 }' | tail -1)"
 bash scripts/factory/bench.sh add runner 01-run --area tooling --why "first ticket" >/dev/null
 c=.factory/bench/cases/runner--01-run
