@@ -10,6 +10,12 @@
 #   bench.sh add-file <issue.md> <mission> [--area <tag>] [--suite <name>] [--why "..."]
 #                a hand-written follow-up case (kind followup)
 #   bench.sh list [suite]
+#   bench.sh capture <mission>
+#                every finished ticket of the mission (passed, or escalated)
+#                as a case in the mission folder: <mission>/bench/<ticket>/.
+#                checkpoint.sh runs it on its own (D146; FACTORY_BENCH_CAPTURE=0
+#                turns it off), so every mission feeds the benchmark. These
+#                cases are suite "missions"; a case added by hand wins.
 #   bench.sh run <suite|all> --config <models-profile.json> [--label x] [--review]
 #                [--case <id>] [--debug]
 #   bench.sh probe <suite|all> --config <profile> [--at <commit>] [--label x]
@@ -28,6 +34,9 @@
 #   .factory/bench/results/<label>.tsv     one line per case run
 #   .factory/bench/results/<label>.json    the configuration and the summary
 #   .factory/bench/compare/<name>.json     what the cockpit's Benchmarks view reads
+#   <mission dir>/bench/<ticket>/           a captured case (D146): issue.md, spec.md,
+#                                           case.json, base.patch (the earlier
+#                                           tickets, applied on the fork commit)
 #
 # Runner: FACTORY_BENCH_RUNNER, a command called as
 #   <runner> <role> <case-id> <work-dir> <brief-file> <model> <thinking> <out-dir>
@@ -63,8 +72,50 @@ HEADER=$'id\tmission\tticket\tsuite\tkind\trole\tdifficulty\tarea\tbase\trounds\
 cmd="${1:-}"; shift || true
 
 ensure_cases() { mkdir -p "$BENCH/cases"; [ -f "$CASES" ] || printf '%s\n' "$HEADER" > "$CASES"; }
+# D146: the cases a run sees: those added by hand, then those every mission
+# captured on its own (a hand-added case with the same id wins).
+VIEW=""
+cases_view() {
+  [ -z "$VIEW" ] || { printf '%s' "$VIEW"; return; }
+  VIEW="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/bench/cases-view.tsv"
+  mkdir -p "$(dirname "$VIEW")"
+  { if [ -f "$CASES" ]; then cat "$CASES"; else printf '%s\n' "$HEADER"; fi
+    node -e 'const fs=require("fs"),path=require("path");const [dir,cases]=process.argv.slice(1);
+      const have=new Set(fs.existsSync(cases)?fs.readFileSync(cases,"utf8").split("\n").slice(1).map(l=>l.split("\t")[0]):[]);
+      let ms=[];try{ms=fs.readdirSync(dir)}catch{}
+      for(const m of ms.sort()){const b=path.join(dir,m,"bench");let ts=[];try{ts=fs.readdirSync(b)}catch{continue}
+        for(const t of ts.sort()){let c;try{c=JSON.parse(fs.readFileSync(path.join(b,t,"case.json"),"utf8"))}catch{continue}
+          if(have.has(c.id))continue;const o=c.outcome||{};
+          console.log([c.id,c.mission,c.ticket,c.suite,c.kind,c.role,c.difficulty,c.area||"",c.fork,o.rounds||0,o.first_pass?"yes":"no",o.escalated?"yes":"no",(c.why||"").replace(/\t/g," ")].join("\t"))}}' \
+      "$FACTORY_DIR" "$CASES"; } > "$VIEW"
+  printf '%s' "$VIEW"
+}
 case_field() {   # case_field <id> <column name>
-  awk -F'\t' -v id="$1" -v col="$2" 'NR == 1 { for (i = 1; i <= NF; i++) h[$i] = i; next } $1 == id { print $h[col]; exit }' "$CASES"
+  awk -F'\t' -v id="$1" -v col="$2" 'NR == 1 { for (i = 1; i <= NF; i++) h[$i] = i; next } $1 == id { print $h[col]; exit }' "$(cases_view)"
+}
+case_dir() {     # the folder holding a case's issue.md and spec.md
+  if [ -d "$BENCH/cases/$1" ]; then echo "$BENCH/cases/$1"
+  else echo "$(mission_dir "$(case_field "$1" mission)")/bench/$(case_field "$1" ticket)"; fi
+}
+# The commit the ticket's worker started from: before its first integration
+# (integrate.sh commits "<type>(<mission>): <ticket>"), or its marker; empty
+# when it was never integrated.
+ticket_first_int() {   # <mission> <ticket>
+  local first_int
+  first_int="$(git log --reverse --format='%H%x09%s' | awk -F'\t' -v s="($1): $2" \
+    '{ i = index($2, s) } i > 1 && i + length(s) - 1 == length($2) && substr($2, 1, i - 1) ~ /^[a-z]+$/ { print $1; exit }')"
+  [ -n "$first_int" ] || first_int="$(ticket_marker "$1" "$2")"
+  printf '%s' "$first_int"
+}
+ticket_outcome() {     # <mission> <ticket> → "rounds first escalated"; empty while the ticket is still open
+  local dir v r1 rounds first=no esc=no
+  dir="$(mission_dir "$1")"; v="$dir/verdicts/$2-code.md"
+  rounds="$(verdict_round "$v" 2>/dev/null)"; rounds="${rounds:-0}"
+  r1="${v%.md}.r1.md"; [ -f "$r1" ] || r1="$v"
+  [ -f "$r1" ] && [ "$(verdict_field "$r1" Result)" = PASS ] && first=yes
+  if [ -f "$dir/state/$2.stuck" ] || { [ "$rounds" -ge "$FACTORY_ROUND_LIMIT" ] && [ "$(verdict_field "$v" Result)" != PASS ]; }; then esc=yes; fi
+  [ -f "$v" ] && { [ "$(verdict_field "$v" Result)" = PASS ] || [ "$esc" = yes ]; } || return 0
+  printf '%s %s %s' "$rounds" "$first" "$esc"
 }
 difficulty_of() {   # <rounds> <first_pass> <escalated>
   if [ "$3" = yes ]; then echo extra-hard; elif [ "$2" = yes ]; then echo easy
@@ -106,11 +157,8 @@ do_add() {
   local r1="${v%.md}.r1.md"; [ -f "$r1" ] || r1="$v"
   [ "$(verdict_field "$r1" Result)" = PASS ] && first=yes
   if [ -f "$dir/state/$ticket.stuck" ] || { [ "$rounds" -ge "$FACTORY_ROUND_LIMIT" ] && [ "$(verdict_field "$v" Result)" != PASS ]; }; then esc=yes; fi
-  # The case starts where the worker started: the commit before the ticket's
-  # first integration (integrate.sh commits "<type>(<mission>): <ticket>").
-  first_int="$(git log --reverse --format='%H%x09%s' | awk -F'\t' -v s="($mission): $ticket" \
-    '{ i = index($2, s) } i > 1 && i + length(s) - 1 == length($2) && substr($2, 1, i - 1) ~ /^[a-z]+$/ { print $1; exit }')"
-  [ -n "$first_int" ] || first_int="$(ticket_marker "$mission" "$ticket")"
+  # The case starts where the worker started: the commit before the ticket's first integration.
+  first_int="$(ticket_first_int "$mission" "$ticket")"
   if [ "$kind" = regression ]; then
     [ -n "$first_int" ] || die "$ticket was never integrated: nothing to replay (a hand-written follow-up goes in with add-file)"
     base="$(git rev-parse "$first_int^")"
@@ -135,11 +183,52 @@ do_add_file() {
   add_case "$mission--$ticket" "$mission" "$ticket" "$suite" followup "$role" "$difficulty" "$area" - 0 no no "$why" "$file" "$spec"
 }
 
+# --- capture (D146) ----------------------------------------------------------
+# Every finished ticket becomes a case without anyone asking. The case lives in
+# the mission folder, so no gate or scope check sees it, and it starts from the
+# mission's fork commit (the target branch's, which survives a squash merge)
+# plus base.patch: what the earlier tickets changed before this one started.
+# The patch is written once; the outcome is updated if a ticket is reopened.
+do_capture() {
+  local mission="${1:?usage: bench.sh capture <mission>}" dir fork t ticket out rounds first esc d base first_int
+  dir="$(mission_dir "$mission")"; [ -d "$dir/issues" ] || return 0
+  case "$(verdict_field "$dir/spec.md" Intent)" in feature|bugfix|maintenance|refactor) ;; *) return 0 ;; esac
+  fork="$(mission_base "$mission")"
+  for t in "$dir"/issues/*.md; do
+    [ -f "$t" ] || continue; ticket="$(basename "$t" .md)"
+    out="$(ticket_outcome "$mission" "$ticket")"; [ -n "$out" ] || continue
+    read -r rounds first esc <<<"$out"
+    d="$dir/bench/$ticket"; mkdir -p "$d"
+    if [ ! -f "$d/base.patch" ]; then
+      first_int="$(ticket_first_int "$mission" "$ticket")"
+      # A ticket whose first integration git no longer has (a squashed branch,
+      # collected) can't be replayed from its real start: left out, said so.
+      if [ -n "$first_int" ]; then base="$(git rev-parse -q --verify "$first_int^{commit}^" 2>/dev/null)" || base=""
+      else base="$(git rev-parse HEAD)"; fi
+      if [ -z "$base" ]; then echo "bench: $mission $ticket left out: its first integration ${first_int:0:12} is no longer in git" >&2; rmdir "$d" 2>/dev/null || true; continue; fi
+      git diff --binary "$fork" "$base" -- . ":(exclude)$FACTORY_DIR" > "$d/base.patch"
+      cp "$t" "$d/issue.md"; cp "$dir/spec.md" "$d/spec.md"
+    fi
+    node -e 'const fs=require("fs");const [file,id,mission,ticket,fork,rounds,first,esc,runs,difficulty]=process.argv.slice(1);
+      const models={};
+      try{const [h,...rows]=fs.readFileSync(runs,"utf8").trim().split("\n");const c=h.split("\t");const ix=(n)=>c.indexOf(n);
+        for(const r of rows){const f=r.split("\t");const key=f[ix("key")]||"";
+          if(key===ticket||key.startsWith(ticket+"-")||key.startsWith(ticket+":"))models[f[ix("agent")]]=[f[ix("model")],f[ix("thinking")]].filter(Boolean).join(":")}}catch{}
+      let prev={};try{prev=JSON.parse(fs.readFileSync(file,"utf8"))}catch{}
+      const c={id,mission,ticket,suite:"missions",kind:"regression",role:"worker",difficulty,area:prev.area||"",fork,base_patch:"base.patch",
+        outcome:{rounds:Number(rounds)||0,first_pass:first==="yes",escalated:esc==="yes"},live:{models},why:prev.why||"captured at checkpoint (D146)",
+        captured:prev.captured||new Date().toISOString().slice(0,10)};
+      const txt=JSON.stringify(c,null,2)+"\n";if(fs.existsSync(file)&&fs.readFileSync(file,"utf8")===txt)process.exit(0);fs.writeFileSync(file,txt)' \
+      "$d/case.json" "$mission--$ticket" "$mission" "$ticket" "$fork" "$rounds" "$first" "$esc" "$dir/runs.tsv" "$(difficulty_of "$rounds" "$first" "$esc")"
+  done
+}
+
 # --- run ---------------------------------------------------------------------
 # select_cases <suite|all> <kind filter: regression|followup|any> [case id]
 select_cases() {
-  [ -f "$CASES" ] || die "no cases yet: bench.sh add <mission> <ticket>"
-  awk -F'\t' -v s="$1" -v k="$2" -v c="${3:-}" 'NR > 1 && (s == "all" || $4 == s) && (k == "any" || $5 == k) && (c == "" || $1 == c) { print $1 }' "$CASES"
+  local v; v="$(cases_view)"
+  [ "$(wc -l < "$v")" -gt 1 ] || die "no cases yet: bench.sh add <mission> <ticket>, or finish a mission (D146)"
+  awk -F'\t' -v s="$1" -v k="$2" -v c="${3:-}" 'NR > 1 && (s == "all" || $4 == s) && (k == "any" || $5 == k) && (c == "" || $1 == c) { print $1 }' "$v"
 }
 
 profile_role() {   # <profile> <role> → "model<TAB>thinking"
@@ -228,7 +317,7 @@ one_case() {
   local id="$1" profile="$2" label="$3" at="$4" review="$5" debug="$6"
   local mission ticket kind role base d top prefix wt wd out start rc=0 gate="" patch
   mission="$(case_field "$id" mission)"; ticket="$(case_field "$id" ticket)"; kind="$(case_field "$id" kind)"
-  role="$(case_field "$id" role)"; base="$(case_field "$id" base)"; d="$BENCH/cases/$id"
+  role="$(case_field "$id" role)"; base="$(case_field "$id" base)"; d="$(case_dir "$id")"
   [ -n "$at" ] && base="$(git rev-parse "$at")"
   [ "$base" != "-" ] || base="$(git rev-parse HEAD)"
   top="$(git rev-parse --show-toplevel)"; prefix="$(project_prefix)"
@@ -239,6 +328,12 @@ one_case() {
   wt="$wts/wt-$label-$id-$$"; out="$root/out/$label/$id"; rm -rf "$out"; mkdir -p "$out"
   git -C "$top" worktree add -q --detach "$wt" "$base" >/dev/null 2>&1 || die "could not create a worktree at $base"
   BENCH_WT="$wt"; BENCH_TOP="$top"; BENCH_KEEP="$debug"
+  # D146: a captured case starts at its mission's fork plus the earlier tickets.
+  if [ -z "$at" ] && [ -s "$d/base.patch" ]; then
+    git -C "$wt" apply --binary "$(cd "$d" && pwd)/base.patch" || die "case $id: its base.patch doesn't apply on $base"
+    git -C "$wt" add -A >/dev/null && git -C "$wt" -c user.name=bench -c user.email=bench@localhost commit -q -m "bench: base of $id" >/dev/null
+    base="$(git -C "$wt" rev-parse HEAD)"
+  fi
   wd="$wt${prefix:+/$prefix}"
   # D101: never an unguarded agent. A project on the installed package (D92)
   # has no guard file in its tree: Pi loads it from the package, installed
@@ -333,7 +428,8 @@ do_run() {     # <probe 0|1> <suite> options...
 case "$cmd" in
   add) do_add "$@" ;;
   add-file) do_add_file "$@" ;;
-  list) [ -f "$CASES" ] || die "no cases yet"; awk -F'\t' -v s="${1:-all}" 'NR == 1 || s == "all" || $4 == s' "$CASES" | column -ts$'\t' ;;
+  list) v="$(cases_view)"; [ "$(wc -l < "$v")" -gt 1 ] || die "no cases yet"; awk -F'\t' -v s="${1:-all}" 'NR == 1 || s == "all" || $4 == s' "$v" | { if command -v column >/dev/null; then column -ts$'\t'; else cat; fi; } ;;
+  capture) do_capture "$@" ;;
   run) do_run 0 "$@" ;;
   probe) do_run 1 "$@" ;;
   compare)
@@ -341,6 +437,6 @@ case "$cmd" in
     node "$here/bench-report.mjs" compare "$BENCH" "$@" ;;
   paired)
     node "$here/bench-report.mjs" paired "$BENCH" "$@" ;;
-  ""|-h|--help|help) sed -n '2,48p' "$0" | sed 's/^# \{0,1\}//' ;;
+  ""|-h|--help|help) sed -n '2,63p' "$0" | sed 's/^# \{0,1\}//' ;;
   *) die "unknown command: $cmd (bench.sh help)" ;;
 esac
