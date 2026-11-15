@@ -178,8 +178,6 @@ $nxt"
     paused)
       if [ "$steps" = 1 ]; then must pause.sh resume "$feature"; continue; fi
       printf '%s\n' "$nxt"; stop 3 "the mission paused itself" ;;
-    grill|approve|approve-design|decide|approve-tickets|coverage|setup|escalate|blocked|unverified|approve-conclusion|handoff|report)
-      printf '%s\n' "$nxt"; echo "WAITING: human ($step)"; exit 0 ;;
     install)
       must install.sh "$feature" ;;
     context-sync)
@@ -197,6 +195,8 @@ $nxt"
       wave tickets "$feature" "$task"; [ "$WAVE_OK" = 1 ] || stop 2 "the tickets wave failed: $RESULT" ;;
     health)
       bash "$here/health.sh" check "$feature" || say "health check failed (recorded; the loop continues)" ;;
+    verify)
+      bash "$here/verify.sh" "$feature" || say "done condition failed (recorded; the loop continues)" ;;
     build)
       build
       if [ "$ASKED" = 1 ]; then
@@ -212,6 +212,9 @@ $nxt"
       must metrics.sh "$feature"; must mr.sh "$feature" --draft ;;
     mr-open|closed)
       printf '%s\n' "$nxt"; exit 0 ;;
-    *) printf '%s\n' "$nxt"; stop 2 "unknown step '$step'" ;;
+    *)
+      printf '%s\n' "$nxt"
+      if [[ "$HUMAN_STEPS" == *" $step "* ]]; then echo "WAITING: human ($step)"; exit 0; fi
+      stop 2 "unknown step '$step'" ;;
   esac
 done

@@ -22,7 +22,6 @@ done
 [ -n "$json" ] || die "usage: status.sh <mission>|--all --json (for the text view, run next.sh)"
 [ -n "$all" ] || [ -n "$feature" ] || die "usage: status.sh <mission>|--all --json"
 
-HUMAN_STEPS=" paused grill approve decide approve-tickets coverage setup escalate blocked unverified pr "
 
 # One mission → tab-separated lines node turns into JSON:
 #   S <step> / N <next> / H <1 if a human step> / O <branch holding the state>

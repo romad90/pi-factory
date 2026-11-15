@@ -961,7 +961,7 @@ lc="$(bash scripts/factory/mr.sh demo --local "private repository" 2>&1)" || tru
 grep -q '^local: ' $m/mr.url 2>/dev/null && grep -q 'private repository' $m/mr.url && grep -q 'closed locally' <<<"$lc" \
   && t "mr.sh --local closes a mission without an MR, and says why (F7)" || fail "mr --local" "$lc"
 expect_step closed "a mission closed locally is done, not waiting for /pr (F7)"
-grep -q '^STEP: closed' <<<"$(bash scripts/factory/next.sh demo)" && ! grep -q ' closed ' <<<"$(sed -n 's/^HUMAN_STEPS=//p' scripts/factory/next.sh scripts/factory/status.sh)" \
+grep -q '^STEP: closed' <<<"$(bash scripts/factory/next.sh demo)" && ! grep -q ' closed ' <<<"$(sed -n 's/^HUMAN_STEPS=//p' scripts/factory/lib.sh)" \
   && t "a closed mission needs nobody" || fail "closed is a human step"
 echo "https://gitlab.example.com/g/p/-/merge_requests/7" > $m/mr.url
 expect_step mr-open "an open MR waits for its merge, not for /pr (F7)"
@@ -1922,6 +1922,17 @@ pe() { bash -c '. scripts/factory/lib.sh; provider_error_line "$1"' _ "$1"; }
 bash scripts/factory/gate.sh mission runner >"$work/gate.log" 2>&1 && t "the mission run.sh drove passes the gates (G1-G5)" || fail "run.sh gate" "$(cat "$work/gate.log")"
 out="$(FACTORY_RUNNER=fake FACTORY_FAKE_RUNNER=/bin/false bash scripts/factory/run.sh runner --no-preflight --max-steps 0 2>&1)" && fail "run.sh must stop past --max-steps"
 echo "$out" | grep -q 'more than 0 steps' && t "run.sh: a step budget stops a loop that would not end" || fail "max steps" "$out"
+# error-codes-970: run.sh stopped at "unknown step 'verify'"; its human steps are next.sh's list now.
+cp $r/spec.md "$work/runner-spec.md"; printf '\n## Done when\n\n`false`\n' >> $r/spec.md; bash scripts/factory/checkpoint.sh runner >/dev/null
+out="$(FACTORY_RUNNER=fake FACTORY_FAKE_RUNNER="$work/bin/fakerun" bash scripts/factory/run.sh runner --no-preflight 2>&1)" || fail "run.sh verify-failed" "$out"
+vfail="$out"; sed -i 's/^`false`$/`true`/' $r/spec.md; rm -f $r/verify.md; bash scripts/factory/checkpoint.sh runner >/dev/null
+out="$(FACTORY_RUNNER=fake FACTORY_FAKE_RUNNER="$work/bin/fakerun" bash scripts/factory/run.sh runner --no-preflight 2>&1)" || fail "run.sh verify" "$out"
+grep -q 'run: step 1: verify' <<<"$vfail" && grep -q 'WAITING: human (verify-failed)' <<<"$vfail" \
+  && grep -q 'run: step 1: verify' <<<"$out" && grep -q 'WAITING: human (pr)' <<<"$out" && grep -q '^\*\*Result:\*\* PASS' $r/verify.md \
+  && t "run.sh: runs the done condition (verify), and stops at every human step next.sh lists (verify-failed)" || fail "run.sh verify" "$vfail
+---
+$out"
+cp "$work/runner-spec.md" $r/spec.md; rm -f $r/verify.md; bash scripts/factory/checkpoint.sh runner >/dev/null
 unset FAKE_LOG FAKE_STATE FAKE_PATCH
 
 # D98: the benchmark replays a real ticket with another model setup, scored by the gates.
