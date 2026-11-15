@@ -1038,8 +1038,12 @@ changed_code_files() {                 # <base> <commit>
 #   A ticket opts out with "## Test on base: skip — <reason>": the line then
 #   reads "test on base: skipped by the ticket (<reason>)".
 # A subshell: its trap removes the temporary worktree on any exit or signal.
+#   D148: without a base, a fix round (the ticket integrated before) runs on
+#   the commit before the ticket's first integration, with the test files as
+#   the round leaves them: on HEAD, round 1's fix makes a tests-only round
+#   pass, so it could never fail as a bugfix needs (error-codes-970).
 test_on_base() (
-  feature="$1" ticket="$2" patch="$3" log="$4" base="${5:-HEAD}"
+  feature="$1" ticket="$2" patch="$3" log="$4" base="${5:-}" fixround=""
   dir="$(mission_dir "$feature")"
   if [ "${FACTORY_TEST_ON_BASE:-1}" = 0 ]; then echo "test on base: off (FACTORY_TEST_ON_BASE=0)"; exit 0; fi
   if [ -z "${FACTORY_TEST_CMD:-}" ]; then echo "test on base: no test command"; exit 0; fi
@@ -1053,6 +1057,13 @@ test_on_base() (
   if [ -f "$issue" ] && opt="$(grep -m1 -iE '^## Test on base: *skip' "$issue")"; then
     why="$(printf '%s' "$opt" | sed -E 's/^## [Tt]est on base: *[Ss]kip *(—|-|:)? *//')"
     echo "test on base: skipped by the ticket (${why:-no reason given})"; exit 0
+  fi
+  if [ -z "$base" ]; then
+    base=HEAD
+    while read -r c; do
+      [ "$(git log -1 --format='%(trailers:key=Factory-Script,valueonly)' "$c")" = integrate ] || continue
+      base="$(git rev-parse "$c^")"; fixround=1; break
+    done < <(ticket_commits "$feature" "$ticket" HEAD)
   fi
   # D124: the packages installed now were changed by hand after the base: the
   # base's tests can't run with them (deps-node-22: tap 21 rejects tap 16 options).
@@ -1076,6 +1087,14 @@ test_on_base() (
   done < <(node "$FACTORY_SCRIPTS/patch-paths.mjs" list "$patch") | sort -u > "$tmp/tests"
   if [ ! -s "$tmp/tests" ]; then echo "test on base: the change has no test files"; exit 0; fi
   node "$FACTORY_SCRIPTS/patch-paths.mjs" keep "$patch" "$tmp/tests.patch" "$tmp/tests"
+  if [ -n "$fixround" ]; then   # D148: the test files from the base to HEAD plus this round
+    mapfile -t specs < <(sed 's/^/:(top)/' "$tmp/tests")
+    if ! { GIT_INDEX_FILE="$tmp/index" git read-tree HEAD && GIT_INDEX_FILE="$tmp/index" git apply --cached "$tmp/tests.patch" \
+         && GIT_INDEX_FILE="$tmp/index" git diff --cached --relative "$base" -- "${specs[@]}" > "$tmp/tests.full"; } >"$log" 2>&1; then
+      echo "test on base: error: the tests don't apply on HEAD ($(tail -1 "$log"))"; exit 2
+    fi
+    mv "$tmp/tests.full" "$tmp/tests.patch"
+  fi
   top="$(git rev-parse --show-toplevel)"; prefix="$(project_prefix)"
   # The instrument stays hidden, as in a worker's worktree (D21).
   if ! git worktree add -q --detach --no-checkout "$wt" "$base" >"$log" 2>&1; then
