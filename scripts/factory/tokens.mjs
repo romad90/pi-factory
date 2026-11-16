@@ -20,6 +20,7 @@
 // the window's quota untouched) shows it there.
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { parseRecord } from "./redact.mjs";
 
 const argv = process.argv.slice(2);
 const opt = (name, dflt) => { const i = argv.indexOf(name); return i >= 0 && argv[i + 1] ? argv[i + 1] : dflt; };
@@ -41,7 +42,7 @@ if (argv.includes("--shape")) {
     const tf = join(dir, name, "transcript.jsonl");
     if (!existsSync(tf)) continue;
     for (const line of readFileSync(tf, "utf8").split("\n")) {
-      let r; try { r = JSON.parse(line); } catch { continue; }
+      const r = parseRecord(line); if (!r) continue;
       const m = r.message && typeof r.message === "object" ? r.message : {};
       const key = [r.recordType, r.type, r.role, m.role].map((x) => x || "-").join(" | ");
       const k = (kinds[key] ??= { n: 0, fields: new Set(), message: new Set(), usage: null });
@@ -80,7 +81,7 @@ for (const name of readdirSync(dir).sort()) {
   if (existsSync(tf)) {
     for (const line of readFileSync(tf, "utf8").split("\n")) {
       if (!line.trim()) continue;
-      let r; try { r = JSON.parse(line); } catch { continue; }
+      const r = parseRecord(line); if (!r) continue;
       if (r.recordType === "tool_start" && r.toolCallId) calls.set(r.toolCallId, r.argsPreview || "");
       if (r.recordType && r.recordType !== "message") continue;
       const m = r.message && typeof r.message === "object" ? r.message : {};

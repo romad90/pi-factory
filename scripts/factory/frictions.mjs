@@ -19,6 +19,7 @@
 // brief line, a setup step, a skill.
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { parseRecord } from "./redact.mjs";
 
 const argv = process.argv.slice(2);
 const opt = (name, dflt) => { const i = argv.indexOf(name); return i >= 0 && argv[i + 1] ? argv[i + 1] : dflt; };
@@ -49,7 +50,7 @@ for (const name of readdirSync(dir).sort()) {
   if (existsSync(tf)) {
     for (const line of readFileSync(tf, "utf8").split("\n")) {
       if (!line.trim()) continue;
-      let r; try { r = JSON.parse(line); } catch { continue; }
+      const r = parseRecord(line); if (!r) continue;
       if (r.recordType === "tool_start" && r.toolCallId) {
         const s = sig(r.toolName || "?", r.argsPreview);
         calls.set(r.toolCallId, s); total++;

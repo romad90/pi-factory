@@ -1872,6 +1872,25 @@ echo '{"type":"session"}'
 echo '{"type":"tool_execution_end","toolName":"subagent","isError":false,"result":{"content":[{"type":"text","text":"Workflow completed."}],"details":{"workflow":{"value":[{"key":"contract-critic","output":"approve"}]}}}}'
 PI
 chmod +x "$work/bin/fakepi"; mkdir -p "$work/pi dir"; cp "$work/bin/fakepi" "$work/pi dir/pi bin"
+# B12 (abandon-timeout, archive run 47ac94a6…_factory-contract-author): the
+# author's transcript stopped growing at 01:09:08, its next model call never
+# answered, and the wave waited until the workflow's 2-hour limit. A pi
+# stand-in that writes one transcript record, then hangs, with its child.
+cat > "$work/bin/hangpi" <<'PI'
+#!/usr/bin/env bash
+echo '{"type":"session"}'
+mkdir -p "$HANG_DIR/run"; echo '{"recordType":"message","role":"assistant"}' > "$HANG_DIR/run/47ac94a6_factory-contract-author_transcript.jsonl"
+sleep 300 & echo $! > "$HANG_DIR/child.pid"; wait
+PI
+chmod +x "$work/bin/hangpi"; mkdir -p "$work/hang"
+rc=0; SECONDS=0
+out="$(HANG_DIR="$work/hang" FACTORY_USAGE_DIRS="$work/hang" FACTORY_RUN_IDLE_SECONDS=3 FACTORY_PI_BIN="$work/bin/hangpi" bash scripts/factory/run.sh runner --no-preflight 2>&1)" || rc=$?
+hung=$SECONDS
+[ "$rc" = 3 ] && [ "$hung" -lt 60 ] && grep -q 'provider hang: no event from any run for 3s' <<<"$out" && grep -q 'last event .*Z in 47ac94a6_factory-contract-author_transcript.jsonl' <<<"$out" \
+  && grep -q 'provider hang' $r/state/PAUSED.md && ! kill -0 "$(cat "$work/hang/child.pid")" 2>/dev/null \
+  && t "run.sh: a wave with no event for FACTORY_RUN_IDLE_SECONDS is stopped (pi and its children), reported as a provider hang with its last event, and the mission pauses (B12)" \
+  || fail "run.sh provider hang" "rc=$rc ${hung}s $out"
+bash scripts/factory/pause.sh resume runner >/dev/null
 out="$(PI_ARGS_LOG="$work/pi.args" FACTORY_PI_BIN="$work/pi dir/pi bin" bash scripts/factory/run.sh runner --no-preflight 2>&1)" || fail "run.sh contract" "$out"
 grep -q -- '-p --mode json' "$work/pi.args" && grep -q 'driver.mjs --model factory-driver/script' "$work/pi.args" && grep -q 'workflows/.*-contract.js' "$work/pi.args" \
   && echo "$out" | grep -q '^STEP: approve' && echo "$out" | grep -q 'WAITING: human (approve)' \

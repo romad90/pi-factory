@@ -11,6 +11,9 @@
 //   credentials in URLs (scheme://user:pass@host); and assignments to a name
 //   containing password, passwd, secret, token or api_key/apikey, quoted or
 //   not (export DB_PASSWORD=x, "token": "x", api_key: x).
+// A count is not a secret (D150): a name ending in "tokens" (totalTokens,
+// max_tokens, cacheReadTokens) with a number keeps its number, or every
+// assistant line of a transcript stops being JSON.
 export const REDACTED = "[REDACTED]";
 
 const TOKENS = new RegExp([
@@ -40,5 +43,16 @@ export function redact(text) {
     .replace(TOKENS, REDACTED)
     .replace(BEARER, `$1 ${REDACTED}`)
     .replace(URL_CRED, `$1:${REDACTED}@`)
-    .replace(ASSIGN, (m, name, sep, value) => (value === REDACTED ? m : `${name}${sep}${REDACTED}`));
+    .replace(ASSIGN, (m, name, sep, value) => (value === REDACTED || COUNT.test(name) && /^\d+(\.\d+)?$/.test(value) ? m : `${name}${sep}${REDACTED}`));
+}
+const COUNT = /tokens$/i;
+
+// One transcript or log line as JSON, or null. A line archived before D150 may
+// hold a bare [REDACTED] where a number was ("totalTokens":[REDACTED]): it
+// reads as null, and the rest of the line is kept.
+export function parseRecord(line) {
+  if (typeof line !== "string" || !line.trim()) return null;
+  try { return JSON.parse(line); } catch {}
+  if (!line.includes(REDACTED)) return null;
+  try { return JSON.parse(line.replace(/(:\s*)\[REDACTED\](?=\s*[,}\]])/g, "$1null")); } catch { return null; }
 }

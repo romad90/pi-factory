@@ -20,10 +20,11 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFil
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { check } from "./guard-rules.mjs";
+import { parseRecord } from "./redact.mjs";
 
 const ls = (d) => (existsSync(d) ? readdirSync(d) : []);
 const records = (f) => readFileSync(f, "utf8").split("\n").filter(Boolean)
-  .map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+  .map(parseRecord).filter(Boolean);
 const text = (c) => (Array.isArray(c) ? c.map((x) => x?.text ?? "").join(" ") : String(c ?? ""));
 const REFUSED = /blocked by the factory guard/;
 
