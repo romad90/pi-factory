@@ -362,6 +362,7 @@ If the merge left your branch's dependency versions, take the target's `package.
 | Worker returns no patch | run ended on a thinking-only turn, or ticket too big | recorded automatically as a round; round 2 goes to the heavy worker |
 | Gate: "verdict not recorded" | `collect.sh` didn't run | `scripts/factory/collect.sh <f>` |
 | 429 rate limit | shared quota | concurrency 1, `FACTORY_MAX_PARALLEL=1` |
+| `run: STOP — provider hang` | no run wrote anything for 10 minutes: a model call never answered | `factory run` paused the mission; run it again later. Change the wait with `FACTORY_RUN_IDLE_SECONDS` in `.factory/commands.env` (0: off) |
 | `not a git repo` from install | unquoted path with spaces or `&` | `cd` into it, pass `"$PWD"` |
 | Lead context above 70% | long mission | it pauses itself; `/factory <f>` in a new session |
 | `STEP: blocked` … "Did you mean" | misspelled mission name | `/factory <the suggested name>` |

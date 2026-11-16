@@ -19,7 +19,11 @@
 #            value as JSON (tests).
 #
 # Exit: 0 stopped at a human step (the NEXT line says what to do)
-#       3 paused on a provider error (not a round; run again later)
+#       3 paused on a provider error or hang (not a round; run again later)
+#
+# FACTORY_RUN_IDLE_SECONDS (environment or .factory/commands.env, default 600,
+# 0 off): a wave in which no run has written anything for that long is stopped
+# as a provider hang (D151).
 #       2 a script or the runner failed, or an unknown step: read the output
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -61,10 +65,17 @@ run_workflow() {
       [ -n "${FACTORY_FAKE_RUNNER:-}" ] || die "FACTORY_RUNNER=fake needs FACTORY_FAKE_RUNNER"
       "$FACTORY_FAKE_RUNNER" "$wf" ;;
     pi-json)
-      raw="$logs/$(basename "$wf" .js).jsonl"
-      # stdin closed: pi -p waits on an open stdin.
+      raw="$logs/$(basename "$wf" .js).jsonl"; rm -f "$raw.hang"
+      # stdin closed: pi -p waits on an open stdin. Its own process group
+      # (set -m), so a hang stops pi and every run it started (B12).
+      local pid wpid t0; t0="$(node -e 'console.log(Date.now() - 1000)')"; set -m
       FACTORY_DRIVE_WORKFLOW="$wf" "${pi_cmd[@]}" -p --mode json --no-session --approve \
-        -e "$here/driver.mjs" --model factory-driver/script "run the workflow" </dev/null >"$raw" 2>"$raw.err" || true
+        -e "$here/driver.mjs" --model factory-driver/script "run the workflow" </dev/null >"$raw" 2>"$raw.err" &
+      pid=$!; set +m
+      idle_watch "$pid" "$raw" "$t0" >/dev/null 2>&1 & wpid=$!
+      wait "$pid" || true
+      kill "$wpid" 2>/dev/null || true; wait "$wpid" 2>/dev/null || true
+      if [ -s "$raw.hang" ]; then cat "$raw.hang"; return 1; fi
       node -e '
         const fs = require("fs"); const lines = fs.readFileSync(process.argv[1], "utf8").split("\n").filter(Boolean);
         let end = null;
@@ -76,6 +87,50 @@ run_workflow() {
         console.log(JSON.stringify(end.result.details.workflow.value ?? null));' "$raw" ;;
     *) die "unknown FACTORY_RUNNER: $runner (pi-json or fake)" ;;
   esac
+}
+
+# idle_watch <pid> <runner log> <wave start, ms> (D151, B12): a model call that never returns
+# leaves no error, only silence; the workflow's own limit is 2 hours. When
+# neither the runner's log nor any run's transcript (where archive.sh finds
+# runs, FACTORY_USAGE_DIRS) has changed for FACTORY_RUN_IDLE_SECONDS (default
+# 600; 0: off), the runner's process group is stopped and <log>.hang says why.
+# A wave's runs in parallel share one clock: a hung worker is stopped once the
+# others are done and the limit has passed with no event.
+idle_watch() {
+  local pid="$1" raw="$2" start="$3" limit="$idle_limit" poll now last at roots
+  [ "$limit" -gt 0 ] 2>/dev/null || return 0
+  poll=30; [ "$limit" -ge 120 ] || poll=1
+  read -r -a roots <<<"${FACTORY_USAGE_DIRS:-.pi/subagents $HOME/.pi/agent ${TMPDIR:-/tmp}}"
+  while kill -0 "$pid" 2>/dev/null; do
+    sleep "$poll"
+    read -r last at < <(node "$here/idle.mjs" "$start" "$raw" "${roots[@]}")
+    [ -n "$last" ] || continue
+    now="$(node -e 'console.log(Date.now())')"
+    [ $(((now - last) / 1000)) -ge "$limit" ] || continue
+    printf 'provider hang: no event from any run for %ss (last event %s in %s); the wave was stopped\n' "$limit" \
+      "$(node -e 'console.log(new Date(Number(process.argv[1])).toISOString().replace(/\.\d+Z$/, "Z"))' "$last")" \
+      "$([ "$at" = - ] && echo "no run: none started" || basename "$at")" > "$raw.hang"
+    kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+    sleep 2; kill -KILL -- "-$pid" 2>/dev/null || true
+    return 0
+  done
+}
+# FACTORY_RUN_IDLE_SECONDS: environment first, then .factory/commands.env, else 600.
+idle_limit="${FACTORY_RUN_IDLE_SECONDS:-}"
+if [ -z "$idle_limit" ] && [ -f .factory/commands.env ]; then
+  idle_limit="$(sed -n 's/^[[:space:]]*\(export[[:space:]]*\)\{0,1\}FACTORY_RUN_IDLE_SECONDS=["'"'"']\{0,1\}\([0-9][0-9]*\).*/\2/p' .factory/commands.env | tail -1)"
+fi
+idle_limit="${idle_limit:-600}"
+
+# failed <wave>: a wave that failed. A provider error or hang pauses the
+# mission (no round, exit 3, D58); anything else stops for a person (exit 2).
+failed() {
+  local line; line="$(provider_error_line "$RESULT")"
+  if [ -n "$line" ]; then
+    bash "$here/pause.sh" "$feature" "provider error in the $1 wave, no round recorded: $line" >/dev/null
+    stop 3 "provider error in the $1 wave, mission paused (no round): $line"
+  fi
+  stop 2 "the $1 wave failed: $RESULT"
 }
 
 # wave <workflow.sh args...>: generates the wave, runs it; result in $RESULT.
@@ -123,7 +178,13 @@ build() {
   if [ "$WAVE_OK" = 0 ]; then
     line="$(provider_error_line "$RESULT")"
     if [ -n "$line" ]; then
-      for t in $tickets; do must record-no-patch.sh "$feature" "$t" --provider "$line"; done
+      # A hang stops the wave after the other workers are done: their patches
+      # are on disk and integrate; the rest wait for the provider (B12).
+      for t in $tickets; do
+        patch=""; [[ "$line" != "provider hang"* ]] || patch="$(bash "$here/locate-patch.sh" "$feature" "$t" 2>/dev/null)" || patch=""
+        if [ -n "$patch" ]; then bash "$here/integrate.sh" "$feature" "$t" "$patch" || say "$t: integration failed, recorded as a round"
+        else must record-no-patch.sh "$feature" "$t" --provider "$line"; fi
+      done
       stop 3 "provider error, mission paused (no round): $line"
     fi
     if grep -qi 'timed out' <<<"$RESULT"; then
@@ -194,16 +255,16 @@ $nxt"
     context-sync)
       must context.sh sync "$feature" ;;
     investigate)
-      wave investigate "$feature"; [ "$WAVE_OK" = 1 ] || stop 2 "the investigate wave failed: $RESULT" ;;
+      wave investigate "$feature"; [ "$WAVE_OK" = 1 ] || failed investigate ;;
     contract|design|validate|steward)
-      wave "$step" "$feature"; [ "$WAVE_OK" = 1 ] || stop 2 "the $step wave failed: $RESULT"
+      wave "$step" "$feature"; [ "$WAVE_OK" = 1 ] || failed "$step"
       case "$step" in contract|design) ;; *) must collect.sh "$feature" ;; esac ;;
     behavior-stale)
-      wave validate "$feature"; [ "$WAVE_OK" = 1 ] || stop 2 "the validate wave failed: $RESULT"
+      wave validate "$feature"; [ "$WAVE_OK" = 1 ] || failed validate
       must collect.sh "$feature" ;;
     tickets|behavior-fix|health-fix)
       task=all; [ "$step" = behavior-fix ] && task=fix-behavior; [ "$step" = health-fix ] && task=fix-health
-      wave tickets "$feature" "$task"; [ "$WAVE_OK" = 1 ] || stop 2 "the tickets wave failed: $RESULT" ;;
+      wave tickets "$feature" "$task"; [ "$WAVE_OK" = 1 ] || failed tickets ;;
     health)
       bash "$here/health.sh" check "$feature" || say "health check failed (recorded; the loop continues)" ;;
     verify)
@@ -214,7 +275,7 @@ $nxt"
         printf '%s\n' "$(bash "$here/next.sh" "$feature")"; echo "WAITING: human (a worker asked a question)"; exit 0
       fi ;;
     review)
-      wave review-wave "$feature"; [ "$WAVE_OK" = 1 ] || stop 2 "the review wave failed: $RESULT"
+      wave review-wave "$feature"; [ "$WAVE_OK" = 1 ] || failed review
       must collect.sh "$feature" ;;
     pr)
       must metrics.sh "$feature"
