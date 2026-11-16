@@ -9,6 +9,7 @@
 //   timeline gives it (missions[].timeline[].dir).
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { parseRecord } from "./redact.mjs";
 import { pathToFileURL } from "node:url";
 import { check } from "./guard-rules.mjs";
 
@@ -37,7 +38,7 @@ export function events(transcript) {
   const out = [], byId = new Map();
   for (const line of String(transcript || "").split("\n")) {
     if (!line.trim()) continue;
-    let r; try { r = JSON.parse(line); } catch { continue; }
+    const r = parseRecord(line); if (!r) continue;
     const m = r.message && typeof r.message === "object" ? r.message : {};
     if (r.recordType === "tool_start" || (r.type === "tool" && r.name)) {
       const e = { at: when(r, m), kind: "call", tool: r.toolName || r.name || "?", text: cut(r.argsPreview ?? r.args ?? ""), error: false, result: "" };

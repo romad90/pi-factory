@@ -34,3 +34,51 @@ test("an input cut at 300 characters in guard.log is still matched by its first 
   const cut = { ...refusal("2026-11-08T16:21:31.538Z", ""), input: JSON.stringify({ command: long }).slice(0, 300) };
   assert.equal(refusalsFor(reviewer, Date.parse("2026-11-08T16:20:55Z"), Date.parse("2026-11-08T16:22:04Z"), [cut]).length, 1);
 });
+
+// abandon-timeout, archive run 47ac94a6…_factory-contract-author (paths anonymized):
+// every assistant message carries usage.totalTokens, and the redaction took the
+// count for a secret ("totalTokens":[REDACTED]): 1284 lines across the gym's
+// archive stopped being JSON, so tokens, frictions and run-detail skipped every
+// turn with usage and fell back to estimates.
+import { redact, parseRecord } from "../scripts/factory/redact.mjs";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { execFileSync } from "node:child_process";
+const turn = (input, cacheRead) => JSON.stringify({ version: 1, recordType: "message", source: "async", agent: "factory-contract-author",
+  ts: 1794616233717, timestamp: "2026-11-14T00:30:33.717Z", sourceEventType: "message_end", role: "assistant",
+  usage: { input, output: 1685, cacheRead, cacheWrite: 0, cost: 0.056312 },
+  message: { role: "assistant", content: [{ type: "toolCall", id: "t1", name: "read", arguments: { path: "docs/agents/factory.md" } }],
+    usage: { input, output: 1685, cacheRead, cacheWrite: 0, reasoning: 15, totalTokens: input + 1685 + cacheRead, maxTokens: 4096 }, stopReason: "toolUse" } });
+
+test("a token count is not a secret: a redacted transcript line stays JSON with its counts", () => {
+  const line = turn(5653, 0);
+  const out = redact(line);
+  assert.doesNotThrow(() => JSON.parse(out), out.slice(0, 200));
+  assert.equal(JSON.parse(out).message.usage.totalTokens, 7338);
+  assert.equal(JSON.parse(out).message.usage.maxTokens, 4096);
+  for (const s of ["max_tokens=4096", "\"input_tokens\": 12", "TOTAL_TOKENS=99"]) assert.equal(redact(s), s);
+  // A secret still goes, numeric or not.
+  assert.equal(redact("token=123456"), "token=[REDACTED]");
+  assert.equal(redact("\"api_key\": 98765"), "\"api_key\": [REDACTED]");
+});
+
+test("a line archived before the fix is read again: the redacted count becomes null, the rest is kept", () => {
+  const old = turn(5653, 0).replace(/"totalTokens":\d+/, "\"totalTokens\":[REDACTED]");
+  assert.throws(() => JSON.parse(old));
+  const r = parseRecord(old);
+  assert.equal(r.message.usage.input, 5653);
+  assert.equal(r.message.usage.totalTokens, null);
+  assert.equal(parseRecord("not json"), null);
+  assert.equal(parseRecord("{\"text\":\"a [REDACTED] word\"}").text, "a [REDACTED] word");
+
+  const dir = mkdtempSync(join(tmpdir(), "tokens-"));
+  mkdirSync(join(dir, "r1"));
+  writeFileSync(join(dir, "r1", "run.json"), JSON.stringify({ run: "47ac94a6", agent: "factory-contract-author", model: "or/anthropic/claude-opus-5.5:high",
+    usage: { input: 11653, output: 3370, cacheRead: 0, cacheWrite: 0, turns: 2 } }));
+  writeFileSync(join(dir, "r1", "transcript.jsonl"), [old, turn(6000, 0).replace(/"totalTokens":\d+/, "\"totalTokens\":[REDACTED]")].join("\n") + "\n");
+  const j = JSON.parse(execFileSync(process.execPath, [new URL("../scripts/factory/tokens.mjs", import.meta.url).pathname, dir, "--json"], { encoding: "utf8" }));
+  assert.equal(j.runs[0].estimated, false, "the turns were read, not estimated");
+  assert.equal(j.runs[0].turns, 2);
+  assert.equal(j.runs[0].peak, 6000);
+});
