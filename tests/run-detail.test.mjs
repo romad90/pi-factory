@@ -59,3 +59,13 @@ test("runDetail: the archived run with times, counts and each refusal judged aga
   assert.equal(d.refused[0].rule, "strayWrite"); assert.equal(d.refused[0].today, "allowed");
   assert.equal(runDetail(join(project, "nope")), null);
 });
+
+// B13: the run page shows the part of the run's input read from cache.
+test("runDetail: the run's cache share, none when the run read nothing from cache", () => {
+  const dir = join(project, "47ac94a6_factory-contract-author"); mkdirSync(dir);
+  writeFileSync(join(dir, "run.json"), JSON.stringify({ run: "47ac94a6", agent: "factory-contract-author", model: "gw/vendor-a/big-1:high",
+    date: "2026-11-14T02:46:30.000Z", durationMs: 1000, usage: { input: 2113846, output: 30000, cacheRead: 0, cacheWrite: 0, turns: 51, cost: 13.06 } }));
+  assert.equal(runDetail(dir).cache.share, 0);
+  writeFileSync(join(dir, "run.json"), JSON.stringify({ run: "47ac94a6", agent: "factory-worker", usage: { input: 22514, cacheRead: 700928, cacheWrite: 0 } }));
+  assert.equal(Math.round(runDetail(dir).cache.share * 100), 97);
+});

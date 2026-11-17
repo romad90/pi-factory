@@ -101,7 +101,8 @@ check_mission() {                       # <feature>
   if [ ! -f "$spec" ]; then bad "spec.md missing"; return; fi
   if ! has_contract "$spec"; then bad "G1: no validation contract"; return; fi
 
-  if [ -f "$dir/contract-critique.md" ]; then ok "G1: contract critique present"
+  if critique_written "$dir/contract-critique.md"; then ok "G1: contract critique present"
+  elif [ -f "$dir/contract-critique.md" ]; then bad "G1: contract critique empty (run the contract wave again, B6)"
   else bad "G1: contract critique missing (run /contract-critic)"; fi
 
   if [ -f "$dir/investigation.md" ] && grep -q '^## Conclusion' "$dir/investigation.md"; then   # D99, D101

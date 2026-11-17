@@ -21,6 +21,7 @@
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { parseRecord } from "./redact.mjs";
+import { cacheShare, cacheByModel, table as cacheTable, pct } from "./cache.mjs";
 
 const argv = process.argv.slice(2);
 const opt = (name, dflt) => { const i = argv.indexOf(name); return i >= 0 && argv[i + 1] ? argv[i + 1] : dflt; };
@@ -124,10 +125,13 @@ for (const name of readdirSync(dir).sort()) {
   const noCache = !!meta.usage && num(u, "input") > 0 && num(u, "cacheRead") === 0;
   runs.push({ run: meta.run || name, agent: meta.agent || "?", model: meta.model || "", ticket: meta.ticket || "",
     turns: turns.length || (meta.usage && meta.usage.turns) || 0, fixed, peak, next, estimated, error, results, toolTokens,
-    input, role, runBudget, overRunBudget: !!runBudget && input > runBudget, noCache });
+    input, role, runBudget, overRunBudget: !!runBudget && input > runBudget, noCache,
+    usage: meta.usage || null, cacheShare: meta.usage ? cacheShare(meta.usage).share : null });
 }
 
-if (asJson) { console.log(JSON.stringify({ budget, runs: runs.map(({ results, ...r }) => ({ ...r, largest: results.sort((a, b) => b.tokens - a.tokens).slice(0, top) })) }, null, 2)); process.exit(0); }
+// B13: the part of each run's input read from cache, and the same per model.
+const models = cacheByModel(runs.filter((r) => r.usage));
+if (asJson) { console.log(JSON.stringify({ budget, runs: runs.map(({ results, usage, ...r }) => ({ ...r, largest: results.sort((a, b) => b.tokens - a.tokens).slice(0, top) })), models }, null, 2)); process.exit(0); }
 
 if (!runs.length) { console.log("tokens: no archived runs yet"); process.exit(0); }
 const over = (n) => (budget && n > budget ? " OVER" : "");
@@ -158,6 +162,14 @@ if (runs.some((r) => r.input)) {
     if (!r.overRunBudget && !(r.noCache && r.input >= 100000)) continue;
     console.log(`  ${r.run.slice(0, 10).padEnd(10)} ${r.role.slice(0, 16).padEnd(16)} ${k(r.input)}${r.overRunBudget ? ` over its budget (${k(r.runBudget)})` : ""}, ${r.turns} turns${r.noCache ? ", no cache read: every turn paid the whole conversation at the full input price" : ""}`);
   }
+}
+
+if (models.length) {
+  console.log(`\nCache per run (the part of its input read from cache)`);
+  for (const r of runs.filter((x) => x.cacheShare !== null))
+    console.log(`  ${r.run.slice(0, 10).padEnd(10)} ${r.role.slice(0, 16).padEnd(16)} ${k(r.input).padStart(8)} ${pct(r.cacheShare)} from cache`);
+  console.log(`\nCache by model`);
+  for (const l of cacheTable(models)) console.log(l);
 }
 
 const all = runs.flatMap((r) => r.results.map((x) => ({ ...x, agent: r.agent, ticket: r.ticket })));

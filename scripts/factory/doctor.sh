@@ -13,6 +13,12 @@ fail=0
 ok()  { printf '  ✓ %s\n' "$*"; }
 bad() { printf '  ✗ %s\n' "$*"; fail=1; }
 
+cache_warnings() {
+  local root; root="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)/pi-factory/archive"
+  [ -d "$root" ] && node "$here/cache.mjs" --warn "$root" 2>/dev/null | sed 's/^/  ! /'
+  return 0
+}
+
 # Pre-flight: everything that made a wave fail for avoidable reasons in
 # mission 1 (network down, no tests configured, dirty tree, broken models),
 # caught before any request is spent.
@@ -78,6 +84,10 @@ if [ "${1:-}" = "--quick" ]; then
   else
     printf '  - model probe skipped (no agent model maps to a provider in Pi'"'"'s models.json, and FACTORY_GATEWAY_URL is empty)\n'
   fi
+  # B13 (P20): a model whose archived runs never read from cache pays every
+  # turn's whole conversation at the full price. A warning: the route's caching
+  # is its owner's to change, never the factory's.
+  cache_warnings
   [ "$fail" -eq 0 ] && echo "PREFLIGHT: OK" || echo "PREFLIGHT: FAIL"
   exit "$fail"
 fi
@@ -111,6 +121,7 @@ echo
 bash "$here/skills-pin.sh" check-global
 echo
 node "$here/models-lint.mjs" || fail=1
+cache_warnings
 echo
 # Probe the gateway with what the factory really sends (D59). Spends a few requests.
 ( . "$here/lib.sh"; load_commands
