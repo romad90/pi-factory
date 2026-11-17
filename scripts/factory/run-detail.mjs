@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { parseRecord } from "./redact.mjs";
 import { pathToFileURL } from "node:url";
 import { check } from "./guard-rules.mjs";
+import { cacheShare } from "./cache.mjs";
 
 const SAFE = /^[\w.-]+$/;
 const MAX_EVENTS = 400, MAX_TEXT = 600;
@@ -71,7 +72,7 @@ export function runDetail(dir) {
     contract: 1, run: j.run, dir: dir.split(/[\\/]/).pop(), role: String(j.agent || "?").replace(/^factory-/, ""), agent: j.agent, model: j.model || "", thinking: j.thinking || "",
     ticket: j.ticket || "", briefId: j.briefId || "", head: j.head || "",
     start: isNaN(start) ? "" : new Date(start).toISOString(), end: isNaN(end) ? "" : j.date,
-    usage: j.usage || {}, calls: typeof j.calls === "number" ? j.calls : ev.filter((e) => e.kind === "call" || e.kind === "refused").length,
+    usage: j.usage || {}, cache: cacheShare(j.usage), calls: typeof j.calls === "number" ? j.calls : ev.filter((e) => e.kind === "call" || e.kind === "refused").length,
     outcome: j.outcome || {},
     refused: (Array.isArray(j.guard) ? j.guard : []).map((g) => ({ at: g.date || "", rule: g.rule || "", tool: g.tool || "", input: g.input || "", cwd: g.cwd || "", ...replay(g) })),
     errors: ev.filter((e) => e.error).length,

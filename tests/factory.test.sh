@@ -1548,6 +1548,18 @@ git add -A; git commit -qm "test: back to the plain commands"
 
 echo "Pre-flight"
 bash scripts/factory/doctor.sh --quick >"$work/pre.log" 2>&1 && t "pre-flight OK on a configured repo" || fail "preflight" "$(cat "$work/pre.log")"
+# B13 (P20): every archived run of one model family read 0 from cache (a
+# contract author paid $13.06 for 2.1M uncached tokens) and nothing said so.
+# Pre-flight names the model, as a warning: the route is its owner's to fix.
+ca="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/archive/cache-b13"
+mkdir -p "$ca/a1_factory-contract-author" "$ca/a2_factory-contract-author" "$ca/a3_factory-reviewer"
+printf '{"run":"a1","agent":"factory-contract-author","model":"gw/vendor-a/big-1:high","usage":{"input":2113846,"output":30000,"cacheRead":0,"cacheWrite":0,"turns":51}}' > "$ca/a1_factory-contract-author/run.json"
+printf '{"run":"a2","agent":"factory-contract-author","model":"gw/vendor-a/big-1:high","usage":{"input":176334,"output":4000,"cacheRead":0,"cacheWrite":0,"turns":10}}' > "$ca/a2_factory-contract-author/run.json"
+printf '{"run":"a3","agent":"factory-reviewer","model":"gw/vendor-b/rev-1:high","usage":{"input":57,"output":2000,"cacheRead":560131,"cacheWrite":60811,"turns":19}}' > "$ca/a3_factory-reviewer/run.json"
+bash scripts/factory/doctor.sh --quick >"$work/pre.log" 2>&1 && grep -q '! gw/vendor-a/big-1: 2 runs, 61 turns, 2.29M input, none read from cache' "$work/pre.log" \
+  && ! grep -q 'vendor-b' "$work/pre.log" \
+  && t "pre-flight names a model whose archived runs never read from cache, and still passes (B13)" || fail "cache warning" "$(cat "$work/pre.log")"
+rm -rf "$ca"
 echo dirty >> src/tools/a.js
 if bash scripts/factory/doctor.sh --quick >"$work/pre.log" 2>&1; then fail "dirty tree must fail pre-flight"; fi
 t "pre-flight fails on a dirty tree"

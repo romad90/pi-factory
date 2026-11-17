@@ -381,6 +381,7 @@ function runView(m, dir) {
       <div><div class="k">Failed calls</div><div class="v"${d.errors ? ` style="color:var(--red)"` : ""}>${d.errors}</div></div>
       <div><div class="k">Refused</div><div class="v"${d.refused.length ? ` style="color:var(--red)"` : ""}>${d.refused.length}</div></div>
       <div><div class="k">Cost · tokens</div><div class="v" style="font-size:15px">${u.cost ? "$" + u.cost.toFixed(2) + " · " : ""}${fmtK(u.input || 0)} in · ${fmtK(u.output || 0)} out</div></div>
+      <div><div class="k">From cache</div><div class="v"${d.cache && d.cache.share === 0 ? ` style="color:var(--red)" title="every turn paid the whole conversation at the full input price"` : ""}>${d.cache && d.cache.share !== null ? Math.round(d.cache.share * 100) + "% of " + fmtK(d.cache.total) : "-"}</div></div>
     </div></div>
     ${d.refused.length ? `<div class="panel" style="margin-bottom:16px"><h2>What the guard refused</h2>${d.refused.map((g) => `<div class="refusal"><div class="h"><span>${esc(g.rule)}</span><span class="muted">${esc(g.tool)}${g.at ? " · " + hhmm(Date.parse(g.at)) : ""}</span>
         <span class="spacer"></span><span class="today-${esc(g.today)}">${esc(TODAY[g.today] || g.today)}</span></div>
