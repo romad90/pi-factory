@@ -1879,9 +1879,12 @@ mkdir -p "$work/bin"
 cat > "$work/bin/fakepi" <<'PI'
 #!/usr/bin/env bash
 printf '%s\n' "$*" > "$PI_ARGS_LOG"; echo "$FACTORY_DRIVE_WORKFLOW" >> "$PI_ARGS_LOG"
-echo "No findings. Critique result: approve" > .scratch/runner/contract-critique.md
+case "${CRIT_MODE:-write}" in
+  write) echo "No findings. Critique result: approve" > .scratch/runner/contract-critique.md ;;
+  empty) : > .scratch/runner/contract-critique.md ;;
+esac
 echo '{"type":"session"}'
-echo '{"type":"tool_execution_end","toolName":"subagent","isError":false,"result":{"content":[{"type":"text","text":"Workflow completed."}],"details":{"workflow":{"value":[{"key":"contract-critic","output":"approve"}]}}}}'
+echo '{"type":"tool_execution_end","toolName":"subagent","isError":false,"result":{"content":[{"type":"text","text":"Workflow completed."}],"details":{"workflow":{"value":[{"key":"contract-critic","output":"'"${CRIT_SUMMARY-approve}"'"}]}}}}'
 PI
 chmod +x "$work/bin/fakepi"; mkdir -p "$work/pi dir"; cp "$work/bin/fakepi" "$work/pi dir/pi bin"
 # B12 (abandon-timeout, archive run 47ac94a6…_factory-contract-author): the
@@ -1903,8 +1906,22 @@ hung=$SECONDS
   && t "run.sh: a wave with no event for FACTORY_RUN_IDLE_SECONDS is stopped (pi and its children), reported as a provider hang with its last event, and the mission pauses (B12)" \
   || fail "run.sh provider hang" "rc=$rc ${hung}s $out"
 bash scripts/factory/pause.sh resume runner >/dev/null
-out="$(PI_ARGS_LOG="$work/pi.args" FACTORY_PI_BIN="$work/pi dir/pi bin" bash scripts/factory/run.sh runner --no-preflight 2>&1)" || fail "run.sh contract" "$out"
-grep -q -- '-p --mode json' "$work/pi.args" && grep -q 'driver.mjs --model factory-driver/script' "$work/pi.args" && grep -q 'workflows/.*-contract.js' "$work/pi.args" \
+# B6 (eslint-10 twice, search-attrs-case once): the critic's summary came back
+# empty in the workflow result and nobody could tell whether contract-critique.md
+# had been written. A contract wave that ends without the critique, or with an
+# empty one, stops loudly; the next call runs the contract wave again.
+rc=0; out="$(CRIT_MODE=none PI_ARGS_LOG="$work/pi.args" FACTORY_PI_BIN="$work/pi dir/pi bin" bash scripts/factory/run.sh runner --no-preflight 2>&1)" || rc=$?
+[ "$rc" = 2 ] && grep -q 'the contract wave ended without .*contract-critique.md' <<<"$out" \
+  && t "run.sh: a contract wave that ends without contract-critique.md stops and says so (B6)" || fail "run.sh no critique" "rc=$rc $out"
+rc=0; out="$(CRIT_MODE=empty PI_ARGS_LOG="$work/pi.args" FACTORY_PI_BIN="$work/pi dir/pi bin" bash scripts/factory/run.sh runner --no-preflight 2>&1)" || rc=$?
+nx="$(bash scripts/factory/next.sh runner)"
+[ "$rc" = 2 ] && grep -q 'contract-critique.md is empty' <<<"$out" && grep -q '^STEP: contract' <<<"$nx" \
+  && t "run.sh: an empty contract-critique.md stops the run, and next.sh runs the contract wave again rather than approve on it (B6)" || fail "run.sh empty critique" "rc=$rc $out
+$nx"
+out="$(CRIT_SUMMARY='' PI_ARGS_LOG="$work/pi.args" FACTORY_PI_BIN="$work/pi dir/pi bin" bash scripts/factory/run.sh runner --no-preflight 2>&1)" || fail "run.sh contract" "$out"
+grep -q 'contract critique rewritten at .*: 0 \[blocking\] finding(s) (the critic.s summary in the workflow result was empty)' <<<"$out" \
+  && t "run.sh: says the critique was rewritten in this wave even when the critic's summary is empty (B6)" || fail "run.sh critique said" "$out"
+grep -q -- '-p --mode json' "$work/pi.args" && grep -q 'driver.mjs --model factory-driver/script' "$work/pi.args" && grep -qE 'workflows/.*-contract(-[0-9]+)?\.js' "$work/pi.args" \
   && echo "$out" | grep -q '^STEP: approve' && echo "$out" | grep -q 'WAITING: human (approve)' \
   && grep -q -- '--approve' "$work/pi.args" \
   && t "run.sh: pi in JSON mode (path with spaces, project trusted so the guard loads) with the driver as the model runs the contract wave, then stops at G1 (D91)" || fail "run.sh pi-json" "$out

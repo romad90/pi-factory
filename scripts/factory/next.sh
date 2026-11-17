@@ -194,12 +194,13 @@ done
 # D140: the critic's [blocking] findings go back to the author in the next
 # round, with no person between, until the critic has had its rounds.
 crounds="$(contract_rounds "$dir")"; reround=""
-if has_contract "$spec" && [ -f "$critique" ] && [ ${#open_amendments[@]} -eq 0 ] && ! contract_approved "$spec" \
+if has_contract "$spec" && critique_written "$critique" && [ ${#open_amendments[@]} -eq 0 ] && ! contract_approved "$spec" \
    && grep -q '\[blocking\]' "$critique" && [ "$crounds" -lt "$FACTORY_CONTRACT_ROUNDS" ] && critique_current "$dir" "$critique"; then
   reround=1
   STATUS="Critic round $crounds of $FACTORY_CONTRACT_ROUNDS left [blocking] findings: the author applies them in round $((crounds + 1)), no person needed."$'\n'
 fi
-if ! has_contract "$spec" || [ ! -f "$critique" ] || [ ${#open_amendments[@]} -gt 0 ] || [ -n "$reround" ]; then
+if ! has_contract "$spec" || ! critique_written "$critique" || [ ${#open_amendments[@]} -gt 0 ] || [ -n "$reround" ]; then
+  [ -f "$critique" ] && ! critique_written "$critique" && STATUS+="contract-critique.md is empty: the critic's run ended before writing it (B6). The contract wave runs again."$'\n'
   unsent=""
   for a in "${open_amendments[@]}"; do
     grep -q '^\*\*Status:\*\* pending' "$a" && continue

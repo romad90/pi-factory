@@ -233,6 +233,25 @@ build() {
   done <<<"$rows"
 }
 
+# B6: the contract wave's critic must have written contract-critique.md in this
+# wave. Its summary in the workflow result came back empty (eslint-10 twice,
+# search-attrs-case once) and nobody could tell whether the critique was new.
+critique_check() {
+  local d c spec when nb sum
+  d="$(mission_dir "$feature")"; c="$d/contract-critique.md"; spec="$d/spec.md"
+  [ -f "$c" ] || stop 2 "the contract wave ended without $c: the critic did not write its critique. Run the contract wave again (B6)"
+  critique_written "$c" || stop 2 "$c is empty: the critic's run ended before writing it. Run the contract wave again (B6)"
+  when="$(date -r "$c" '+%H:%M:%S' 2>/dev/null || echo '?')"
+  if [ ! "$c" -nt "$WAVE_FILE" ] || [ "$spec" -nt "$c" ]; then
+    stop 2 "$c was not rewritten in this wave (last written $when, before the contract it should critique). Run the contract wave again (B6)"
+  fi
+  nb="$(grep -c '\[blocking\]' "$c" || true)"
+  sum="$(node -e 'let j; try { j = JSON.parse(process.argv[1]); } catch { process.exit(0); }
+    const v = (j && (j.value || j)) || []; const it = (Array.isArray(v) ? v : []).find((x) => x && x.key === "contract-critic");
+    if (it && !String(it.output ?? "").trim()) console.log(" (the critic\x27s summary in the workflow result was empty)");' "$RESULT" 2>/dev/null || true)"
+  say "contract critique rewritten at $when: ${nb:-0} [blocking] finding(s)$sum"
+}
+
 # --- the loop -----------------------------------------------------------------
 if [ "$preflight" = 1 ]; then must doctor.sh --quick "$feature"; fi
 steps=0; last=""
@@ -258,6 +277,7 @@ $nxt"
       wave investigate "$feature"; [ "$WAVE_OK" = 1 ] || failed investigate ;;
     contract|design|validate|steward)
       wave "$step" "$feature"; [ "$WAVE_OK" = 1 ] || failed "$step"
+      [ "$step" != contract ] || critique_check
       case "$step" in contract|design) ;; *) must collect.sh "$feature" ;; esac ;;
     behavior-stale)
       wave validate "$feature"; [ "$WAVE_OK" = 1 ] || failed validate

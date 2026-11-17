@@ -962,8 +962,14 @@ contract_rounds() {         # contract_rounds <mission dir>
 # itself on round 1's 4 [blocking] findings, 15 s before round 2's critique).
 # ponytail: file times; a fresh clone can make a current critique look old,
 # which only sends G1 to the person.
+# B6: an empty critique is no critique (the critic's run can end before it
+# writes; eslint-10's summary came back empty twice).
+critique_written() {        # critique_written <critique>
+  [ -f "$1" ] && grep -q '[^[:space:]]' "$1"
+}
 critique_current() {        # critique_current <mission dir> <critique>
   local f last=""
+  critique_written "$2" || return 1
   for f in "$1"/workflows/*-contract.js "$1"/workflows/*-contract-[0-9]*.js; do [ -f "$f" ] && [[ "$f" > "$last" ]] && last="$f"; done
   [ -z "$last" ] || [ "$2" -nt "$last" ]
 }
