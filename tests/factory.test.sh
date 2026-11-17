@@ -1180,6 +1180,22 @@ adir="$(dirname "$arch")"
 [ ! -e "$adir/r9zzz_factory-worker" ] && [ -f "$adir/r8own_factory-worker/run.json" ] && grep -q '1 run(s) of another checkout ignored' <<<"$out" \
   && t "archive collect keeps only this checkout's runs: a foreign run is ignored (D101)" || fail "archive foreign" "$out $(ls "$adir")"
 rm -f "$work/usage/run/r9zzz_"* "$work/usage/run/r8own_"*; rm -rf "$adir/r8own_factory-worker"
+# D154: pi-subagents' Prompt Audit writes "[prompt redacted]" as the input, and the run's paths are a removed
+# worktree outside the checkout: the brief, its id and ticket come from the transcript's first user message.
+printf '{"model":"gw/maker-1","usage":{"turns":2},"durationMs":1000}' > "$work/usage/run/r7red_factory-worker_meta.json"
+printf '# Task for factory-worker\n\n[prompt redacted]; live Prompt Audit only.\n' > "$work/usage/run/r7red_factory-worker_input.md"
+node -e 'const u = (text) => JSON.stringify({ role: "user", text, message: { role: "user", content: [{ type: "text", text }] } });
+console.log(u("[prompt redacted]; live Prompt Audit only.")); console.log(u("Task: Role: factory-worker.\n\nbrief-id: " + process.argv[1] + "\n\n- Extend the test (ticket 02-later cites it).\n\nTask: mission demo, ticket 01-hello, base commit abc123.\n"))' "$bid" > "$work/usage/run/r7red_factory-worker_transcript.jsonl"
+r7="$adir/r7red_factory-worker"; r7ok='const r=require(process.argv[1]+"/run.json"); process.exit(r.briefId===process.argv[2] && r.ticket==="01-hello" && r.outcome.result ? 0 : 1)'
+FACTORY_USAGE_DIRS="$work/usage" bash scripts/factory/archive.sh collect demo >/dev/null
+node -e "$r7ok" "$r7" "$bid" && grep -q "^brief-id: $bid" "$r7/brief.md" \
+  && t "archive: a run whose input pi-subagents redacted is kept, its brief, id and ticket read from the transcript (D154)" || fail "archive redacted" "$(cat "$r7/run.json" "$r7/brief.md" 2>&1)"
+printf '[prompt redacted]; live Prompt Audit only.\n' > "$r7/brief.md"
+node -e 'const f=process.argv[1]+"/run.json", r=require(f); Object.assign(r, { briefId: "", ticket: "", outcome: {} }); require("fs").writeFileSync(f, JSON.stringify(r))' "$r7"
+bash scripts/factory/archive.sh refresh demo >/dev/null
+node -e "$r7ok" "$r7" "$bid" && grep -q "^brief-id: $bid" "$r7/brief.md" \
+  && t "archive refresh: a run archived with a redacted brief gets its brief, id, ticket and outcome back (D154)" || fail "archive refresh redacted" "$(cat "$r7/run.json" "$r7/brief.md" 2>&1)"
+rm -f "$work/usage/run/r7red_"*; rm -rf "$r7"
 # Pi's own layout: ~/.pi/agent/sessions/--<project path, / as ->--/subagent-artifacts/, the transcript beside the meta.
 enc="--$(sed 's#^/##; s#[/:]#-#g' <<<"$PWD")--"
 sd="$work/usage/sessions/$enc/subagent-artifacts"; od="$work/usage/sessions/--srv-other-project--/subagent-artifacts"; mkdir -p "$sd" "$od"

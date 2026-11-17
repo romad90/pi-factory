@@ -3,6 +3,7 @@
 //   node archive.mjs collect <out-dir> <mission-dir> <head> [guard.log] [root...]   (meta paths on stdin)
 //     root: this checkout's folders (top level, worktrees, git common dir)
 //   node archive.mjs owned <mission-dir> [root...]   (meta paths on stdin → the ones this checkout owns)
+//   node archive.mjs refresh <out-dir> [guard.log] [mission-dir]
 //   node archive.mjs list <out-dir>
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, realpathSync } from "node:fs";
 import { join, dirname, basename, isAbsolute, resolve } from "node:path";
@@ -14,6 +15,26 @@ export { redact };
 
 const read = (f) => { try { return readFileSync(f, "utf8"); } catch { return null; } };
 const field = (text, name) => (text.match(new RegExp(`^\\*\\*${name}:\\*\\*\\s*(.*)$`, "m")) || [])[1]?.trim() ?? "";
+
+// D154: pi-subagents' Prompt Audit writes "[prompt redacted]" as a run's
+// _input.md. The brief is then the transcript's first user message carrying a
+// brief id. transcript is a thunk: the file is read only when the input lacks one.
+const hasId = (t) => /^brief-id:/m.test(t || "");
+function briefIn(transcript) {
+  for (const l of (transcript || "").split("\n")) {
+    if (!l.includes("brief-id:")) continue;
+    let r; try { r = JSON.parse(l); } catch { continue; }
+    const c = r.message?.content;
+    const text = typeof r.text === "string" ? r.text : Array.isArray(c) ? c.map((x) => x?.text || "").join("") : "";
+    if ((r.role || r.message?.role) === "user" && hasId(text)) return text;
+  }
+  return null;
+}
+const briefOf = (input, transcript) => hasId(input) ? input : briefIn(transcript()) ?? input;
+const briefFields = (brief) => ({ briefId: (brief.match(/^brief-id:\s*(\S+)/m) || [])[1] || "",
+  // The brief's closing "Task: mission m, ticket t, base commit c." names it; a
+  // ticket's own text may cite another ("ticket 01 created it") before that line.
+  ticket: (brief.match(/^Task: mission \S+, ticket (\d{2}[\w-]*)/m) || brief.match(/\bticket\s+(\d{2}[\w-]*)/i) || [])[1] || "" });
 
 function outcome(missionDir, briefId, ticket) {
   const res = {};
@@ -63,8 +84,9 @@ function sessionOwned(paths, roots) {
 }
 // One run's meta (path and parsed JSON) is ours by its paths or its brief id.
 function owned(meta, j, roots, recorded) {
-  const input = read(join(dirname(meta), `${basename(meta).replace(/_meta\.json$/, "")}_input.md`)) || "";
-  const id = (input.match(/^brief-id:\s*(\S+)/m) || [])[1] || "";
+  const stem = join(dirname(meta), basename(meta).replace(/_meta\.json$/, ""));
+  const input = briefOf(read(`${stem}_input.md`), () => read(`${stem}_transcript.jsonl`) ?? read(`${stem}.jsonl`)) || "";
+  const { briefId: id } = briefFields(input);
   return under(meta, roots) || pathsIn(j).some((p) => under(p, roots)) || sessionOwned([meta, ...pathsIn(j)], roots)
     || (id.length >= 6 && recorded.includes(id));
 }
@@ -156,13 +178,13 @@ if (cmd === "collect") {
     let brief = read(join(dest, "brief.md")) || "";
     for (const [name, src] of Object.entries(files)) {
       if (existsSync(join(dest, name))) continue;
-      const t = read(src); if (t === null) continue;
+      const t = name === "brief.md" ? briefOf(read(src), () => read(files["transcript.jsonl"])) : read(src);
+      if (t === null) continue;
       const clean = redact(t); if (clean !== t) redacted++;
       writeFileSync(join(dest, name), clean);
       if (name === "brief.md") brief = clean;
     }
-    const briefId = (brief.match(/^brief-id:\s*(\S+)/m) || [])[1] || "";
-    const ticket = (brief.match(/\bticket\s+(\d{2}[\w-]*)/i) || [])[1] || "";
+    const { briefId, ticket } = briefFields(brief);
     const u = j.usage || {};
     const transcript = read(join(dest, "transcript.jsonl")) || "";
     const ts = transcriptSpan(transcript);
@@ -196,8 +218,9 @@ if (cmd === "collect") {
 } else if (cmd === "refresh") {
   // Runs archived before their times, tool calls or refusals were read from
   // the transcript: fill what's missing from the archived transcript and
-  // guard.log. Only runs lacking a field are read.
-  const [out, guardLog = ""] = args;
+  // guard.log. Only runs lacking a field are read. A brief archived redacted
+  // is rebuilt from the archived transcript (D154).
+  const [out, guardLog = "", missionDir = ""] = args;
   if (!existsSync(out)) process.exit(0);
   const refusals = (read(guardLog) || "").split("\n").filter(Boolean).map((l) => l.split("\t"))
     .map(([date, rule, tool, input, cwd]) => ({ t: Date.parse(date), date, rule, tool, input: redact(input || ""), cwd: cwd || "" }))
@@ -206,8 +229,14 @@ if (cmd === "collect") {
   for (const d of readdirSync(out).sort()) {
     const f = join(out, d, "run.json"), prev = read(f); if (!prev) continue;
     const j = JSON.parse(prev);
-    if (j.start && typeof j.calls === "number" && j.durationMs) continue;
+    if (j.start && typeof j.calls === "number" && j.durationMs && j.briefId) continue;
     const transcript = read(join(out, d, "transcript.jsonl")) || "";
+    const brief = j.briefId ? null : briefIn(transcript);
+    if (brief) {
+      writeFileSync(join(out, d, "brief.md"), redact(brief));
+      Object.assign(j, briefFields(brief));
+      if (missionDir) j.outcome = { ...j.outcome, ...outcome(missionDir, j.briefId, j.ticket) };
+    }
     const ts = transcriptSpan(transcript);
     if (ts && !j.durationMs) { j.durationMs = ts.end - ts.start; j.start = new Date(ts.start).toISOString(); j.end = new Date(ts.end).toISOString(); }
     if (!j.start) j.start = new Date(Date.parse(j.date) - (j.durationMs || 0)).toISOString();
