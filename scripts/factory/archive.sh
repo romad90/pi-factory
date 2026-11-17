@@ -59,12 +59,12 @@ case "$cmd" in
     since="$(mission_since "$dir")" && newer=(-newermt "$since")
     find "${existing[@]}" -maxdepth 7 -type f -name '*_meta.json' "${newer[@]}" 2>/dev/null \
       | node "$here/archive.mjs" collect "$out" "$dir" "$(git rev-parse HEAD 2>/dev/null || echo none)" "$(dirname "$(archive_root)")/guard.log" "${owned[@]}"
-    node "$here/archive.mjs" refresh "$out" "$(dirname "$(archive_root)")/guard.log" >/dev/null
+    node "$here/archive.mjs" refresh "$out" "$(dirname "$(archive_root)")/guard.log" "$dir" >/dev/null
     ;;
   refresh)
     # Fill the times, tool calls and refusals of runs archived without them.
     feature="${1:?$usage}"
-    node "$here/archive.mjs" refresh "$(archive_root)/$feature" "$(dirname "$(archive_root)")/guard.log"
+    node "$here/archive.mjs" refresh "$(archive_root)/$feature" "$(dirname "$(archive_root)")/guard.log" "$(mission_dir "$feature")"
     ;;
   list)
     feature="${1:?$usage}"
@@ -84,6 +84,7 @@ case "$cmd" in
     ;;
   export)
     feature="${1:?$usage}"; src="$(archive_root)/$feature"
+    bash "$here/archive.sh" collect "$feature" >/dev/null 2>&1 || true   # the newest runs count (D154)
     [ -d "$src" ] || die "no archive for '$feature' yet: run archive.sh collect $feature"
     file="${2:-$PWD/archive-$feature-$(date +%Y%m%d).tar.gz}"
     tar -czf "$file" -C "$(archive_root)" "$feature"
