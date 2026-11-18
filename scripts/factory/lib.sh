@@ -82,6 +82,25 @@ FACTORY_EXCLUDE_RE="${FACTORY_EXCLUDE_RE:-^(\.scratch|\.pi|\.factory|scripts/fac
 die() { printf 'factory: %s\n' "$*" >&2; exit 2; }
 
 mission_dir()  { printf '%s/%s' "$FACTORY_DIR" "$1"; }
+# worktree_dirty [path]: the files that make Pi's worktree admission
+# (pi-subagents) refuse to start a worker, one per line: any change or
+# untracked file in the whole repository but .pi/subagents/ and the path given
+# (a mission's folder, which checkpoint.sh commits before each wave). Ignored
+# files don't count. doctor.sh and the build step use this one rule (B7).
+worktree_dirty() {
+  local e _
+  # -z: names as they are, unquoted ("projects/bot repo & co/x"); a rename's
+  # old name follows its entry and is skipped.
+  while IFS= read -r -d '' e; do
+    printf '%s\n' "${e:3}"
+    case "${e:0:1}" in R|C) IFS= read -r -d '' _ ;; esac
+  done < <(git status --porcelain -z -- ':(top)' ':(top,exclude).pi/subagents' ${1:+":(exclude)$1"} 2>/dev/null)
+}
+# dirty_names <files>: the first five, comma-separated, with " …" when there are more.
+dirty_names() {
+  printf '%s' "$(head -5 <<<"$1" | paste -sd, - | sed 's/,/, /g')"
+  [ "$(grep -c . <<<"$1")" -le 5 ] || printf ' …'
+}
 
 # --- context repos and investigation (D99) ------------------------------------
 # A mission changes one repo. Other repos it must understand are listed in the

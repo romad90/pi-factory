@@ -315,6 +315,10 @@ if [ ${#T_BUILD[@]} -gt 0 ]; then
   [ ${#T_ESCALATE[@]} -gt 0 ] && extra+="; ${T_ESCALATE[*]} wait for the human afterwards, run this step now"
   [ ${#T_HAND[@]} -gt 0 ] && extra+="; ${T_HAND[*]} wait for a person's commit (by hand), run this step now"
   [ ${#T_ASKED[@]} -gt 0 ] && extra+="; ${T_ASKED[*]} wait for an answer, asked once nothing else can run (D142)"
+  # B7: Pi's worktree admission refuses the whole wave on any change or
+  # untracked file; say so before the wave starts, naming the files.
+  dirty="$(worktree_dirty "$dir")"
+  [ -z "$dirty" ] || step blocked "human: Pi's worktrees refuse a tree with changes or untracked files, and the build wave would fail at its start: $(dirty_names "$dirty"). Commit, remove or git-ignore them, then next.sh again"
   step build "scripts/factory/workflow.sh build-wave $feature (${#T_BUILD[@]} ticket(s)$extra), then integrate.sh per patch"
 fi
 # D142: nothing else can build or review: the oldest held question goes to the

@@ -19,6 +19,22 @@ cache_warnings() {
   return 0
 }
 
+# B8: every prompt the docs name exists, and pi was started after the prompts
+# changed (pi reads them at start): /factory-deps was documented and unknown.
+prompts_check() {
+  local pkg pd out
+  pkg="$(cd -P "$here/../.." && pwd)"
+  if [ -d .pi/prompts ]; then pd=.pi/prompts; else pd="$pkg/.pi/prompts"; fi
+  out="$(node "$here/prompts-check.mjs" "$pkg" "$pd" 2>/dev/null)"
+  while IFS=$'\t' read -r kind a b c; do
+    case "$kind" in
+      missing) bad "$b names $a, and $pd has no ${a#/}.md: the command is unknown to pi" ;;
+      stale) printf '  ! %s changed at %s, after this pi started (%s): restart pi so it loads the prompts\n' "$pd/$a" "$b" "$c" ;;
+    esac
+  done <<<"$out"
+  grep -q '^missing' <<<"$out" || ok "every prompt the docs name is in $pd"
+}
+
 # Pre-flight: everything that made a wave fail for avoidable reasons in
 # mission 1 (network down, no tests configured, dirty tree, broken models),
 # caught before any request is spent.
@@ -51,9 +67,9 @@ if [ "${1:-}" = "--quick" ]; then
   # whole repository but .pi/subagents/. get-port-7 passed "clean tree outside
   # .scratch/" with another mission's untracked files, then the build wave was
   # refused. The mission's own folder is committed before each wave.
-  dirty="$(git status --porcelain -- ':(top)' ':(top,exclude).pi/subagents' ${2:+":(exclude)$(mission_dir "$2")"} 2>/dev/null | cut -c4-)"
+  dirty="$(worktree_dirty ${2:+"$(mission_dir "$2")"})"
   if [ -z "$dirty" ]; then ok "clean tree (Pi's worktrees refuse any change or untracked file)"
-  else bad "Pi's worktrees refuse a tree with changes or untracked files: $(head -5 <<<"$dirty" | paste -sd, - | sed 's/,/, /g')$( [ "$(grep -c . <<<"$dirty")" -le 5 ] || echo ' …') (commit, remove or git-ignore them)"; fi
+  else bad "Pi's worktrees refuse a tree with changes or untracked files: $(dirty_names "$dirty") (commit, remove or git-ignore them)"; fi
   if node "$here/models-lint.mjs" >/dev/null 2>&1; then ok "models: one per role, families separated"
   else bad "models-lint fails (node scripts/factory/models-lint.mjs)"; fi
   # D102: tools, models without a version, production routes, TLS checks off.
@@ -88,6 +104,7 @@ if [ "${1:-}" = "--quick" ]; then
   # turn's whole conversation at the full price. A warning: the route's caching
   # is its owner's to change, never the factory's.
   cache_warnings
+  prompts_check
   [ "$fail" -eq 0 ] && echo "PREFLIGHT: OK" || echo "PREFLIGHT: FAIL"
   exit "$fail"
 fi
@@ -122,6 +139,7 @@ bash "$here/skills-pin.sh" check-global
 echo
 node "$here/models-lint.mjs" || fail=1
 cache_warnings
+prompts_check
 echo
 # Probe the gateway with what the factory really sends (D59). Spends a few requests.
 ( . "$here/lib.sh"; load_commands
