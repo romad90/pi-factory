@@ -229,7 +229,7 @@ Keep specs to roughly 12 stories or fewer; split anything bigger into two missio
 | `collect` | lead | a code verdict is written but not recorded as a round | `collect.sh <f>`, then `next.sh` again |
 | `hand` | you | a ticket changes only paths reserved for people (CI, hooks, the factory) | make the change, commit it, then `/factory-deliver <f> <ticket> "<what you did>"` |
 | `escalate` | you | 3 failed rounds | usually: split the ticket, amend the contract, or rethink the design |
-| `blocked` | you | `## Blocked by` can't resolve, a misspelled mission, or the checkout is on another branch | check for cycles; use the name it suggests; `git switch` to the branch it names |
+| `blocked` | you | `## Blocked by` can't resolve, a misspelled mission, the checkout is on another branch, or tickets are ready and the tree has changes Pi's worktrees refuse | check for cycles; use the name it suggests; `git switch` to the branch it names; commit, remove or git-ignore the files it names |
 | `validate` | lead | all tickets pass, or fixes built since a failing verdict | validator → `collect.sh` |
 | `behavior-fix` | lead | behavior FAIL with findings | ticket writer drafts one fix ticket per finding |
 | `behavior-stale` | lead | behavior paths changed after validation | re-validates |

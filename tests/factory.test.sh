@@ -558,6 +558,18 @@ grep -q "body:  $a/pr.md" <<<"$out" && grep -q '^Draft opened by the factory' $a
 git reset -q --hard "$auto0"; rm -rf $a
 
 echo "Mission: build and review"
+# B7 (deps-node-22, get-port-7 retro finding 1): a dirty main checkout broke the
+# build wave only after it started, when Pi's worktree admission refused it.
+# The build step checks the tree first, with that rule, and names the files.
+echo stray > stray-notes.txt; echo dirty >> README.md
+out="$(bash scripts/factory/next.sh demo 2>&1)"
+[ "$(head -1 <<<"$out")" = "STEP: blocked" ] && grep -q 'README.md, .*stray-notes.txt' <<<"$out" && grep -q "Pi's worktrees refuse" <<<"$out" \
+  && t "next.sh doesn't say build on a tree Pi's worktrees refuse, and names the files (B7)" || fail "dirty build step" "$out"
+nwf="$(ls .scratch/demo/workflows 2>/dev/null | wc -l)"
+if bash scripts/factory/workflow.sh build-wave demo >"$work/wf.log" 2>&1; then fail "build wave on a dirty tree must fail"; fi
+grep -q 'README.md, .*stray-notes.txt' "$work/wf.log" && ! grep -q '^WORKFLOW_FILE' "$work/wf.log" && [ "$(ls .scratch/demo/workflows 2>/dev/null | wc -l)" = "$nwf" ] \
+  && t "the build wave refuses a dirty tree before any agent starts, naming the files (B7)" || fail "dirty build wave" "$(cat "$work/wf.log")"
+rm -f stray-notes.txt; git checkout -q -- README.md
 bash scripts/factory/workflow.sh build-wave demo >"$work/wf.log"
 wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
 grep -q '"key": "01-hello"' "$wf" && ! grep -q '"key": "02-count"' "$wf" && t "build wave holds only unblocked tickets" || fail "build wave"
@@ -1590,6 +1602,18 @@ bash scripts/factory/doctor.sh --quick >"$work/pre.log" 2>&1 && grep -q '! gw/ve
   && ! grep -q 'vendor-b' "$work/pre.log" \
   && t "pre-flight names a model whose archived runs never read from cache, and still passes (B13)" || fail "cache warning" "$(cat "$work/pre.log")"
 rm -rf "$ca"
+# B8: the CHEATSHEET named /factory-deps and pi had no such prompt. Pre-flight
+# fails on a prompt the docs name and the prompts folder lacks, naming it. The
+# docs are the package's: this copy's own when it is a copied install.
+pkg="$(bash -c '. scripts/factory/lib.sh; printf %s "$FACTORY_PACKAGE_ROOT"')"
+if [ "$pkg" = "$(pwd -P)" ]; then
+  printf 'Run `/factory-nope <m>`.\n' >> README.md; want='README.md names /factory-nope, and .* has no factory-nope.md'
+else
+  mkdir -p .pi/prompts; printf 'x\n' > .pi/prompts/factory.md; want='CHEATSHEET.md names /factory-deps, and .pi/prompts has no factory-deps.md'
+fi
+if bash scripts/factory/doctor.sh --quick >"$work/pre.log" 2>&1; then fail "a documented prompt missing must fail pre-flight"; fi
+if [ "$pkg" = "$(pwd -P)" ]; then git checkout -q -- README.md; else rm -rf .pi/prompts; fi
+grep -q "$want" "$work/pre.log" && t "pre-flight fails when a prompt the docs name is missing, and names it (B8)" || fail "prompt check" "$(cat "$work/pre.log")"
 echo dirty >> src/tools/a.js
 if bash scripts/factory/doctor.sh --quick >"$work/pre.log" 2>&1; then fail "dirty tree must fail pre-flight"; fi
 t "pre-flight fails on a dirty tree"

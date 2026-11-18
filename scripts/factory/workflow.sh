@@ -183,6 +183,9 @@ return { output: r.output };'
     bash "$here/checkpoint.sh" "$feature" >/dev/null
     compute_ticket_state "$feature"
     [ ${#T_BUILD[@]} -gt 0 ] || die "nothing to build for $feature (run next.sh)"
+    # B7: the same rule as Pi's worktree admission, before any agent starts.
+    dirty="$(worktree_dirty "$(mission_dir "$feature")")"
+    [ -z "$dirty" ] || die "Pi's worktrees refuse a tree with changes or untracked files: $(dirty_names "$dirty"). Commit, remove or git-ignore them, then run again; no agent was started"
     n=0
     for name in "${T_BUILD[@]}"; do
       [ "$n" -ge "$FACTORY_MAX_PARALLEL" ] && break
