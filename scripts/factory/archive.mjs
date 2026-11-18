@@ -5,7 +5,7 @@
 //   node archive.mjs owned <mission-dir> [root...]   (meta paths on stdin → the ones this checkout owns)
 //   node archive.mjs refresh <out-dir> [guard.log] [mission-dir]
 //   node archive.mjs list <out-dir>
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, realpathSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, realpathSync, renameSync, rmSync } from "node:fs";
 import { join, dirname, basename, isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -35,6 +35,12 @@ const briefFields = (brief) => ({ briefId: (brief.match(/^brief-id:\s*(\S+)/m) |
   // The brief's closing "Task: mission m, ticket t, base commit c." names it; a
   // ticket's own text may cite another ("ticket 01 created it") before that line.
   ticket: (brief.match(/^Task: mission \S+, ticket (\d{2}[\w-]*)/m) || brief.match(/\bticket\s+(\d{2}[\w-]*)/i) || [])[1] || "" });
+// D155: the mission a brief is for: its closing Task line, else the first
+// .scratch/<mission>/ path it names; "" when it names none (kept, as before).
+const missionOf = (b) => ((b || "").match(/^Task: mission ([^\s,]+),/m) || (b || "").match(/\.scratch\/([\w.-]+)\//) || [])[1] || "";
+const elsewhere = (brief, missionDir) => { const m = missionOf(brief); return m && m !== basename(missionDir) ? m : ""; };
+const metaBrief = (meta) => { const stem = join(dirname(meta), basename(meta).replace(/_meta\.json$/, ""));
+  return briefOf(read(`${stem}_input.md`), () => read(`${stem}_transcript.jsonl`) ?? read(`${stem}.jsonl`)) || ""; };
 
 function outcome(missionDir, briefId, ticket) {
   const res = {};
@@ -83,10 +89,8 @@ function sessionOwned(paths, roots) {
   });
 }
 // One run's meta (path and parsed JSON) is ours by its paths or its brief id.
-function owned(meta, j, roots, recorded) {
-  const stem = join(dirname(meta), basename(meta).replace(/_meta\.json$/, ""));
-  const input = briefOf(read(`${stem}_input.md`), () => read(`${stem}_transcript.jsonl`) ?? read(`${stem}.jsonl`)) || "";
-  const { briefId: id } = briefFields(input);
+function owned(meta, j, roots, recorded, brief = metaBrief(meta)) {
+  const { briefId: id } = briefFields(brief);
   return under(meta, roots) || pathsIn(j).some((p) => under(p, roots)) || sessionOwned([meta, ...pathsIn(j)], roots)
     || (id.length >= 6 && recorded.includes(id));
 }
@@ -159,7 +163,7 @@ if (cmd === "collect") {
     .map(([date, rule, tool, input, cwd]) => ({ t: Date.parse(date), date, rule, tool, input: redact(input || ""), cwd: cwd || "" }))
     .filter((r) => !Number.isNaN(r.t));
   const metas = readFileSync(0, "utf8").split("\n").filter(Boolean);
-  let added = 0, redacted = 0, foreign = 0;
+  let added = 0, redacted = 0, foreign = 0, other = 0;
   for (const meta of metas) {
     let j; try { j = JSON.parse(readFileSync(meta, "utf8")); } catch { continue; }
     const base = basename(meta).replace(/_meta\.json$/, "");
@@ -167,7 +171,9 @@ if (cmd === "collect") {
     const runId = String(j.runId || (i > 0 ? base.slice(0, i) : base));
     const agent = String(j.agent || (i > 0 ? base.slice(i + 1) : "?")).replace(/_\d+$/, "");
     if (!agent.startsWith("factory-")) continue;
-    if (roots.length && !owned(meta, j, roots, recorded)) { foreign++; continue; }
+    const b = metaBrief(meta);
+    if (roots.length && !owned(meta, j, roots, recorded, b)) { foreign++; continue; }
+    if (elsewhere(b, missionDir)) { other++; continue; }
     const key = `${runId}_${agent}`.replace(/[^\w.-]/g, "_");
     const dest = join(out, key);
     const known = existsSync(join(dest, "run.json"));   // archived before: add what was missing, refresh the outcome
@@ -205,7 +211,7 @@ if (cmd === "collect") {
     if (next !== prev) writeFileSync(join(dest, "run.json"), next);
     if (!known) added++;
   }
-  console.log(`archive: ${added} run(s) added to ${out}${redacted ? ` (${redacted} file(s) redacted)` : ""}${foreign ? `; ${foreign} run(s) of another checkout ignored` : ""}`);
+  console.log(`archive: ${added} run(s) added to ${out}${redacted ? ` (${redacted} file(s) redacted)` : ""}${foreign ? `; ${foreign} run(s) of another checkout ignored` : ""}${other ? `; ${other} run(s) of another mission ignored` : ""}`);
 } else if (cmd === "owned") {
   // usage.sh: of the meta paths on stdin, print the ones this checkout owns (D101).
   const [missionDir, ...rootArgs] = args;
@@ -213,22 +219,38 @@ if (cmd === "collect") {
   const recorded = missionText(missionDir).join("\n");
   for (const meta of readFileSync(0, "utf8").split("\n").filter(Boolean)) {
     let j; try { j = JSON.parse(readFileSync(meta, "utf8")); } catch { continue; }
-    if (owned(meta, j, roots, recorded)) console.log(meta);
+    const b = metaBrief(meta);
+    if (owned(meta, j, roots, recorded, b) && !elsewhere(b, missionDir)) console.log(meta);
   }
 } else if (cmd === "refresh") {
   // Runs archived before their times, tool calls or refusals were read from
   // the transcript: fill what's missing from the archived transcript and
   // guard.log. Only runs lacking a field are read. A brief archived redacted
-  // is rebuilt from the archived transcript (D154).
+  // is rebuilt from the archived transcript (D154). A run whose brief names
+  // another mission moves to that mission's archive, or is dropped when it is
+  // there already (D155).
   const [out, guardLog = "", missionDir = ""] = args;
   if (!existsSync(out)) process.exit(0);
   const refusals = (read(guardLog) || "").split("\n").filter(Boolean).map((l) => l.split("\t"))
     .map(([date, rule, tool, input, cwd]) => ({ t: Date.parse(date), date, rule, tool, input: redact(input || ""), cwd: cwd || "" }))
     .filter((r) => !Number.isNaN(r.t));
-  let changed = 0;
+  let changed = 0, moved = 0;
+  const move = (d, j) => {
+    const away = missionDir ? elsewhere(read(join(out, d, "brief.md")), missionDir) : "";
+    if (!away) return false;
+    const to = join(dirname(out), away, d);
+    if (existsSync(to)) rmSync(join(out, d), { recursive: true });
+    else {
+      j.outcome = outcome(join(dirname(missionDir), away), j.briefId, j.ticket);
+      writeFileSync(join(out, d, "run.json"), JSON.stringify(j, null, 2) + "\n");
+      mkdirSync(dirname(to), { recursive: true }); renameSync(join(out, d), to);
+    }
+    moved++; return true;
+  };
   for (const d of readdirSync(out).sort()) {
     const f = join(out, d, "run.json"), prev = read(f); if (!prev) continue;
     const j = JSON.parse(prev);
+    if (move(d, j)) continue;
     if (j.start && typeof j.calls === "number" && j.durationMs && j.briefId) continue;
     const transcript = read(join(out, d, "transcript.jsonl")) || "";
     const brief = j.briefId ? null : briefIn(transcript);
@@ -244,8 +266,9 @@ if (cmd === "collect") {
     if (ts && !(j.guard || []).length) j.guard = refusalsFor(transcript, ts.start, ts.end, refusals);
     const next = JSON.stringify(j, null, 2) + "\n";
     if (next !== prev) { writeFileSync(f, next); changed++; }
+    move(d, j);   // its brief may name its mission only now, rebuilt above
   }
-  console.log(`archive: ${changed} run(s) refreshed in ${out}`);
+  console.log(`archive: ${changed} run(s) refreshed in ${out}${moved ? `; ${moved} run(s) moved to their mission` : ""}`);
 } else if (cmd === "list") {
   const [out] = args;
   if (!existsSync(out)) process.exit(0);

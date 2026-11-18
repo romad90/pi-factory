@@ -1208,6 +1208,20 @@ bash scripts/factory/archive.sh refresh demo >/dev/null
 node -e "$r7ok" "$r7" "$bid" && grep -q "^brief-id: $bid" "$r7/brief.md" \
   && t "archive refresh: a run archived with a redacted brief gets its brief, id, ticket and outcome back (D154)" || fail "archive refresh redacted" "$(cat "$r7/run.json" "$r7/brief.md" 2>&1)"
 rm -f "$work/usage/run/r7red_"*; rm -rf "$r7"
+# D155: a run of this checkout whose brief names another mission is that mission's, not this one's
+# (in the gym, 56 of error-codes-970's 79 archived runs were other missions').
+printf '{"model":"gw/maker-1","usage":{"turns":2},"durationMs":1000,"execution":{"cwd":"%s/src"}}' "$PWD" > "$work/usage/run/r6oth_factory-worker_meta.json"
+printf 'Role: factory-worker.\n\nbrief-id: 6666666666aa\n\nTask: mission other, ticket 01-x, base commit abc123.\n' > "$work/usage/run/r6oth_factory-worker_input.md"
+out="$(FACTORY_USAGE_DIRS="$work/usage" bash scripts/factory/archive.sh collect demo)"
+[ ! -e "$adir/r6oth_factory-worker" ] && grep -q '1 run(s) of another mission ignored' <<<"$out" \
+  && t "archive collect leaves out a run of this checkout whose brief names another mission (D155)" || fail "archive other mission" "$out $(ls "$adir")"
+r5="$adir/r5mov_factory-worker"; mkdir -p "$r5"
+printf '{"run":"r5mov","agent":"factory-worker","briefId":"5555555555aa","start":"2026-01-01T00:00:00.000Z","durationMs":1000,"calls":0}' > "$r5/run.json"
+printf 'Role: factory-worker.\n\nbrief-id: 5555555555aa\n\nTask: mission other, ticket 01-x, base commit abc123.\n' > "$r5/brief.md"
+out="$(bash scripts/factory/archive.sh refresh demo)"
+[ ! -e "$r5" ] && [ -f "$(dirname "$adir")/other/r5mov_factory-worker/run.json" ] && grep -q '1 run(s) moved to their mission' <<<"$out" \
+  && t "archive refresh moves a run archived under the wrong mission to its own (D155)" || fail "archive move" "$out $(ls "$adir" "$(dirname "$adir")")"
+rm -f "$work/usage/run/r6oth_"*; rm -rf "$(dirname "$adir")/other"
 # Pi's own layout: ~/.pi/agent/sessions/--<project path, / as ->--/subagent-artifacts/, the transcript beside the meta.
 enc="--$(sed 's#^/##; s#[/:]#-#g' <<<"$PWD")--"
 sd="$work/usage/sessions/$enc/subagent-artifacts"; od="$work/usage/sessions/--srv-other-project--/subagent-artifacts"; mkdir -p "$sd" "$od"
