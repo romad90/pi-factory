@@ -748,6 +748,19 @@ grep -q 'failed on the process, not the code (\*\*Cause:\*\* process): not a rou
   && [ "$(bash scripts/factory/next.sh demo 2>&1 | head -1)" = "STEP: review" ] && grep -q '`\*\*Cause:\*\* process`' <<<"$(brief_text="$(bash scripts/factory/brief.sh reviewer demo 01-hello "$c1")"; echo "$brief_text")" \
   && t "a FAIL whose reviewer wrote **Cause:** process is not a build round: the ticket goes back to review (D142)" || fail "process cause" "$out $(ls $m/verdicts $m/state)"
 rm -f $m/state/01-hello.not-run $m/state/01-hello.not-run-verdict.md $m/verdicts/01-hello-code.md
+# D158 (bind-req-dn-944): the reviewer wrote [amendment], the contract asked
+# what no code could give; two more reviews changed nothing, and the escalation
+# said "failed 3 rounds" at round 0. Now it escalates at once, says why, and
+# reset-ticket --review clears it although the verdict was set aside.
+printf '# Verdict: 01-hello\n**Result:** FAIL\n**Commit:** %s\n**Cause:** process\n\n## Assertions\n- VAL-HELLO-001: FAIL — the handler never runs\n- VAL-HELLO-002: PASS — x\n\n## Issues\n- [amendment] VAL-HELLO-001 conflicts with VAL-HELLO-002\n' "$c1" > $m/verdicts/01-hello-code.md
+out="$(bash scripts/factory/collect.sh demo)"; nx="$(bash scripts/factory/next.sh demo 2>&1)"
+grep -q 'asks to amend the contract: escalated' <<<"$out" && grep -q 'VAL-HELLO-001 conflicts' $m/state/01-hello.stuck \
+  && [ "$(head -1 <<<"$nx")" = "STEP: escalate" ] && grep -q '01-hello is stuck: the reviewer says the contract must change' <<<"$nx" && ! grep -q 'failed [0-9]* rounds' <<<"$nx" \
+  && t "a review asking to amend the contract escalates at once, and next.sh says why, not 'failed N rounds' (D158)" || fail "amendment verdict" "$out $nx"
+bash scripts/factory/reset-ticket.sh demo 01-hello --review "contract amended" >"$work/rr.log" 2>&1
+[ ! -f $m/state/01-hello.stuck ] && [ ! -f $m/state/01-hello.not-run ] && [ "$(bash scripts/factory/next.sh demo 2>&1 | head -1)" = "STEP: review" ] \
+  && t "reset-ticket --review clears a stuck ticket whose verdict was set aside (D158)" || fail "rereview stuck" "$(cat "$work/rr.log"; ls $m/state)"
+rm -f $m/state/01-hello.not-run-verdict.md
 # P25 (1): a review run that leaves no file is not a verdict: back to review once, then escalated.
 out="$(bash scripts/factory/collect.sh demo)"
 grep -q '01-hello-code.md .*no verdict file at /.*/verdicts/01-hello-code.md: the review run left none' <<<"$out" && [ ! -f $m/state/01-hello.stuck ] \
@@ -814,6 +827,8 @@ tracked="$(git ls-files -- "$m/tmp")"
   && grep -q 'tmp/review-notes.md' <<<"$tracked" && grep -q 'tmp/run.tap' <<<"$tracked" && grep -q 'tmp/facts.json' <<<"$tracked" \
   && grep -q 'tmp/t.diff' <<<"$tracked" && grep -q 'tmp/validator-1/lcov.info' <<<"$tracked" \
   && t "a checkpoint never commits a copy of the project, a node_modules or an npm cache; evidence files go in" || fail "checkpoint copies" "$tracked"
+[ ! -e "$m/tmp/cache/_cacache" ] && [ -d "$m/tmp/stray/node_modules" ] && grep -q 'Cache removed: .*tmp/cache/_cacache' "$work/ck.log" \
+  && t "a checkpoint deletes an npm cache, so it can't leave the tree dirty; a node_modules stays (D158)" || fail "checkpoint cache" "$(cat "$work/ck.log")"
 git add -f -- "$cp_dir/package.json" && git commit -q -m "chore: an older checkpoint" -- "$cp_dir/package.json"
 bash scripts/factory/checkpoint.sh demo > "$work/ck.log" 2>&1
 [ -z "$(git ls-files -- "$cp_dir")" ] && [ -f "$cp_dir/package.json" ] && t "a copy an older checkpoint committed leaves the index, never the disk" || fail "checkpoint untracks copies" "$(git ls-files -- "$cp_dir")"

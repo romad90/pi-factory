@@ -33,9 +33,13 @@ if [ "${3:-}" = "--review" ]; then
   [ -n "$why" ] || die "--review needs a reason: what changed since the review"
   [ -n "$(ticket_marker "$feature" "$ticket")" ] || die "$ticket isn't integrated: there is nothing to review again (reset-ticket.sh $feature $ticket rebuilds it)"
   v="$dir/verdicts/$ticket-code.md"
-  [ -f "$v" ] || { echo "No verdict for $ticket: next.sh already sends it to review."; exit 0; }
+  # D158: a verdict set aside as not run leaves no verdict, but its stuck
+  # marker still escalates the ticket: clear that too.
+  [ -f "$v" ] || [ -f "$dir/state/$ticket.stuck" ] || [ -f "$dir/state/$ticket.not-run" ] \
+    || { echo "No verdict for $ticket: next.sh already sends it to review."; exit 0; }
   mkdir -p "$dir/state"
-  if git ls-files --error-unmatch -- "$v" >/dev/null 2>&1; then git mv -f -- "$v" "$dir/state/$ticket.superseded-verdict.md"; else mv -f -- "$v" "$dir/state/$ticket.superseded-verdict.md"; fi
+  if [ ! -f "$v" ]; then :
+  elif git ls-files --error-unmatch -- "$v" >/dev/null 2>&1; then git mv -f -- "$v" "$dir/state/$ticket.superseded-verdict.md"; else mv -f -- "$v" "$dir/state/$ticket.superseded-verdict.md"; fi
   rm -f "$dir/state/$ticket.stuck" "$dir/state/$ticket.not-run" "$dir/state/$ticket.sent-back"
   if [ -f "$dir/state/$ticket.asked" ]; then git rm -q --ignore-unmatch -- "$dir/state/$ticket.asked"; rm -f -- "$dir/state/$ticket.asked"; fi
   q="$dir/state/open-question.md"
