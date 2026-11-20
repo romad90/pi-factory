@@ -44,6 +44,9 @@ excl=()
 for p in ${skip[@]+"${skip[@]}"}; do
   [ -z "$(GIT_INDEX_FILE="$idx" git ls-files -- ":(literal)$p" | head -1)" ] || GIT_INDEX_FILE="$idx" git rm -r -q --cached -- ":(literal)$p"
   ! git check-ignore -q -- "$p" || continue
+  # D158: an npm cache is never needed again, and left untracked it makes the
+  # tree dirty, which stops the next pre-flight and build wave (D156).
+  case "${p##*/}" in _cacache|.npm|npm-cache|.npm-cache) rm -rf -- "$p"; echo "Cache removed: $p"; continue ;; esac
   excl+=(":(exclude,literal)$p")
   echo "Copy left out of the mission state: $p (keep copies under $FACTORY_DIR/<mission>/tmp/copies/)"
 done

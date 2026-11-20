@@ -337,7 +337,12 @@ if [ ${#T_HAND[@]} -gt 0 ]; then
   step hand "human: ${T_HAND[*]} change(s) only paths reserved for people ($(for n in "${T_HAND[@]}"; do sed -n 's/^\*\*Files:\*\* //p' "$dir/state/$n.by-hand"; done | paste -sd';' - | sed 's/;/; /g')). Make the change, commit it, then ${cmds%; }."
 fi
 if [ ${#T_ESCALATE[@]} -gt 0 ]; then
-  step escalate "human: ${T_ESCALATE[*]} failed $FACTORY_ROUND_LIMIT rounds. Usually the contract or spec is wrong: consider 'workflow.sh contract' (amend)."
+  # D158: a stuck ticket didn't fail its rounds (it may be at round 0); its file says why.
+  why=""; for n in "${T_ESCALATE[@]}"; do
+    if [ -f "$dir/state/$n.stuck" ]; then why+="$n is stuck: $(head -1 "$dir/state/$n.stuck") (state/$n.stuck). "
+    else why+="$n failed $FACTORY_ROUND_LIMIT rounds. "; fi
+  done
+  step escalate "human: ${why}Usually the contract or spec is wrong: /factory-amend $feature \"<change>\", then /factory-rereview $feature <ticket> <why> for integrated code that stands."
 fi
 if [ ${#T_BLOCKED[@]} -gt 0 ]; then
   missing=""

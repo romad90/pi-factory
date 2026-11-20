@@ -103,7 +103,15 @@ for v in "$dir"/verdicts/*-code.md; do
       nr="$dir/state/$ticket.not-run"; k=$(( $(cat "$nr" 2>/dev/null || echo 0) + 1 )); echo "$k" > "$nr"
       mv "$v" "$dir/state/$ticket.not-run-verdict.md"
       if [ "$n" -gt 0 ]; then cp "${v%.md}.r$n.md" "$v"; fi
-      if [ "$k" -ge 2 ]; then
+      # D158: a reviewer's [amendment] says the contract asks what no code can
+      # give (bind-req-dn-944: a handler must run where frozen routing never
+      # calls one). Reviewing again can't change that: escalate at once.
+      amend="$(grep -E '^- \[amendment\]' "$dir/state/$ticket.not-run-verdict.md" | head -4 || true)"
+      if [ -n "$amend" ]; then
+        { printf 'the reviewer says the contract must change before any code can pass; amend it (/factory-amend), then /factory-rereview:\n%s\n' "$amend"
+          grep -E '^- [A-Z]+-[A-Z0-9-]+: FAIL' "$dir/state/$ticket.not-run-verdict.md" | head -4; } > "$dir/state/$ticket.stuck"
+        printf '  %-40s asks to amend the contract: escalated, see state/%s.stuck\n' "$(basename "$v")" "$ticket"
+      elif [ "$k" -ge 2 ]; then
         { printf 'two reviews in a row judged too little (no assertion failed, most unverified); the reviewer said:\n'
           sed -n '/^## Assertions/,/^## [^A]/p' "$dir/state/$ticket.not-run-verdict.md" | grep -E '^- ' | head -8
           grep -E '^- \[(blocking|process)\]' "$dir/state/$ticket.not-run-verdict.md" | head -4; } > "$dir/state/$ticket.stuck"
