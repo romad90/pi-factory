@@ -6,7 +6,7 @@
 //
 // Usage: node node-version.mjs [<project dir>]
 // Prints "ok|mismatch|unknown<TAB><sentence>". Exit 0, or 1 on a mismatch.
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -55,7 +55,7 @@ export function check(dir, version = process.version) {
     : ["mismatch", `Node ${version} doesn't match ${from} "${range}": tests run here prove nothing about the Node the project runs on. Use a matching Node (nvm use, or install one).`];
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   const [state, sentence] = check(process.argv[2] || ".");
   console.log(`${state}\t${sentence}`);
   process.exit(state === "mismatch" ? 1 : 0);

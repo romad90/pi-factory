@@ -57,7 +57,9 @@ case "$cmd" in
     # Runs since the mission began, not since spec.md last changed (F10, D120).
     newer=(-newer "$dir/spec.md")
     since="$(mission_since "$dir")" && newer=(-newermt "$since")
-    find "${existing[@]}" -maxdepth 7 -type f -name '*_meta.json' "${newer[@]}" 2>/dev/null \
+    # D159: on macOS find exits 1 on the protected folders under $TMPDIR;
+    # with pipefail that stopped collect before its refresh.
+    { find "${existing[@]}" -maxdepth 7 -type f -name '*_meta.json' "${newer[@]}" 2>/dev/null || true; } \
       | node "$here/archive.mjs" collect "$out" "$dir" "$(git rev-parse HEAD 2>/dev/null || echo none)" "$(dirname "$(archive_root)")/guard.log" "${owned[@]}"
     node "$here/archive.mjs" refresh "$out" "$(dirname "$(archive_root)")/guard.log" "$dir" >/dev/null
     ;;
