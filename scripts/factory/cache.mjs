@@ -11,7 +11,7 @@
 //                                               (doctor); prints nothing otherwise
 // Reads only run.json usage (input, cacheRead, cacheWrite, turns). It never
 // changes a model or a route: that is the route owner's to fix.
-import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync, statSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -76,7 +76,7 @@ export function table(models) {
 
 export const warning = (m) => `${m.model}: ${m.runs} runs, ${m.turns} turns, ${k(m.total)} input, none read from cache: every turn pays the whole conversation at the full input price (the route's caching for this model, not the factory)`;
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   const args = process.argv.slice(2), warn = args.includes("--warn");
   const root = args.find((a) => !a.startsWith("--"));
   if (!root) { console.error("usage: cache.mjs [--warn] <archive-root>"); process.exit(2); }

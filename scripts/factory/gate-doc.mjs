@@ -6,7 +6,7 @@
 //
 // Usage: node gate-doc.mjs <missions-dir> <mission>
 //   Prints JSON; exits 1 when the mission has no spec.md.
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseCritique } from "./cockpit-contract.mjs";
@@ -88,7 +88,7 @@ export function gateDoc(root, mission) {
   return { mission, contract, critique, critiqueAfterContract: ct !== null && mtime(join(dir, "contract-critique.md")) >= mtime(specFile), amendments, decisions };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   const d = gateDoc(process.argv[2] || ".scratch", process.argv[3] || "");
   if (!d) { console.error("gate-doc: no such mission (or no spec.md)"); process.exit(1); }
   process.stdout.write(JSON.stringify(d));
