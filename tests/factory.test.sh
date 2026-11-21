@@ -1236,6 +1236,14 @@ printf 'Role: factory-worker.\n\nbrief-id: 5555555555aa\n\nTask: mission other, 
 out="$(bash scripts/factory/archive.sh refresh demo)"
 [ ! -e "$r5" ] && [ -f "$(dirname "$adir")/other/r5mov_factory-worker/run.json" ] && grep -q '1 run(s) moved to their mission' <<<"$out" \
   && t "archive refresh moves a run archived under the wrong mission to its own (D155)" || fail "archive move" "$out $(ls "$adir" "$(dirname "$adir")")"
+# D159 (bind-req-dn-944): in package mode scripts/factory is a symlink, so
+# Node's import.meta.url (the real path) never equalled argv[1]: archive.mjs
+# and four other scripts ran nothing and exited 0; the mission archived 0 runs.
+ln -s "$root/scripts/factory" "$work/linked-factory"
+lrc=0; lm="$(node "$work/linked-factory/archive.mjs" 2>&1)" || lrc=$?
+raw="$(grep -l 'pathToFileURL(process.argv\[1\])' "$root"/scripts/factory/*.mjs || true)"
+[ "$lrc" = 2 ] && grep -q '^usage: archive.mjs' <<<"$lm" && [ -z "$raw" ] \
+  && t "a factory script run through the package's symlink runs its main code (D159)" || fail "symlinked main" "rc=$lrc $lm; raw compare in: $raw"
 rm -f "$work/usage/run/r6oth_"*; rm -rf "$(dirname "$adir")/other"
 # Pi's own layout: ~/.pi/agent/sessions/--<project path, / as ->--/subagent-artifacts/, the transcript beside the meta.
 enc="--$(sed 's#^/##; s#[/:]#-#g' <<<"$PWD")--"

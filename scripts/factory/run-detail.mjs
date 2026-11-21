@@ -7,7 +7,7 @@
 // Usage: node run-detail.mjs <archive-root> <mission> <run-folder>
 //   <run-folder>: the archive folder's name (<run>_<agent>), as the snapshot's
 //   timeline gives it (missions[].timeline[].dir).
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { parseRecord } from "./redact.mjs";
 import { pathToFileURL } from "node:url";
@@ -83,7 +83,7 @@ export function runDetail(dir) {
 }
 
 // A path with spaces is percent-encoded in import.meta.url: compare URLs.
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   const [root, mission, run] = process.argv.slice(2);
   if (!root || !SAFE.test(mission || "") || !SAFE.test(run || "")) { console.error("usage: run-detail.mjs <archive-root> <mission> <run-folder>"); process.exit(2); }
   const dir = join(root, mission, run);

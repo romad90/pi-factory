@@ -152,7 +152,7 @@ export function toolCalls(text) {
 }
 
 // Imported (tests, other scripts): the helpers only, no command runs.
-const isMain = !!process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+const isMain = !!process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href;
 const [cmd, ...args] = isMain ? process.argv.slice(2) : ["(imported)"];
 if (cmd === "collect") {
   const [out, missionDir, head, guardLog = "", ...rootArgs] = args;
