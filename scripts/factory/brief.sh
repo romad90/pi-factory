@@ -30,7 +30,19 @@ if [ "$role" = ticket-writer ]; then
   case "$ticket" in
     all)          task="Task: write the mission's tickets from the approved contract (none exist yet)." ;;
     fix-behavior) task="Task: write one fix ticket per finding in .scratch/$feature/verdicts/behavior.md (named NN-fix-<slug>.md, numbered after the last ticket)." ;;
-    fix-health)   task="Task: write one fix ticket per finding in .scratch/$feature/verdicts/health.md and in .scratch/$feature/health/report.md (named NN-fix-<slug>.md, numbered after the last ticket)." ;;
+    fix-health)
+      # E70: name only the files that hold findings. The ratchet fails before
+      # the steward has judged the current code, so verdicts/health.md may not
+      # exist yet, or be a PASS on older code: neither has a finding to ticket.
+      hd="$(mission_dir "$feature")"; hv="$hd/verdicts/health.md"; src=""
+      if [ -f "$hv" ] && { [ "$(verdict_field "$hv" Result)" != PASS ] || code_verdict_is_fresh "$(verdict_field "$hv" Commit)"; }; then
+        src=".scratch/$feature/verdicts/health.md"
+      fi
+      if [ -f "$hd/health/report.md" ] && [ "$(verdict_field "$hd/health/report.md" Result)" != PASS ]; then
+        src="${src:+$src and in }.scratch/$feature/health/report.md"
+      fi
+      [ -n "$src" ] || die "no health finding to ticket: neither a steward verdict nor a failing health report in $hd"
+      task="Task: write one fix ticket per finding in $src (named NN-fix-<slug>.md, numbered after the last ticket)." ;;
     *) die "ticket-writer task must be all, fix-behavior or fix-health" ;;
   esac
 fi
