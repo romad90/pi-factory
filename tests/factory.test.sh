@@ -1336,7 +1336,19 @@ grep -q 'duplicate_blocks | 0 | [1-9]' $m/health/report.md && t "ratchet fails o
 bash scripts/factory/checkpoint.sh demo >/dev/null
 expect_step health-fix "failing health report asks for fix tickets"
 bash scripts/factory/workflow.sh tickets demo fix-health >"$work/wf.log"
-grep -q 'fix ticket per finding in .scratch/demo/verdicts/health.md' "$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")" && t "fix-health tickets drafted by the ticket writer" || fail "fix-health wave"
+# E70: the ratchet fails before the steward has judged this code: its verdict is
+# missing (bind-req-dn-944's ticket writer was sent to read it and reported it
+# missing) or, as here, a PASS on older code. Neither holds a finding.
+wf="$(sed -n 's/^WORKFLOW_FILE: //p' "$work/wf.log")"
+grep -q 'fix ticket per finding in .scratch/demo/health/report.md' "$wf" && ! grep -q 'verdicts/health.md' "$wf" \
+  && t "fix-health tickets drafted by the ticket writer, from the health report only while the steward has no verdict (E70)" || fail "fix-health wave" "$(grep -o 'Task: write one fix[^.]*\.[^(]*' "$wf")"
+cp $m/verdicts/health.md "$work/health.keep"; rm $m/verdicts/health.md
+b1="$(bash scripts/factory/brief.sh ticket-writer demo fix-health 2>&1)"
+sed 's/^\*\*Result:\*\* PASS/**Result:** FAIL/' "$work/health.keep" > $m/verdicts/health.md
+b2="$(bash scripts/factory/brief.sh ticket-writer demo fix-health 2>&1)"; cp "$work/health.keep" $m/verdicts/health.md
+grep -q 'per finding in .scratch/demo/health/report.md (' <<<"$b1" && grep -q 'per finding in .scratch/demo/verdicts/health.md and in .scratch/demo/health/report.md' <<<"$b2" \
+  && t "fix-health brief: no steward verdict names the report alone; a failing verdict is named with it (E70)" || fail "fix-health sources" "$b1
+$b2"
 # E38: a health-fix ticket covers the quality-bar item its finding names
 # (ticket-format.md); G2 read only VAL- IDs and refused every one of them.
 printf '# 09-fix-dup\n**Size:** S\n\n## Covers\nQB-CLEAR-01\n\n## Blocked by\nNone.\n' > $m/issues/09-fix-dup.md
