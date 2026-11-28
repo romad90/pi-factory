@@ -10,7 +10,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
-import { cacheShare, cacheByModel, modelOf, scanArchive } from "../scripts/factory/cache.mjs";
+import { cacheShare, cacheByModel, modelOf, scanArchive, warning } from "../scripts/factory/cache.mjs";
 
 const root = mkdtempSync(join(tmpdir(), "factory-cache-"));
 after(() => rmSync(root, { recursive: true, force: true }));
@@ -79,4 +79,10 @@ test("tokens.mjs: each run's cache share, and the share per model", () => {
   const j = JSON.parse(execFileSync("node", ["scripts/factory/tokens.mjs", join(root, "m2"), "--json"], { encoding: "utf8" }));
   assert.equal(j.runs.find((r) => r.run === "a5").cacheShare, 0.97);
   assert.ok(Array.isArray(j.models) && j.models.length === 4);
+});
+
+test("the warning for a Claude model names Pi's cache setting; for another model it doesn't (batch 2026-11-28)", () => {
+  const m = { runs: 11, turns: 250, total: 4321132 };
+  assert.match(warning({ ...m, model: "or/anthropic/claude-big" }), /none read from cache.*"cacheControlFormat": "anthropic".*models\.json/);
+  assert.doesNotMatch(warning({ ...m, model: "gw/vendor-a/big-1" }), /cacheControlFormat/);
 });
