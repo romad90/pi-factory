@@ -1094,6 +1094,7 @@ test_on_base() (
       base="$(git rev-parse "$c^")"; fixround=1; break
     done < <(ticket_commits "$feature" "$ticket" HEAD)
   fi
+  ticketbase="$base"
   # D124: the packages installed now were changed by hand after the base: the
   # base's tests can't run with them (deps-node-22: tap 21 rejects tap 16 options).
   if dc="$(deps_commits "$feature" "$base" | head -1)" && [ -n "$dc" ]; then
@@ -1115,6 +1116,18 @@ test_on_base() (
     for d in "$f" "$n"; do [ -n "$d" ] && is_test_file "$d" && printf '%s\n' "$d"; done
   done < <(node "$FACTORY_SCRIPTS/patch-paths.mjs" list "$patch") | sort -u > "$tmp/tests"
   if [ ! -s "$tmp/tests" ]; then echo "test on base: the change has no test files"; exit 0; fi
+  # D161: a tests-only ticket in a feature or bugfix mission tests the change
+  # other tickets made: its tests run on the code before the mission's first
+  # integration (event-routing-945: ticket 02 came after ticket 01's fix).
+  if [ "$want" = fail ] && [ -z "$fixround" ] && [ "$ticketbase" = HEAD ] && [ -z "${5:-}" ]; then
+    other=""
+    while IFS=$'\x1f' read -r _ f n _; do
+      for d in "$f" "$n"; do [ -n "$d" ] && [ "$d" != /dev/null ] && ! is_test_file "$d" && other=1; done
+    done < <(node "$FACTORY_SCRIPTS/patch-paths.mjs" list "$patch")
+    if [ -z "$other" ] && first="$(git log --reverse --format=%H --grep='^Factory-Script: integrate$' "$(mission_base "$feature")..HEAD" | head -1)" && [ -n "$first" ]; then
+      base="$(git rev-parse "$first^")"; fixround=1
+    fi
+  fi
   node "$FACTORY_SCRIPTS/patch-paths.mjs" keep "$patch" "$tmp/tests.patch" "$tmp/tests"
   top="$(git rev-parse --show-toplevel)"; prefix="$(project_prefix)"
   dirarg=(); rel=(); [ -z "$prefix" ] || { dirarg=(--directory="$prefix"); rel=(--relative="$prefix/"); }

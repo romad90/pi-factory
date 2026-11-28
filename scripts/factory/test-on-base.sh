@@ -5,7 +5,9 @@
 #
 # Usage: scripts/factory/test-on-base.sh <mission> <ticket> <patch> [base]
 #   patch: project-relative, as integration sees it; base: default HEAD, or
-#   for a fix round the commit before the ticket's first integration (D148).
+#   for a fix round the commit before the ticket's first integration (D148),
+#   for a tests-only ticket in a feature or bugfix mission the commit before
+#   the mission's first integration (D161).
 # Exit: 0 as expected or not checked (the line says which), 1 mismatch
 # (the reason on stdout), 2 error or inconclusive (the tests don't apply on
 # the base, no temporary worktree, the test command can't start, the base is

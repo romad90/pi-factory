@@ -1905,6 +1905,14 @@ tob_rc tob-bugfix 01-a "$work/tob-r2pins.patch"
 [ "${r2%% *}" = 0 ] && grep -q 'as expected (fails before the change)' <<<"$r2" && [ "${r2head%% *}" = 1 ] && [ "$rc" = 1 ] \
   && grep -q "pass on the code before the change" <<<"$out" && [ -z "$(git status --porcelain --untracked-files=no)" ] \
   && t "test on base: a tests-only fix round runs on the code before the ticket's first round, where HEAD already has its fix (D148)" || fail "tob fix round" "$r2 / $r2head / $rc $out"
+# event-routing-945: ticket 02 was tests-only, written after ticket 01's fix was integrated; on HEAD its tests pass.
+printf 'diff --git a/tests/tob/more.check b/tests/tob/more.check\nnew file mode 100644\n--- /dev/null\n+++ b/tests/tob/more.check\n@@ -0,0 +1 @@\n+grep -qx 2 src/tob/value.txt\n' > "$work/tob-t2.patch"
+printf 'diff --git a/tests/tob/more.check b/tests/tob/more.check\nnew file mode 100644\n--- /dev/null\n+++ b/tests/tob/more.check\n@@ -0,0 +1 @@\n+test -s src/tob/value.txt\n' > "$work/tob-t2pins.patch"
+tob_rc tob-bugfix 02-c "$work/tob-t2.patch"; t2="$rc $out"
+tob_rc tob-bugfix 02-c "$work/tob-t2pins.patch"
+[ "${t2%% *}" = 0 ] && grep -q 'as expected (fails before the change)' <<<"$t2" && [ "$rc" = 1 ] \
+  && grep -q "pass on the code before the change" <<<"$out" && [ -z "$(git status --porcelain --untracked-files=no)" ] \
+  && t "test on base: a tests-only ticket after another ticket's fix runs on the code before the mission's first integration (event-routing-945)" || fail "tob tests-only ticket" "$t2 / $rc $out"
 git reset -q --hard "$tobbase"
 printf 'diff --git a/tests/tob/zz.check b/tests/tob/zz.check\n--- a/tests/tob/zz.check\n+++ b/tests/tob/zz.check\n@@ -1 +1 @@\n-nothing here\n+grep -qx 2 src/tob/value.txt\n' > "$work/tob-noapply.patch"
 tob_rc tob-feature 01-a "$work/tob-noapply.patch" "$tobbase"
