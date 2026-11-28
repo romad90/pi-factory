@@ -261,9 +261,15 @@ while :; do
   nxt="$(bash "$here/next.sh" "$feature")" || stop 2 "next.sh failed: $nxt"
   step="$(sed -n '1s/^STEP: //p' <<<"$nxt")"
   # Watchdog: the same state twice in a row means the last action changed nothing.
-  [ "$nxt" != "$last" ] || stop 2 "no progress at STEP: $step (the last action changed nothing)
+  # The state is next.sh's text and the mission's state files: a review set
+  # aside (process failure, no verdict, bad format) leaves the same STEP: review
+  # with a new marker in state/, and is run again; collect.sh escalates the
+  # second one in a row, so this can't loop (3 of 5 missions, batch 2026-11-28).
+  now="$nxt
+$(sd="$(mission_dir "$feature")/state"; find "$sd" -type f 2>/dev/null | sort; cat "$sd"/*.not-run 2>/dev/null || true)"
+  [ "$now" != "$last" ] || stop 2 "no progress at STEP: $step (the last action changed nothing)
 $nxt"
-  last="$nxt"
+  last="$now"
   say "step $steps: $step"
   case "$step" in
     paused)

@@ -2032,6 +2032,9 @@ case "$wf" in
     if [ ! -f "$FAKE_STATE.429" ]; then touch "$FAKE_STATE.429"; echo '[{"ticket":"01-run","patch":null,"ok":false,"error":"429 Too Many Requests: rate limit"}]'
     else echo "[{\"ticket\":\"01-run\",\"patch\":\"$FAKE_PATCH\",\"ok\":true}]"; fi ;;
   *-review-wave*.js)
+    if [ ! -f "$FAKE_STATE.proc" ]; then touch "$FAKE_STATE.proc"
+      printf '# Verdict: 01-run\n**Result:** FAIL\n**Commit:** %s\n**Brief:** %s\n**Cause:** process\n\n## Assertions\n- VAL-RUN-001: UNVERIFIED — the guard refused the test command\n\n## Issues\n- [process] no test ran\n' "$(ticket_marker runner 01-run)" "$(bid 01-run)" > $r/verdicts/01-run-code.md
+      echo '[{"ticket":"01-run","output":"FAIL"}]'; exit 0; fi
     printf '# Verdict: 01-run\n**Result:** PASS\n**Commit:** %s\n**Brief:** %s\n\n## Assertions\n- VAL-RUN-001: PASS — tests/run.test.js "runs"\n' "$(ticket_marker runner 01-run)" "$(bid 01-run)" > $r/verdicts/01-run-code.md
     echo '[{"ticket":"01-run","output":"PASS"}]' ;;
   *-validate*.js)
@@ -2060,6 +2063,8 @@ out="$(FACTORY_RUNNER=fake FACTORY_FAKE_RUNNER="$work/bin/fakerun" bash scripts/
 echo "$out" | grep -q '^STEP: pr' && echo "$out" | grep -q 'WAITING: human (pr)' && [ -f tests/run.test.js ] \
   && grep -q 'review-wave' "$FAKE_LOG" && grep -q 'validate' "$FAKE_LOG" && grep -q 'steward' "$FAKE_LOG" \
   && t "run.sh: resumes, builds, integrates, reviews, validates, checks health and stewards up to the MR, unattended" || fail "run.sh to pr" "$out"
+[ "$(grep -c 'review-wave' "$FAKE_LOG")" = 2 ] && echo "$out" | grep -q 'failed on the process, not the code' && ! echo "$out" | grep -q 'no progress' \
+  && t "run.sh: a review set aside as a process failure is run again, not stopped as 'no progress' (batch 2026-11-28)" || fail "run.sh review again" "$out"
 runlogs="$(git rev-parse --path-format=absolute --git-common-dir)/pi-factory/runs/runner"
 ! compgen -G "$r/logs/*.jsonl" >/dev/null && ! compgen -G "$r/logs/*.result.json" >/dev/null && [ -z "$(git ls-files $r | grep -E 'jsonl|result\.json|\.err$')" ] && ls "$runlogs"/*-contract.jsonl >/dev/null 2>&1 && ls "$runlogs"/*-review-wave.result.json >/dev/null 2>&1 \
   && t "run.sh keeps raw runner output in the git folder, never in the committed mission folder" || fail "run logs" "$(ls -R $r "$runlogs" 2>&1 | head -40)"
