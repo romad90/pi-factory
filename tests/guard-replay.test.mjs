@@ -69,6 +69,12 @@ test("replay: the fixes let nothing dangerous through", () => {
   for (const cmd of ['echo x > "$PWD/notes.md"', 'D="$PWD/.."; echo x > "$D/notes.md"', 'export TMPDIR="$PWD/src"; echo x > "$TMPDIR/a.js"'])
     assert.ok(bash(cmd), `should block: ${cmd}`);
   assert.equal(bash('echo x > "${PWD}/.scratch/m/tmp/a.log"'), null);
+  // E74, E75: mktemp's folder is its template's or -p's, and a cd to a variable
+  // the command set goes to its value; neither makes an outside write look inside.
+  for (const cmd of ['R=$(mktemp -d src/x-XXXX); echo x > "$R/../a.js"', 'R=$(mktemp -d -p "$PWD" x-XXXX); echo x > "$R/a"',
+    'R=$(pwd); echo x > "$R/a.js"', 'c="$PWD/src"; cd "$c" && echo x > a.js', 'c="$PWD/.scratch/m/tmp"; cd "$c" && echo x > ../../../a.js'])
+    assert.ok(bash(cmd), `should block: ${cmd}`);
+  assert.equal(bash('R=$(mktemp -d "$PWD/.scratch/m/tmp/x-XXXX"); echo x > "$R/a"'), null);
   // E60: the validator's raw results go to instrument/results/ (git-ignored),
   // and nowhere else in instrument/ or the tree; a worker never reaches it.
   for (const cmd of ["echo x > instrument/scenarios/a.yaml", "echo x > instrument/results/../../src/a.js",

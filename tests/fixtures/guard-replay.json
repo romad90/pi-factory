@@ -209,5 +209,32 @@
   "input": {
    "command": "RES_DIR=\"{root}/instrument/results/m/round-1\"\nBASE_DIR=\"{root}/.scratch/m/tmp/copies/validator-c5aeff34-base\"\nFIXED_DIR=\"{root}/.scratch/m/tmp/copies/validator-c5aeff34-fixed\"\nmkdir -p \"$RES_DIR\"\nnode .scratch/m/tmp/validator-c5aeff34-probe.cjs \"$BASE_DIR\" \"$FIXED_DIR\" > \"$RES_DIR/results.json\""
   }
+ },
+ {
+  "id": "E74",
+  "context": "judge",
+  "tool": "bash",
+  "input": {
+   "command": "set -e\nTMP=\"$PWD/.scratch/m/tmp\"\nRUN=$(mktemp -d \"$TMP/copies/review-02-a721544eab5f-XXXXXX\")\nmkdir \"$RUN/reviewed\" \"$RUN/base\" \"$RUN/mutation\"\ngit archive 3ff7e3a33ca446616fe6f2793f4350bf412178c3 | tar -x -C \"$RUN/reviewed\"\ngit archive 211d6e748cb44d92763b186d1b584fe1d32c218c | tar -x -C \"$RUN/base\"\ngit archive 3ff7e3a33ca446616fe6f2793f4350bf412178c3 | tar -x -C \"$RUN/mutation\"\nfor copy in reviewed base mutation; do ln -s \"$PWD/node_modules\" \"$RUN/$copy/node_modules\"; done\nprintf '%s\\n' \"$RUN\" > \"$TMP/review-02-a721544eab5f.path\"\nshasum lib/a.js > \"$RUN/checkout-lib-before.sha\"\nprintf 'Copies: %s\\n' \"$RUN\"\ngrep -n -A 48 -B 4 'throws' node_modules/x/README.md | head -100\n",
+   "timeout": 120
+  }
+ },
+ {
+  "id": "E75",
+  "context": "judge",
+  "tool": "bash",
+  "input": {
+   "command": "set -e\ncopy=\"$PWD/.scratch/m/tmp/copies/review-base\"\nmkdir -p \"$copy\"\ngit archive 211d6e7 | tar -xf - -C \"$copy\"\ncp test/a.test.js \"$copy/test/a.test.js\"\nln -s \"$PWD/node_modules\" \"$copy/node_modules\"\nCOPY=\"$copy\" node <<'NODE'\nconst fs = require('node:fs')\nconst file = process.env.COPY + '/examples/a.js'\nconst before = fs.readFileSync(file, 'utf8')\nfs.writeFileSync(file, before.replace('listen(1389', 'listen(process.env.PORT || 1389'))\nNODE\ncd \"$copy\"\nset +e\nnode_modules/.bin/tap --disable-coverage --timeout=15 -R tap test/a.test.js > ../../review-base.log 2>&1\nresult=$?\ncat ../../review-base.log\nexit \"$result\"",
+   "timeout": 45
+  }
+ },
+ {
+  "id": "E75",
+  "context": "judge",
+  "tool": "bash",
+  "input": {
+   "command": "set -eu\nbase_dir=\"$PWD/.scratch/m/tmp/copies/review-02-base-211d6e7\"\nmkdir -p \"$base_dir\"\ngit archive 211d6e748cb44d92763b186d1b584fe1d32c218c | tar -x -C \"$base_dir\"\nln -s \"$PWD/node_modules\" \"$base_dir/node_modules\"\ncd \"$base_dir\"\nnpm test > ../../review-02/base-tests.log 2>&1; result=$?; tail -n 80 ../../review-02/base-tests.log; exit \"$result\"",
+   "timeout": 180
+  }
  }
 ]
