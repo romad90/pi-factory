@@ -74,7 +74,13 @@ export function table(models) {
   return lines;
 }
 
-export const warning = (m) => `${m.model}: ${m.runs} runs, ${m.turns} turns, ${k(m.total)} input, none read from cache: every turn pays the whole conversation at the full input price (the route's caching for this model, not the factory)`;
+// Batch 2026-11-28: $21.70 of a $33.96 batch was one Claude model reached
+// through a custom OpenAI-compatible provider. Pi sends Anthropic's cache
+// markers on its own only for the provider named "openrouter"; any other
+// needs the model's compat setting. The warning names that setting.
+const CLAUDE_HINT = `. For a Claude model behind an OpenAI-compatible provider, set "compat": {"cacheControlFormat": "anthropic"} on the model in ~/.pi/agent/models.json`;
+export const warning = (m) => `${m.model}: ${m.runs} runs, ${m.turns} turns, ${k(m.total)} input, none read from cache: every turn pays the whole conversation at the full input price (the route's caching for this model, not the factory)`
+  + (/anthropic|claude/i.test(m.model) ? CLAUDE_HINT : "");
 
 if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   const args = process.argv.slice(2), warn = args.includes("--warn");
