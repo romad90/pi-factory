@@ -248,16 +248,33 @@ export function stripHeredocs(cmd) {
 // refused.
 // E39: $PWD is the working folder, and a variable set from another one
 // (TMPDIR="$PWD/.scratch/m/tmp") is expanded where it is set.
+// E74: mktemp makes its file or folder where its template or -p names
+// (`RUN=$(mktemp -d "$TMP/copies/x-XXXXXX")` is under $TMP), else in the temp
+// folder. E75: a cd to a variable the command set is a cd to its value
+// (`cd "$copy" && npm test > ../../x.log`). Another $(...) stays unknown.
 export function resolveTargets(cmd, cwd = process.cwd()) {
   const vars = { TMPDIR: tmpdir(), PWD: cwd };
-  const expand = (t) => t.replace(/\$\(mktemp\b[^)]*\)/g, join(tmpdir(), "mktemp"))
-    .replace(/\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?/g, (all, n) => (Object.hasOwn(vars, n) ? vars[n] : all));
-  for (const m of String(cmd).matchAll(/(?:^|[;&|\n(]|\s)([A-Za-z_][A-Za-z0-9_]*)=(?:"([^"]*)"|'([^']*)'|([^\s;&|'"()]+))/g)) {
-    vars[m[1]] = m[3] ?? expand(m[2] ?? m[4] ?? "");
+  const sub = (t) => t.replace(/\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?/g, (all, n) => (Object.hasOwn(vars, n) ? vars[n] : all));
+  const mktemp = (args) => {
+    const words = [...args.matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g)].map((w) => w[1] ?? w[2] ?? w[3]);
+    let dir = null, template = null;
+    for (let i = 0; i < words.length; i++) {
+      const w = words[i];
+      if (w === "-p" || w === "--tmpdir") dir = words[++i] ?? null;
+      else if (/^--tmpdir=/.test(w)) dir = w.slice(9);
+      else if (/^-p./.test(w)) dir = w.slice(2);
+      else if (!w.startsWith("-")) template = w;
+    }
+    if (template && template.includes("/")) return join(dir ? sub(dir) : "", dirname(sub(template)), "mktemp");
+    return join(dir ? sub(dir) : tmpdir(), "mktemp");
+  };
+  const expand = (t) => sub(t.replace(/\$\(mktemp\b([^)]*)\)/g, (all, args) => mktemp(args)));
+  for (const m of String(cmd).matchAll(/(?:^|[;&|\n(]|\s)([A-Za-z_][A-Za-z0-9_]*)=(?:"([^"]*)"|'([^']*)'|(\$\(mktemp\b[^()]*\))|([^\s;&|'"()]+))/g)) {
+    vars[m[1]] = m[3] ?? expand(m[2] ?? m[4] ?? m[5] ?? "");
   }
   return String(cmd)
-    .replace(/(\d?(?:>>?|>\|)\s*|\btee\s+(?:-a\s+)?)(["'])([^"'\n]*)\2/g, (all, op, _q, t) => (/\s/.test(t) ? all : op + expand(t)))
-    .replace(/(\d?(?:>>?|>\|)\s*|\btee\s+(?:-a\s+)?)(\$[^\s;&|<>]+)/g, (all, op, t) => op + expand(t));
+    .replace(/(\d?(?:>>?|>\|)\s*|\btee\s+(?:-a\s+)?|(?:^|[;&|\n(]\s*)(?:cd|pushd)\s+)(["'])([^"'\n]*)\2/g, (all, op, _q, t) => (/\s/.test(t) ? all : op + expand(t)))
+    .replace(/(\d?(?:>>?|>\|)\s*|\btee\s+(?:-a\s+)?|(?:^|[;&|\n(]\s*)(?:cd|pushd)\s+)(\$[^\s;&|<>]+)/g, (all, op, t) => op + expand(t));
 }
 
 export function strayWrite(n, cwd, root) {
